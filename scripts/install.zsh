@@ -80,7 +80,7 @@ else
   zsh ./scripts/check_zshrc.zsh
 
   print ""
-  print " then run: help"
+  print " now restart your terminal then run: help"
   print ""
   
   popd 1>/dev/null || exit

@@ -17,13 +17,13 @@
   "scripts": {
     "check_zshrc": "zsh ./scripts/check_zshrc.zsh",
     "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
-    "install": "zsh ./scripts/install.zsh",
     "install_deps": "bash ./scripts/install_deps.sh",
+    "install_pump": "zsh ./scripts/install.zsh",
     "update": "zsh ./scripts/npm_update.zsh",
     "update_config": "zsh ./scripts/update_config.zsh",
     "watch": "npm-watch"
   },
-  "version": "0.0.1",
+  "version": "0.0.2",
   "watch": {
     "update": "lib/*.*"
   }

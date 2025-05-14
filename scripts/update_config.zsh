@@ -138,4 +138,4 @@ done
 # Write new merged content
 printf "%s\n" "${new_lines[@]}" > "$DEST_CONFIG"
 
-echo " config synced."
+# print " config synced."

@@ -34,7 +34,7 @@ else
   zsh ./scripts/check_zshrc.zsh
 
   print ""
-  print " then run: help"
+  print " now restart your terminal then run:\e[93m help \e[0m"
   print ""
   
   popd 1>/dev/null || exit

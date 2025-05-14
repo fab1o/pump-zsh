@@ -24,4 +24,4 @@ echo "$VERSION" > "$DEST_DIR"/.version
 #   cp "$SRC_CONFIG" "$DEST_CONFIG"
 # fi
 
-# print " pump in version $VERSION! Now restart your terminal"
+print " pump in version $VERSION!"
