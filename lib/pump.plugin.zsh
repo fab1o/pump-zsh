@@ -4378,7 +4378,8 @@ function glog() {
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog ${solid_yellow_cor}[n]${reset_cor} : to log last commits limit by n"
+    print "  ${yellow_cor}glog${reset_cor} : to log last 15 commits"
+    print "  ${yellow_cor}glog ${solid_yellow_cor}-n${reset_cor} : to log last n commits"
     return 0;
   fi
 
@@ -4386,16 +4387,7 @@ function glog() {
 
   if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
 
-  local x=${1:-16}
-
-  if [[ "$x" =~ ^-?[0-9]+$ ]]; then
-    x=${x#-}
-  else
-    x=15
-  fi
-
-  print ""
-  git --no-pager log main HEAD --decorate --oneline --graph --date=relative -n ${x} $@
+  git --no-pager log main HEAD --decorate --oneline --graph --date=relative $@
   RET=$?
 
   cd "$_pwd"
