@@ -5544,8 +5544,6 @@ function rebase() {
   git fetch origin --quiet
   RET=$?
 
-  print " rebase on branch${pink_cor} $rebase_branch ${reset_cor}"
-
   if [[ -n "$1" && $1 != -* ]]; then
     git rebase origin/"$rebase_branch" ${@:2}
     RET=$?
@@ -5593,8 +5591,6 @@ function merge() {
 
   git fetch origin --quiet
   RET=$?
-
-  print " merge from branch${pink_cor} $merge_branch ${reset_cor}"
 
   if [[ -n "$1" && $1 != -* ]]; then
     git merge origin/"$merge_branch" --no-edit ${@:2}
