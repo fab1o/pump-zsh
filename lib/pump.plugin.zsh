@@ -106,13 +106,13 @@ function parse_flags_() {
 
         if [[ -n "$valid_flags" ]]; then
           if [[ $valid_flags != *$ch* ]]; then
-            flags+=("$ch")
+            flags+=("-$ch")
             is_invalid=1
             print "${red_cor} ${prefix%_} invalid option: -$ch${reset_cor}" >&2
             echo "${prefix}is_h=1"
           fi
         else
-          flags+=("$ch")
+          flags+=("-$ch")
         fi
 
         if [[ "$ch" == "d" || "$is_debug" -eq 1 ]]; then
@@ -590,13 +590,15 @@ function update_setting_() {
   if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then return 1; fi
 
   local i="$1"
-  local general_key="$2"
+  local general_key="$2" 
   local value="$3"
+
+  if [[ $i -eq 0 || "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+    eval "CURRENT_${general_key}=\"$value\""
+  fi
 
   if (( i > 0 )); then
     eval "${general_key}[$i]=\"$value\""
-  else
-    eval "CURRENT_${general_key}=\"$value\""
   fi
 
   local key="${general_key}_${i}"
@@ -1653,12 +1655,20 @@ function print_current_proj_() {
   print "${solid_magenta_cor} PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}"
   print "${solid_magenta_cor} PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}"
   print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
-  print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
-  print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
   print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
   print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
+  print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
+  print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
+  print "${solid_magenta_cor} PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}"
+  print "${solid_magenta_cor} PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}"
+  print "${solid_magenta_cor} PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}"
+  print "${solid_magenta_cor} PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}"
+  print "${solid_magenta_cor} PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}"
+  print "${solid_magenta_cor} PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}"
   print "${solid_magenta_cor} PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}"
-  print "${solid_magenta_cor} PPUMP_GHA_WORKFLOW_$i=${reset_cor}\"${PUMP_GHA_WORKFLOW[$i]}\""
+  print "${solid_magenta_cor} PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}"
+  print "${solid_magenta_cor} PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}"
+  print "${solid_magenta_cor} PUMP_GHA_WORKFLOW_$i=${reset_cor}\"${PUMP_GHA_WORKFLOW[$i]}\""
   display_line_ "" "$dark_gray_cor"
   print "${pink_cor} CURRENT_PUMP_PROJECT_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJECT_SHORT_NAME"
   print "${pink_cor} CURRENT_PUMP_PROJECT_FOLDER=${reset_cor}$CURRENT_PUMP_PROJECT_FOLDER"
@@ -1673,12 +1683,20 @@ function print_current_proj_() {
   print "${pink_cor} CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO"
   print "${pink_cor} CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR"
   print "${pink_cor} CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV"
-  print "${pink_cor} CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E"
-  print "${pink_cor} CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI"
   print "${pink_cor} CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST"
   print "${pink_cor} CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH"
-  print "${pink_cor} CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}${CURRENT_PUMP_DEFAULT_BRANCH}"
-  print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}\"${CURRENT_PUMP_GHA_WORKFLOW}\""
+  print "${pink_cor} CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E"
+  print "${pink_cor} CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI"
+  print "${pink_cor} CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE"
+  print "${pink_cor} CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE"
+  print "${pink_cor} CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND"
+  print "${pink_cor} CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST"
+  print "${pink_cor} CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD"
+  print "${pink_cor} CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX"
+  print "${pink_cor} CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH"
+  print "${pink_cor} CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README"
+  print "${pink_cor} CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL"
+  print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}\"$CURRENT_PUMP_GHA_WORKFLOW\""
 }
 
 function which_pro_index_pwd_() {
@@ -2672,18 +2690,20 @@ function refix() {
     return 0;
   fi
 
-  if confirm_from_ "fix done, push now?"; then
-    if confirm_from_ "save this preference and don't ask again?"; then
-      local i=0
-      for i in {1..9}; do
-        if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-          update_setting_ $i "PUMP_PUSH_ON_REFIX" 1
-          break
-        fi
-      done
+  if [[ -z "$CURRENT_PUMP_PUSH_ON_REFIX" ]]; then
+    if confirm_from_ "fix done, push now?"; then
+      if confirm_from_ "save this preference and don't ask again?"; then
+        local i=0
+        for i in {1..9}; do
+          if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+            update_setting_ $i "PUMP_PUSH_ON_REFIX" 1
+            break
+          fi
+        done
+      fi
+    else
+      return 0;
     fi
-  else
-    return 0;
   fi
 
   pushf $@
@@ -4445,8 +4465,7 @@ function push() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git log "origin/$my_branch@{1}..origin/$my_branch" --format='%H %s' | xargs -0
-      #git --no-pager log -1 --pretty=format:'%H %s' | xargs -0
+      git --no-pager log "origin/${my_branch}@{1}..origin/${my_branch}" --decorate --oneline
       git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
@@ -4495,8 +4514,7 @@ function pushf() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git log "origin/$my_branch@{1}..origin/$my_branch" --format='%H %s' | xargs -0
-      #git --no-pager log -1 --pretty=format:'%H %s' | xargs -0
+      git --no-pager log "origin/${my_branch}@{1}..origin/${my_branch}" --decorate --oneline
       git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
@@ -5461,7 +5479,7 @@ function stage() {
 }
 
 function rebase() {
-  eval "$(parse_flags_ "rebase_" "" "$@")"
+  eval "$(parse_flags_ "rebase_" "p" "$@")"
   (( rebase_is_d )) && set -x
 
   if (( rebase_is_h )); then
@@ -5503,7 +5521,7 @@ function rebase() {
   fi
 
   if (( RET == 0 && rebase_is_p )); then
-    git push --force-with-lease --no-verify --set-upstream origin "$my_branch"
+    pushf
     RET=$?
   fi
 
@@ -5552,7 +5570,7 @@ function merge() {
   fi
 
   if (( RET == 0 && merge_is_p )); then
-    git push --no-verify --set-upstream origin "$my_branch"
+    push
     RET=$?
   fi
 
