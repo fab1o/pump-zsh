@@ -5,6 +5,37 @@ typeset -Ag ll_next ll_prev
 typeset -gi node_counter=0
 typeset -g head=""
 
+typeset -g dark_gray_cor="\e[38;5;238m"
+typeset -g gray_cor="\e[38;5;252m"
+
+typeset -g bright_green_cor="\e[1m\e[38;5;151m"
+typeset -g solid_green_cor="\e[32m"
+typeset -g green_cor="\e[92m"
+
+# typeset -g bright_yellow_cor="\e[1m\e[38;5;220m"
+typeset -g bright_yellow_cor="\e[1m\e[38;5;228m"
+typeset -g solid_yellow_cor="\e[33m"
+typeset -g yellow_cor="\e[93m"
+
+typeset -g solid_magenta_cor="\e[35m"
+typeset -g magenta_cor="\e[95m"
+
+typeset -g solid_red_cor="\e[31m"
+typeset -g red_cor="\e[91m"
+
+typeset -g bright_blue_cor="\e[1m\e[38;5;75m"
+typeset -g solid_blue_cor="\e[34m"
+typeset -g blue_cor="\e[94m"
+
+typeset -g solid_cyan_cor="\e[36m"
+typeset -g cyan_cor="\e[96m"
+
+typeset -g bright_pink_cor="\e[0;95m"
+typeset -g pink_cor="\e[0;95m"
+typeset -g purple_cor="\e[38;5;99m"
+
+typeset -g reset_cor="\e[0m"
+
 typeset -g PUMP_VERSION="0.0.0"
 
 typeset -g PUMP_VERSION_FILE="$(dirname "$0")/.version"
@@ -195,11 +226,13 @@ function update_() {
 
     if command -v gum &>/dev/null; then
       gum spin --title="updating pump-zsh..." -- \
-        zsh -c "$(curl -H "Cache-Control: no-cache" -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/update.zsh)" 2>/dev/tty
+        zsh -c "$(curl -H "Cache-Control: no-cache" -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/update.zsh)"
     else
       print " updating pump-zsh..."
       zsh -c "$(curl -H "Cache-Control: no-cache" -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/update.zsh)"
     fi
+    PUMP_VERSION=$(<"$PUMP_VERSION_FILE")
+    print " pump version: ${purple_cor}$PUMP_VERSION${reset_cor}"
     zsh
     return 0;
   else
@@ -2422,7 +2455,7 @@ function refresh() {
   fi
 
   if [[ -f "$HOME/.zshrc" ]]; then
-    source "$HOME/.zshrc" 2>/dev/null
+    source "$HOME/.zshrc"
   fi
 }
 
@@ -4607,7 +4640,7 @@ function pull() {
 
   if (( RET == 0 && quiet == 0 )); then
     print ""
-    git --no-pager log -1 --pretty=format:'%H %s' | xargs -0
+    git --no-pager log -1 --decorate --oneline
     #git log -1 --pretty=format:'%H' | pbcopy
   fi
 
@@ -4665,7 +4698,7 @@ function release() {
   (( release_is_d )) && set -x
 
   if (( release_is_h )); then
-    print "  ${yellow_cor}release ${solid_yellow_cor}[<tag>]${reset_cor} : to create a new release, tag format: <major>.<minor>.<patch> i.e: 1.0.0"
+    print "  ${yellow_cor}release ${solid_yellow_cor}[<version>]${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
     print "  ${yellow_cor}  -s${reset_cor} : skip confirmation"
     print "  --"
     print "  ${yellow_cor}  -m${reset_cor} : major release"
@@ -4712,13 +4745,13 @@ function release() {
       if ! pull --quiet; then return 1; fi
 
       if [[ -n "$release_type" ]]; then
-        if ! npm version "$release_type" --no-commit-hooks --no-git-tag-version; then
+        if ! npm version "$release_type" --no-commit-hooks --no-git-tag-version &>/dev/null; then
           print " not able to bump version: $release_type" >&2
           return 1;
         fi
       fi
 
-      tag=$(npm pkg get version --workspaces=false | tr -d '"' 2>/dev/null)
+      tag="$(npm pkg get version --workspaces=false | tr -d '"' 2>/dev/null)"
     fi
 
     if [[ -z "$tag" ]]; then
@@ -4747,27 +4780,29 @@ function release() {
     fi
   else
     if [[ "$tag" =~ ^v[0-9]+.[0-9]+.[0-9]+$ ]]; then
-      tag=${tag#v}
+      tag="${tag#v}"
     fi
 
-    IFS='.' read -r major_version minor_version patch_version <<< "$tag"
+    if [[ "$tag" =~ ^[0-9]+.[0-9]+.[0-9]+$ ]]; then
+      IFS='.' read -r major_version minor_version patch_version <<< "$tag"
 
-    if (( release_is_is_m )); then
-      ((major_version++))
-      minor_version=0
-      patch_version=0
-    elif (( release_is_is_n )); then
-      ((minor_version++))
-      patch_version=0
-    else
-      ((patch_version++))
+      if (( release_is_is_m )); then
+        ((major_version++))
+        minor_version=0
+        patch_version=0
+      elif (( release_is_is_n )); then
+        ((minor_version++))
+        patch_version=0
+      else
+        ((patch_version++))
+      fi
+
+      tag="${major_version}.${minor_version}.${patch_version}"
     fi
-
-    tag="${major_version}.${minor_version}.${patch_version}"
   fi
 
   if (( ! release_is_s )); then
-    if ! confirm_from_ "create release: $tag ?"; then
+    if ! confirm_from_ "create release: \"$tag\" ?"; then
       clean
       return 1;
     fi
@@ -4777,7 +4812,7 @@ function release() {
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -n "$git_status" ]]; then
     if ! git add .; then return 1; fi
-    if ! git commit --no-verify --message="chore: bump version to $tag"; then return 1; fi
+    if ! git commit --no-verify --message="chore: release version $tag"; then return 1; fi
   fi
 
   # check if tag already exists
@@ -6580,37 +6615,6 @@ typeset -g PUMP_PAST_FOLDER=""
 typeset -g PUMP_PAST_BRANCH=""
 
 typeset -g TEMP_PUMP_PROJECT_SHORT_NAME=""
-
-typeset -g dark_gray_cor="\e[38;5;238m"
-typeset -g gray_cor="\e[38;5;252m"
-
-typeset -g bright_green_cor="\e[1m\e[38;5;151m"
-typeset -g solid_green_cor="\e[32m"
-typeset -g green_cor="\e[92m"
-
-# typeset -g bright_yellow_cor="\e[1m\e[38;5;220m"
-typeset -g bright_yellow_cor="\e[1m\e[38;5;228m"
-typeset -g solid_yellow_cor="\e[33m"
-typeset -g yellow_cor="\e[93m"
-
-typeset -g solid_magenta_cor="\e[35m"
-typeset -g magenta_cor="\e[95m"
-
-typeset -g solid_red_cor="\e[31m"
-typeset -g red_cor="\e[91m"
-
-typeset -g bright_blue_cor="\e[1m\e[38;5;75m"
-typeset -g solid_blue_cor="\e[34m"
-typeset -g blue_cor="\e[94m"
-
-typeset -g solid_cyan_cor="\e[36m"
-typeset -g cyan_cor="\e[96m"
-
-typeset -g bright_pink_cor="\e[0;95m"
-typeset -g pink_cor="\e[0;95m"
-typeset -g purple_cor="\e[38;5;99m"
-
-typeset -g reset_cor="\e[0m"
 
 export CURRENT_PUMP_PROJECT_SHORT_NAME=""
 # ========================================================================
