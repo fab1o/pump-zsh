@@ -2572,8 +2572,6 @@ function del() {
   #   done
   # fi
 
-  local RET=0
-
   if [[ -z "$1" ]]; then
     local files;
     if (( del_is_a )); then
@@ -2593,7 +2591,7 @@ function del() {
         if (( ! del_is_s )) && [[ ".DS_Store" != "$file" ]]; then
           if [[ -d "$file" && -n "$(ls -A "$file")" ]] || [[ ! -d "$file" ]]; then
             confirm_from_ "delete "$'\e[94m'$file$'\e[0m'" ?"
-            RET=$?
+            local RET=$?
             if (( RET == 130 )); then
               return 130;
             fi
@@ -2602,15 +2600,15 @@ function del() {
             fi
           fi
         fi
-  
-        gum spin --title="deleting... $file" -- rm -r "$file"
+
+        gum spin --title="deleting... $file" -- rm -rf "$file"
         if (( $? == 0 )); then
           print "${magenta_cor} deleted${blue_cor} $file ${reset_cor}"
         fi
       done
       #ls
-    else
-      print " no files"
+    # else
+    #   print " no files"
     fi
     return 0;
   fi
@@ -2633,10 +2631,23 @@ function del() {
   if [[ ${#files[@]} -gt 1 || "$pattern" != "${files[1]}" ]] || [[ ${#files[@]} -eq 1 && "$pattern" == "${files[1]}" ]]; then
     local f=""
     for f in $files; do
+      f="$(realpath "$f" 2>/dev/null)"
+      if (( $? != 0 )) || [[ ! -e "$f" ]]; then
+        print " not a file or folder: $f" >&2
+        continue;
+      fi
+
+      local file_type=""
+      if [[ -d "$f" ]]; then
+        file_type=" folder"
+      elif [[ -f "$f" ]]; then
+        file_type=" file"
+      fi
+
       if (( ! del_is_s && _count < 3 )) && [[ ".DS_Store" != "$f" ]]; then
         if [[ -d "$f" && -n "$(ls -A "$f")" ]] || [[ ! -d "$f" ]]; then
-          confirm_from_ "delete "$'\e[94m'$f$'\e[0m'" ?"
-          RET=$?
+          confirm_from_ "delete${file_type}: "$'\e[94m'$f$'\e[0m'" ?"
+          local RET=$?
           if (( RET == 130 )); then
             break;
           elif (( RET == 1 )); then
@@ -2654,8 +2665,8 @@ function del() {
             pattern="${pattern[$((maxlen + 1)),-1]}"
           done
           split_pattern="${split_pattern%""$'\n\e[0m'""}"
-          confirm_from_ "delete all $split_pattern"$'\e[0m'" ?"
-          RET=$?
+          confirm_from_ "delete all: $split_pattern"$'\e[0m'" ?"
+          local RET=$?
           if (( RET == 130 )); then
             break;
           elif (( RET == 1 )); then
@@ -2664,9 +2675,10 @@ function del() {
             is_all=1
           fi
         fi
+
         if (( is_all == 0 )); then
           if [[ -d "$f" && -n "$(ls -A "$f")" ]] || [[ ! -d "$f" ]]; then
-            confirm_from_ "delete "$'\e[94m'$f$'\e[0m'" ?"
+            confirm_from_ "delete${file_type}: "$'\e[94m'$f$'\e[0m'" ?"
             RET=$?
             if (( RET == 130 )); then
               break;
@@ -2682,7 +2694,7 @@ function del() {
       # if [[ -d "$f" && -n "$pump_working_branch" && -n "$_pro" ]]; then
       #   delete_pump_working_ $(basename "$f") "$pump_working_branch" "$_pro"
       # fi
-      gum spin --title="deleting... $f" -- rm -r "$f"
+      gum spin --title="deleting... $f" -- rm -rf "$f"
       if (( $? == 0 )); then
         print "${magenta_cor} deleted${blue_cor} $f ${reset_cor}"
       fi
@@ -2695,57 +2707,40 @@ function del() {
   
   unsetopt dot_glob null_glob
 
-  local file_path=$(realpath "$1" 2>/dev/null) # also works: "${1/#\~/$HOME}"
-  if (( $? != 0 )); then return 1; fi
+  # local file_path="$1" #$(realpath "$1" 2>/dev/null) # also works: "${1/#\~/$HOME}"
+  # if (( $? != 0 )); then return 1; fi
 
-  if [[ -z "$file_path" || ! -e "$file_path" ]]; then
-    return 1;
-  fi
-
-  local folder_to_move=""
-
-  if (( ! del_is_s )) && [[ ".DS_Store" != "$file_path" ]]; then
-    if [[ -d "$file_path" && -n "$(ls -A "$file_path")" ]] || [[ ! -d "$file" ]]; then
-      local confirm_msg=""
-
-      if [[ "$file_path" == "$(pwd)" ]]; then
-        folder_to_move="$(dirname "$file_path")"
-        confirm_msg="delete current path "$'\e[94m'$(pwd)$'\e[0m'"?";
-      else
-        confirm_msg="delete "$'\e[94m'$file_path$'\e[0m'"?";
-      fi
-
-      if ! confirm_from_ $confirm_msg; then
-        return 0;
-      fi
-    fi
-  fi
-
-  # local file_path_log=""
-
-  # if [[ "$file_path" == "$(pwd)"* ]]; then # the file_path is inside the current path
-  #   file_path_log=$(shorten_path_until_ "$file_path")
-  # elif [[ -n "$CURRENT_PUMP_PROJECT_FOLDER" ]]; then
-  #   file_path_log=$(shorten_path_until_ "$file_path" $(basename "$CURRENT_PUMP_PROJECT_FOLDER"))
+  # if [[ -z "$file_path" || ! -e "$file_path" ]]; then
+  #   return 1;
   # fi
 
-  # if [[ -d "$file_path" && -n "$pump_working_branch" && -n "$_pro" ]]; then
-  #   delete_pump_working_ "$(basename "$file_path")" "$pump_working_branch" "$_pro"
+  # local folder_to_move=""
+
+  # if (( ! del_is_s )) && [[ ".DS_Store" != "$file_path" ]]; then
+  #   if [[ -d "$file_path" && -n "$(ls -A "$file_path")" ]] || [[ ! -d "$file" ]]; then
+  #     local confirm_msg=""
+
+  #     if [[ "$file_path" == "$(pwd)" ]]; then
+  #       folder_to_move="$(dirname "$file_path")"
+  #       confirm_msg="delete current path "$'\e[94m'$(pwd)$'\e[0m'"?";
+  #     else
+  #       confirm_msg="delete "$'\e[94m'$file_path$'\e[0m'"?";
+  #     fi
+
+  #     if ! confirm_from_ $confirm_msg; then
+  #       return 0;
+  #     fi
+  #   fi
   # fi
 
-  gum spin --title="deleting... $file_path" -- rm -r "$file_path"
+  # gum spin --title="deleting... $file_path" -- rm -rf "$file_path" 
+  # if (( $? == 0 )); then
+  #   print "${magenta_cor} deleted${blue_cor} $file_path ${reset_cor}"
 
-  # if [[ -z "$file_path_log" ]]; then
-  #   file_path_log="$file_path"
-  # fi
-
-  if (( $? == 0 )); then
-    print "${magenta_cor} deleted${blue_cor} $file_path ${reset_cor}"
-
-    if [[ -n "$folder_to_move" ]]; then
-      cd "$folder_to_move"
-    fi
-  fi 
+  #   if [[ -n "$folder_to_move" ]]; then
+  #     cd "$folder_to_move"
+  #   fi
+  # fi 
 }
 
 # muti-task functions =========================================================
