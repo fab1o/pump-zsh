@@ -141,6 +141,10 @@ function parse_flags_() {
             is_invalid=1
             print "${red_cor} ${prefix%_} invalid option: -$ch${reset_cor}" >&2
             echo "${prefix}is_h=1"
+          else
+            if [[ "$ch" == "q" ]]; then
+              flags_double_dash+=("--quiet")
+            fi
           fi
         else
           flags+=("-$ch")
@@ -183,7 +187,7 @@ function confirm_from_() {
   trap 'print ""; return 130' INT
   
   read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" $1 (y/n) "
-  RET=$?
+  local RET=$?
 
   if (( RET == 130 )); then
     print ""
@@ -380,6 +384,8 @@ function confirm_between_() {
   local opt2="${option2[1]}"
 
   local chosen_mode=""
+
+  local RET=0
 
   if command -v gum &>/dev/null; then
     gum confirm ""mode:$'\e[0m'" $1" --no-show-help --affirmative="$option1" --negative="$option2" 2>/dev/tty
@@ -661,9 +667,8 @@ function input_branch_name_() {
   while true; do
     local typed_value=""
     typed_value="$(input_from_ "$header")"
-    if (( $? != 0 )); then
-      return 1;
-    fi
+    if (( $? != 0 )); then return 1; fi
+    
     if git check-ref-format --branch "$typed_value"; then
       echo "$typed_value"
       return 0;
@@ -680,9 +685,8 @@ function input_name_() {
   while true; do
     local typed_value=""
     typed_value="$(input_from_ "$header" "$placeholder")"
-    if (( $? != 0 )); then
-      return 1;
-    fi
+    if (( $? != 0 )); then return 1; fi
+    
     if [[ -z "$typed_value" ]]; then
       if [[ -n "$placeholder" ]] && command -v gum &>/dev/null; then
         typed_value="$placeholder"
@@ -731,7 +735,7 @@ function choose_proj_folder_() {
       fi
 
       confirm_between_ "do you want to use: "$'\e[94m'${new_folder}$'\e[0m'" or keep browsing?" "use" "browse"
-      RET=$?
+      local RET=$?
       if (( RET == 130 )); then
         return 130;
       fi
@@ -821,7 +825,7 @@ function input_repo_() {
 
   if command -v gh &>/dev/null; then
     confirm_from_ "do you want to access your Github account to choose from a list of repositories?"
-    RET=$?
+    local RET=$?
     if (( RET == 130 )); then return 1; fi
 
     if (( RET == 0 )); then
@@ -863,9 +867,7 @@ function input_repo_() {
   while true; do
     local typed_value=""
     typed_value="$(input_from_ "$header" "$placeholder")"
-    if (( $? != 0 )); then
-      return 1;
-    fi
+    if (( $? != 0 )); then return 1; fi
     if [[ -z "$typed_value" ]]; then
       if [[ -n "$placeholder" ]] && command -v gum &>/dev/null; then
         typed_value="$placeholder"
@@ -1205,7 +1207,7 @@ function save_proj_mode_() {
   if [[ -n "$single_mode" ]] && (( single_mode == 0 || single_mode == 1 )); then return 0; fi
     
   choose_mode_ "$proj_folder"
-  RET=$?
+  local RET=$?
   if (( RET == 130 )); then return 130; fi
 
   update_setting_ $i "PUMP_PROJECT_SINGLE_MODE" "$RET"
@@ -1305,7 +1307,8 @@ function save_proj_repo_() {
   if is_git_repo_ "$proj_folder" &>/dev/null; then
     local _pwd="$(pwd)"
     cd "$proj_folder"
-    remote_repo="$(git remote get-url origin 2>/dev/null)"
+    local remote_origin="$(get_remote_origin_)"
+    remote_repo="$(git remote get-url $remote_origin 2>/dev/null)"
     RET=$?
     cd "$_pwd"
 
@@ -1357,7 +1360,7 @@ function detect_pkg_manager_() {
   local pkg_json="package.json"
   local pyproject="pyproject.toml"
 
-  folder=$(get_proj_folder_ "$folder" 2>/dev/null)
+  folder=$(get_proj_for_pkg_from_within_ "$folder" 2>/dev/null)
   
   if [[ -z "$folder" ]]; then
     return 1
@@ -1447,7 +1450,8 @@ function save_proj_() {
     update_setting_ $i "PUMP_PROJECT_FOLDER" "$proj_folder"
     
     if is_git_repo_ "$proj_folder" &>/dev/null; then
-      proj_repo="$(git remote get-url origin 2>/dev/null)"
+      local remote_origin="$(get_remote_origin_)"
+      proj_repo="$(git remote get-url $remote_origin 2>/dev/null)"
     else
       if ! save_proj_repo_ -a $i "$proj_folder"; then return 1; fi
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
@@ -1768,12 +1772,12 @@ function which_pro_pwd_() {
 function is_proj_folder_() {
   local folder="$1"
 
-  if ! get_proj_folder_ "$folder" 1>/dev/null; then return 2; fi
+  if ! get_proj_for_pkg_from_within_ "$folder" 1>/dev/null; then return 2; fi
 
   return 0;
 }
 
-function get_proj_folder_() {
+function get_proj_for_pkg_from_within_() {
   local folder="$1"
 
   if [[ -z "$1" ]]; then
@@ -1872,18 +1876,72 @@ function shorten_path_() {
   echo "$output"
 }
 
-function open_proj_for_git_() {
-  local proj_folder="$1"
+function open_proj_for_pkg_() {
+  local folder="$1"
+  local file="$2"
 
   if [[ -z "$1" ]]; then
     print " fatal: no argument provided" >&2
     return 1;
   fi
 
-  local git_folder=$(get_proj_for_git_ "$proj_folder")
+  local proj_folder=$(get_proj_for_pkg_ "$folder" "$file")
+  if [[ -z "$proj_folder" ]]; then
+    return 1;
+  fi
+
+  cd "$proj_folder"
+}
+
+function get_proj_for_pkg_() {
+  local folder="$1"
+  local file="$2"
+
+  if [[ ! -d "$folder" ]]; then
+    return 1;
+  fi
+
+  if [[ -n "$file" && -n $(ls "$folder" | grep -i "^${(q)file}\$") ]]; then
+    echo "$folder"
+    return 0;
+  else
+    if [[ -f "$folder/package.json" || -f "$folder/pyproject.toml" ]]; then
+      echo "$folder"
+      return 0;
+    fi
+  fi
+
+  local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
+
+  # Loop through each folder name
+  local dir=""
+  for dir in "${folders[@]}"; do
+    if [[ -n "$file" && -d "${folder}/${dir}" && -n $(ls "${folder}/${dir}" | grep -i "^${(q)file}\$") ]]; then
+      echo "${folder}/${dir}"
+      return 0;
+    else
+      if [[ -d "${folder}/${dir}" && -f "$folder/${dir}/$file" || -f "${folder}/${dir}/package.json" || -f "${folder}/${dir}/pyproject.toml" ]]; then
+        echo "${folder}/${dir}"
+        return 0;
+      fi
+    fi
+  done
+
+  return 1;
+}
+
+function open_proj_for_git_() {
+  local folder="$1"
+
+  if [[ -z "$1" ]]; then
+    print " fatal: no argument provided" >&2
+    return 1;
+  fi
+
+  local git_folder=$(get_proj_for_git_ "$folder")
 
   if [[ -z "$git_folder" ]]; then
-    print " not a git repository (or any of the parent directories): $proj_folder" >&2
+    print " not a git repository (or any of the parent directories): $folder" >&2
     return 1;
   fi
 
@@ -1891,54 +1949,45 @@ function open_proj_for_git_() {
 }
 
 function get_proj_for_git_() {
-  local proj_folder="$1"
+  local folder="$1"
 
-  if is_git_repo_ "$proj_folder"; then
-    print "$proj_folder"
+  if is_git_repo_ "$folder"; then
+    echo "$folder"
     return 0;
   fi
 
-  if [[ ! -d "$proj_folder" ]]; then
-    return 1;
-  fi
-
-  local _pwd="$(pwd)"
-
-  cd "$proj_folder"
-
-  local folder=""
   local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
 
   # Loop through each folder name
-  for defaultFolder in "${folders[@]}"; do
-    if [[ -d "$defaultFolder" ]]; then
-      if is_git_repo_ "$defaultFolder" &>/dev/null; then
-        folder="$proj_folder/$defaultFolder"
-        break;
-      fi
+  local dir=""
+  for dir in "${folders[@]}"; do
+    if is_git_repo_ "${folder}/${dir}"; then
+      echo "${folder}/${dir}"
+      return 0;
     fi
   done
 
-  # this is not a good idea, it could cause going into other projects
-  # if [[ -z "$folder" ]]; then
-  #   setopt null_glob
-  #   local i=0
-  #   for i in */; do
-  #     if is_git_repo_ "${i%/}"; then
-  #       folder="$proj_folder/${i%/}"
-  #       break;
-  #     fi
-  #   done
-  #   unsetopt null_glob
-  # fi
+  return 1;
+}
 
-  cd "$_pwd"
+function get_remote_origin_() {
+  local branch="$1"
 
-  if [[ -z "$folder" ]]; then
-    return 1;
+  if [[ -z "$branch" ]]; then
+    branch="$(git branch --show-current 2>/dev/null)"
   fi
 
-  echo "$folder"
+  local remote_origin=""
+  
+  if [[ -n "$branch" ]]; then
+    remote_origin="$(git config --get branch.${branch}.remote 2>/dev/null)"
+  fi
+
+  if [[ -z "$remote_origin" ]]; then
+    remote_origin="origin"
+  fi
+
+  echo "$remote_origin"
 }
 
 function select_branch_() {
@@ -1947,53 +1996,74 @@ function select_branch_() {
   local filter="$2"
   local searchText="$3"
   local multiple=${4:-0}
-  local label=${5:-"choose a branch"}
+  local header="" # $5
+  local include_special_branches=${6:-1}
 
-  # $2 are flag options
-  # $3 is the search string
+  local remote_origin="$(get_remote_origin_)"
+
   local branch_choices=""
 
   if [[ "$filter" == "--all" || "$filter" == "-a" ]]; then
     branch_choices=$(git branch --all --format="%(refname:short)" \
-      | grep -v 'origin/' \
+      | grep -v "${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
     )
   elif [[ "$filter" == "-r" ]]; then
     branch_choices=$(git for-each-ref --format='%(refname:short)' refs/remotes \
-      | grep -v '^origin/HEAD$' \
-      | sed 's/^origin\///' \
+      | grep -v "^${remote_origin}/HEAD\$" \
+      | sed "s/^${remote_origin}\///" \
       | grep -i "$searchText" \
       | sort -fu
     )
   else
     branch_choices=$(git branch --list --format="%(refname:short)" \
-      | grep -v 'origin/' \
+      | grep -v "${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
     )
   fi
-  
-  if [[ -z "$branch_choices" ]]; then
-    print " did not match any branch known to git: $3" >&2
-    return 1;
+
+  if (( ! include_special_branches )); then
+    local excluded_branches=("main" "master" "dev" "develop" "stage" "staging")
+
+    local branch_choices_array=($(echo "$branch_choices" | tr '\n' ' '))
+    local filtered_branches=()
+
+    for branch in "${branch_choices_array[@]}"; do
+      if [[ ! " ${excluded_branches[@]} " == *" $branch "* ]]; then
+        filtered_branches+=("$branch")
+      fi
+    done
+
+    branch_choices="${filtered_branches[@]}"
   fi
 
-  #$branch_choices=$(echo "$branch_choices" | sed -e 's/^[* ]*//g' | sed -e 's/HEAD//' | sed -e 's/remotes\///' | sed -e 's/HEAD -> origin\///' | sed -e 's/origin\///' | sort -fu)
+  if [[ -z "$branch_choices" ]]; then
+    if [[ -n "$searchText" ]]; then
+      print " did not match any branch known to git: $searchText" >&2
+    else
+      print " did not find any branch known to git" >&2
+    fi
+    return 1;
+  fi
 
   local select_branch_choice=""
 
   if (( multiple )); then
-    select_branch_choice=$(choose_multiple_ 0 "choose branches" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+    header=${5:-"choose branches"}
+    select_branch_choice=$(choose_multiple_ 0 "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
   else
+    header=${5:-"choose a branch"}
+
     local branch_choices_count=$(echo "$branch_choices" | wc -l)
     
     if [[ $branch_choices_count -gt 20 ]]; then
-      select_branch_choice=$(filter_one_ $auto "$label" "type to filter" $(echo "$branch_choices" | tr ' ' '\n'))
+      select_branch_choice=$(filter_one_ $auto "$header" "type to filter" $(echo "$branch_choices" | tr ' ' '\n'))
     else
-      select_branch_choice=$(choose_one_ $auto "$label" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+      select_branch_choice=$(choose_one_ $auto "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
     fi
   fi
 
@@ -2019,6 +2089,7 @@ function select_pr_() {
   local count=$(echo "$pr_list" | wc -l)
 
   local select_pr_title=""
+
   if [[ $count -gt 20 ]]; then
     print "${purple_cor} choose pull request: ${reset_cor}" >&2
     select_pr_title=$(echo "$titles" | gum filter --limit 1 --select-if-one --height 20  --indicator=">" --placeholder=" type to filter");
@@ -2037,7 +2108,7 @@ function select_pr_() {
     return 1;
   fi
 
-  echo "$select_pr_choice|$select_pr_branch|$select_pr_title"
+  echo "${select_pr_choice}|${select_pr_branch}|${select_pr_title}"
 
   return 0;
 }
@@ -2454,15 +2525,14 @@ function refresh() {
     return 0;
   fi
 
-  if [[ -f "$HOME/.zshrc" ]]; then
-    source "$HOME/.zshrc"
-  fi
+  zsh
 }
 
 function upgrade() {
   if command -v omz &>/dev/null; then
     omz update
   fi
+
   if command -v oh-my-posh &>/dev/null; then
     oh-my-posh upgrade
   fi
@@ -2477,8 +2547,8 @@ function del() {
   if (( del_is_h )); then
     print "  ${yellow_cor}del${reset_cor} : to delete in current directory"
     print "  ${yellow_cor}del <glob>${reset_cor} : to delete files (or folders)"
-    print "  ${yellow_cor}del -a${reset_cor} : include hidden files"
-    print "  ${yellow_cor}del -s${reset_cor} : skip confirmation"
+    print "  ${yellow_cor}del -a${reset_cor} : to include hidden files"
+    print "  ${yellow_cor}del -s${reset_cor} : to skip confirmation"
     return 0;
   fi
 
@@ -2501,6 +2571,8 @@ function del() {
   #     fi
   #   done
   # fi
+
+  local RET=0
 
   if [[ -z "$1" ]]; then
     local files;
@@ -2531,8 +2603,10 @@ function del() {
           fi
         fi
   
-        gum spin --title="deleting... $file" -- rm -rf "$file"
-        print "${magenta_cor} deleted${blue_cor} $file ${reset_cor}"
+        gum spin --title="deleting... $file" -- rm -r "$file"
+        if (( $? == 0 )); then
+          print "${magenta_cor} deleted${blue_cor} $file ${reset_cor}"
+        fi
       done
       #ls
     else
@@ -2608,9 +2682,10 @@ function del() {
       # if [[ -d "$f" && -n "$pump_working_branch" && -n "$_pro" ]]; then
       #   delete_pump_working_ $(basename "$f") "$pump_working_branch" "$_pro"
       # fi
-  
-      gum spin --title="deleting... $f" -- rm -rf "$f"
-      print "${magenta_cor} deleted${blue_cor} $f ${reset_cor}"
+      gum spin --title="deleting... $f" -- rm -r "$f"
+      if (( $? == 0 )); then
+        print "${magenta_cor} deleted${blue_cor} $f ${reset_cor}"
+      fi
 
     done
 
@@ -2658,22 +2733,24 @@ function del() {
   #   delete_pump_working_ "$(basename "$file_path")" "$pump_working_branch" "$_pro"
   # fi
 
-  gum spin --title="deleting... $file_path" -- rm -rf "$file_path"
+  gum spin --title="deleting... $file_path" -- rm -r "$file_path"
 
   # if [[ -z "$file_path_log" ]]; then
   #   file_path_log="$file_path"
   # fi
 
-  print "${magenta_cor} deleted${blue_cor} $file_path ${reset_cor}"
+  if (( $? == 0 )); then
+    print "${magenta_cor} deleted${blue_cor} $file_path ${reset_cor}"
 
-  if [[ -n "$folder_to_move" ]]; then
-    cd "$folder_to_move"
-  fi
+    if [[ -n "$folder_to_move" ]]; then
+      cd "$folder_to_move"
+    fi
+  fi 
 }
 
 # muti-task functions =========================================================
 function refix() {
-  eval "$(parse_flags_ "refix_" "" "$@")"
+  eval "$(parse_flags_ "refix_" "q" "$@")"
   (( refix_is_d )) && set -x
 
   if (( refix_is_h )); then
@@ -2762,7 +2839,7 @@ function covc() {
 
   # local git_status=$(git status --porcelain 2>/dev/null)
   # if [[ -n "$git_status" ]]; then
-  #   print " branch is not clean, cannot switch branches";
+  #   print " uncommitted changes detected, cannot switch branches";
   #   return 1;
   # fi
 
@@ -2837,13 +2914,12 @@ function covc() {
     cov_folder="$proj_folder/.coverage"
   fi
 
-  RET=1
+  local RET=1
 
   if is_git_repo_ "$cov_folder" &>/dev/null; then
     pushd "$cov_folder" &>/dev/null
 
-    git reset --hard --quiet origin
-    git fetch origin --quiet
+    reseta --quiet &>/dev/null
     git switch "$branch" --quiet &>/dev/null
     RET=$?
   else
@@ -2864,7 +2940,7 @@ function covc() {
   fi
 
   if (( RET == 0 )); then
-    git pull origin --quiet
+    pull --quiet
     RET=$?
   fi
 
@@ -3158,14 +3234,76 @@ function add() {
     git add . $@
   fi
 }
+  
+local pr_commit_msgs=()
+local pr_title=""
+
+function read_commits_() {
+  local line="$1"
+
+  local remote_origin=""
+  local my_branch="$(git branch --show-current)"
+
+  if [[ -z "$my_branch" ]]; then
+    print " branch is detached, cannot push" >&2
+    return 1;
+  fi
+  
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+
+  local default_branch="$(git config --get init.defaultBranch)"
+
+  local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs -0)
+  local commit_message=$(echo "$line" | cut -d'|' -f2- | xargs -0)
+
+  # Check if the commit belongs to the current branch
+  if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
+    break;
+  fi
+
+  local dirty_pr_title="$commit_message"
+  if [[ $dirty_pr_title =~ '.*\b(fix|feat|docs|refactor|test|chore|style|revert)(\s*\([^)]*\))?:\s*' ]]; then
+    pr_title="${dirty_pr_title/${match[0]}/}"
+  else
+    pr_title="$dirty_pr_title"
+  fi
+
+  if [[ $dirty_pr_title =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+    local ticket="${match[1]}"
+
+    local trimmed="${ticket#"${str%%[![:space:]]*}"}"
+    trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+    pr_title="$trimmed"
+    
+    if [[ $dirty_pr_title =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
+      local rest="${match[1]}"
+      trimmed="${rest#"${str%%[![:space:]]*}"}"
+      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+      pr_title="$pr_title$trimmed"
+    fi
+  fi
+
+  # Add the commit hash and message to the list
+  commit_msgs+=("- $commit_hash - $commit_message")
+
+  local head_commit_hash=$(git rev-parse "${remote_origin}/${default_branch}")
+
+  # # Stop if the commit is the origin/HEAD commit
+  if [[ "$commit_hash" == "$head_commit_hash" ]]; then
+    break;
+  fi
+}
 
 function pr() {
-  eval "$(parse_flags_ "pr_" "t" "$@")"
+  eval "$(parse_flags_ "pr_" "tl" "$@")"
   (( pr_is_d )) && set -x
 
   if (( pr_is_h )); then
     print "  ${yellow_cor}pr${reset_cor} : to create a pull request"
-    print "  ${yellow_cor}pr -t${reset_cor} : only if tests pass"
+    print "  ${yellow_cor}pr -l${reset_cor} : to create a pull request and select labels if any"
+    print "  ${yellow_cor}pr -t${reset_cor} : to create a pull request only if tests pass"
     return 0;
   fi
 
@@ -3177,86 +3315,57 @@ function pr() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  # Initialize an empty string to store the commit details
-  local commit_msgs=""
-  local pr_title=""
-
-  # Get the current branch name
-  # HEAD_COMMIT=$(git merge-base f-WMG1-247-performanceView HEAD)
-  # my_branch=$(git branch --show-current)
-  # OPTIONS="--abbrev-commit HEAD"
-
-   git log $(git merge-base HEAD $(git config --get init.defaultBranch))..HEAD --no-merges --oneline --pretty=format:'%H | %s' | xargs -0 | while IFS= read -r line; do
-    local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs -0)
-    local commit_message=$(echo "$line" | cut -d'|' -f2- | xargs -0)
-
-    # # Check if the commit belongs to the current branch
-    # if ! git branch --contains "$commit_hash" | grep -q "\b$my_branch\b"; then
-    #   break;
-    # fi
-
-    local dirty_pr_title="$commit_message"
-    local pattern='.*\b(fix|feat|docs|refactor|test|chore|style|revert)(\s*\([^)]*\))?:\s*'
-    if [[ "$dirty_pr_title" =~ $pattern ]]; then
-      pr_title="${dirty_pr_title/${match[0]}/}"
-    else
-      pr_title="$dirty_pr_title"
-    fi
-
-    pr_title="$dirty_pr_title"
-
-    if [[ $dirty_pr_title =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
-      local ticket="${match[1]}"
-
-      local trimmed="${ticket#"${str%%[![:space:]]*}"}"
-      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-
-      pr_title="$trimmed"
-      
-      if [[ $dirty_pr_title =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
-        local rest="${match[1]}"
-        trimmed="${rest#"${str%%[![:space:]]*}"}"
-        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-
-        pr_title="$pr_title$trimmed"
-      fi
-    fi
-
-    # Add the commit hash and message to the list
-    commit_msgs+="- $commit_hash - $commit_message"$'\n'
-
-    # # Stop if the commit is the origin/HEAD commit
-    # if [[ "$commit_hash" == "$HEAD_COMMIT" ]]; then
-    #   break;
-    # fi
-  done
-
-  if [[ ! -n "$commit_msgs" ]]; then
-    print " no commits found, try${yellow_cor} push${reset_cor} first.";
-    return 0;
+  local git_status=$(git status --porcelain 2>/dev/null)
+  if [[ -n "$git_status" ]]; then
+    print " uncommitted changes detected, cannot create pull request" >&2;
+    return 1;
   fi
 
-  local pr_body="$commit_msgs"
+  fetch --quiet
 
-  if [[ -f "$CURRENT_PUMP_PR_TEMPLATE" && -n "$CURRENT_PUMP_PR_REPLACE" ]]; then
-    local pr_template=$(cat $CURRENT_PUMP_PR_TEMPLATE)
+  local my_branch="$(git branch --show-current)"
+  local default_branch="$(git config --get init.defaultBranch)"
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+  
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
 
-    if [[ $CURRENT_PUMP_PR_APPEND -eq 1 ]]; then
+  if [[ -n "$remote_branch" ]]; then
+    git --no-pager log --oneline --pretty=format:'%H | %s' \
+      "${remote_origin}/${default_branch}..${remote_origin}/${my_branch}" | xargs -0 | while IFS= read -r line; do
+      read_commits_ "$line"
+    done
+  else
+    git --no-pager log --no-merges --oneline --pretty=format:'%H | %s' \
+      $(git merge-base HEAD "${default_branch}")..HEAD | xargs -0 | while IFS= read -r line; do
+      read_commits_ "$line"
+    done
+  fi
+
+  if [[ ! -n "$pr_commit_msgs" ]]; then
+    print " no commits found, cannot create pull request" >&2
+    return 1;
+  fi
+
+  local pr_body=""
+
+  for commit in "${commit_msgs[@]}"; do
+    pr_body+="${commit}\n"
+  done
+
+  if [[ -n "$CURRENT_PUMP_PR_REPLACE" && -f "$CURRENT_PUMP_PR_TEMPLATE" ]]; then
+    local pr_template="$(cat $CURRENT_PUMP_PR_TEMPLATE)"
+
+    if (( CURRENT_PUMP_PR_APPEND )); then
       # Append commit msgs right after CURRENT_PUMP_PR_REPLACE in pr template
-      pr_body=$(echo "$pr_template" | perl -pe "s/(\Q$CURRENT_PUMP_PR_REPLACE\E)/\1\n\n$commit_msgs\n/")
+      pr_body=$(echo "$pr_template" | perl -pe "s/(\Q$CURRENT_PUMP_PR_REPLACE\E)/\1\n\n$pr_body\n/")
     else
       # Replace CURRENT_PUMP_PR_REPLACE with commit msgs in pr template
-      pr_body=$(echo "$pr_template" | perl -pe "s/\Q$CURRENT_PUMP_PR_REPLACE\E/$commit_msgs/g")
+      pr_body=$(echo "$pr_template" | perl -pe "s/\Q$CURRENT_PUMP_PR_REPLACE\E/$pr_body/g")
     fi
   fi
 
   if [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
     if confirm_from_ "run tests before pull request?"; then
-      if ! test; then
-        print "${solid_red_cor} tests are not passing,${reset_cor} did not push" >&2
-        return 1;
-      fi
-
       if confirm_from_ "save this preference and don't ask again?"; then
         local i=0
         for i in {1..9}; do
@@ -3267,18 +3376,10 @@ function pr() {
         done
         print ""
       fi
+      test || return 1;
     fi
-  elif (( $CURRENT_PUMP_PR_RUN_TEST || pr_is_t )); then
-    local git_status=$(git status --porcelain 2>/dev/null)
-    if [[ -n "$git_status" ]]; then
-      print " branch is not clean, cannot create pull request" >&2;
-      return 1;
-    else
-      if ! test; then
-        print "${solid_red_cor} tests are not passing,${reset_cor} did not push" >&2
-        return 1;
-      fi
-    fi
+  elif (( CURRENT_PUMP_PR_RUN_TEST || pr_is_t )); then
+    test || return 1;
   fi
 
   ## debugging purposes
@@ -3287,23 +3388,35 @@ function pr() {
   # print "$pr_body"
   # return 0;
 
-  push $2
+  push || return 1;
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git branch --show-current)"
 
-  if [[ -n "$CURRENT_PUMP_PROJECT_REPO" ]]; then
-    if [[ -z "$CURRENT_PUMP_LABEL_PR" || "$CURRENT_PUMP_LABEL_PR" -eq 0 ]]; then
-      local labels=("none" "${(@f)$(gh label list --repo "$CURRENT_PUMP_PROJECT_REPO" --limit 25 | awk '{print $1}')}")
-      local choose_labels=$(choose_multiple_ 0 "choose labels" 20 "${labels[@]}")
-      if [[ -z "$choose_labels" ]]; then
-        return 1;
+  if (( pr_is_l )); then
+    local proj_repo=""
+
+    local i=0
+    for i in {1..9}; do
+      if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        if check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "${PUMP_PROJECT_FOLDER[$i]}"; then
+          proj_repo="${PUMP_PROJECT_REPO[$i]}"
+        fi
+        break;
       fi
+    done
 
-      if [[ "$choose_labels" == "none" ]]; then
-        gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
-      else
-        local choose_labels_comma="${(j:,:)${(f)choose_labels}}"
-        gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch" --label="$choose_labels_comma"
+    if [[ -n "$proj_repo" ]]; then
+      local labels=("${(@f)$(gh label list --repo "$proj_repo" --limit 25 | awk '{print $1}')}")
+      
+      if [[ -n "$labels" ]]; then
+        local choose_labels=$(choose_multiple_ 0 "choose labels" 20 "none ${labels[@]}")
+
+        if [[ "$choose_labels" == "none" ]]; then
+          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
+        elif [[ -n "$choose_labels" ]]; then
+          local choose_labels_comma="${(j:,:)${(f)choose_labels}}"
+          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch" --label="$choose_labels_comma"
+        fi
       fi
       return 0;
     fi
@@ -3417,9 +3530,9 @@ function run() {
   local folder_to_run=""
 
   if [[ -n "$folder_arg" && -n "$proj_folder" ]]; then
-    if ! is_proj_folder_ "$proj_folder/$folder_arg" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ "${proj_folder}/${folder_arg}" &>/dev/null; then return 2; fi
 
-    folder_to_run="$proj_folder/$folder_arg"
+    folder_to_run="${proj_folder}/${folder_arg}"
   elif [[ -n "$proj_folder" ]]; then
     if is_proj_folder_ "$proj_folder" &>/dev/null; then
       folder_to_run="$proj_folder"
@@ -3451,7 +3564,9 @@ function run() {
 
   pushd "$folder_to_run" &>/dev/null
 
-  print " run $_env on ${gray_cor}$(shorten_path_ "$folder_arg") ${reset_cor}:${pink_cor} $_run ${reset_cor}"
+  print "folder_to_run: $folder_to_run"
+
+  print " run $_env on ${gray_cor}$(shorten_path_ "$folder_to_run") ${reset_cor}:${pink_cor} $_run ${reset_cor}"
   eval "$_run"
 }
 
@@ -3730,27 +3845,20 @@ function rev() {
   if ! open_proj_for_git_ "$proj_folder"; then return 2; fi
 
   if (( rev_is_e )); then
-    if [[ -z "$branch_arg" ]]; then
-      print " branch is required" >&2
-      return 1;
-    fi
-
     branch="$branch_arg"
   elif (( rev_is_b )); then
     fetch --quiet
     branch=$(select_branch_ 1 -r "$branch_arg");
-    if [[ -z "$branch" ]]; then
-      cd "$_pwd"
-      return 1;
-    fi
   else
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
-    if [[ -z "${pr[2]}" ]]; then
-      cd "$_pwd"
-      return 1;
-    fi
-
     branch="${pr[2]}"
+  fi
+
+  if [[ -z "$branch" ]]; then
+    print " branch is required" >&2
+    cd "$_pwd"
+
+    return 1;
   fi
 
   local branch_folder="${branch//\\/-}";
@@ -3768,9 +3876,11 @@ function rev() {
   if [[ -d "$full_rev_folder" ]]; then
     print " review already exist, opening${green_cor} $(shorten_path_ "$full_rev_folder") ${reset_cor} and pulling latest changes..."
   else
-    local remote_branch=$(git ls-remote --heads origin "$branch" | awk '{print $2}')
+    local remote_origin="$(get_remote_origin_ "$branch")"
+    local remote_branch=$(git ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
+
     if [[ -z "$remote_branch" ]]; then
-      print " branch not found in origin: $branch" >&2
+      print " branch not found in $remote_origin: $branch" >&2
       print " ${yellow_cor} rev -h${reset_cor} to see usage" >&2
       return 1;
     fi
@@ -3789,7 +3899,7 @@ function rev() {
   
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -n "$git_status" ]]; then
-    if ! confirm_from_ "branch is not clean, discard all changes and pull?"; then
+    if ! confirm_from_ "uncommitted changes detected, discard all changes and pull?"; then
       return 1;
     fi
     reseta
@@ -3799,7 +3909,7 @@ function rev() {
 
   git checkout "$branch" --quiet
   
-  if ! git pull origin --quiet; then
+  if ! pull --quiet; then
     is_open_editor=1
     warn_msg="${yellow_cor} warn: could not pull latest changes, probably already merged ${reset_cor}"
   fi
@@ -3941,11 +4051,11 @@ function clone() {
     fi
 
     if command -v gum &>/dev/null; then
-      if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone $proj_repo "$proj_folder" --quiet; then return 1; fi
+      if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$proj_folder" --quiet; then return 1; fi
       print "   cloning... $proj_repo on $branch_arg"
     else
       print "  cloning... $proj_repo on $branch_arg"
-      if ! git clone --quiet $proj_repo "$proj_folder"; then return 1; fi
+      if ! git clone --quiet "$proj_repo" "$proj_folder"; then return 1; fi
     fi
 
     if ! pushd "$proj_folder" &>/dev/null; then return 1; fi
@@ -3961,11 +4071,15 @@ function clone() {
       eval "$_clone"
     fi
 
-    if [[ $print_readme -eq 1 ]] && command -v glow &>/dev/null; then
+    if [[ $print_readme -eq 1 ]]; then
       # find readme file
       local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
       if [[ -n "$readme_file" ]]; then
-        glow "$readme_file"
+        if command -v glow &>/dev/null; then
+          glow "$readme_file"
+        else
+          cat "$readme_file"
+        fi
       fi
     fi
 
@@ -4018,18 +4132,18 @@ function clone() {
   branch_to_clone_folder="${branch_to_clone_folder//\//-}"
 
   if command -v gum &>/dev/null; then
-    if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone $proj_repo "$proj_folder/$branch_to_clone_folder" --quiet; then return 1; fi
+    if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "${proj_folder}/${branch_to_clone_folder}" --quiet; then return 1; fi
     print "   cloning... $proj_repo on $branch_arg"
   else
     print "  cloning... $proj_repo on $branch_arg"
-    if ! git clone --quiet $proj_repo "$proj_folder/$branch_to_clone_folder"; then return 1; fi
+    if ! git clone --quiet "$proj_repo" "${proj_folder}/${branch_to_clone_folder}"; then return 1; fi
   fi
 
   # multiple mode
 
   local past_folder="$(pwd)"
 
-  pushd "$proj_folder/$branch_to_clone_folder" &>/dev/null
+  pushd "${proj_folder}/${branch_to_clone_folder}" &>/dev/null
 
   # if (( $? == 0 )); then
   #   save_pump_working_ "$proj_arg"
@@ -4037,9 +4151,12 @@ function clone() {
   
   git config init.defaultBranch $default_branch
 
-  if [[ "$branch_arg" != "$(git symbolic-ref --short HEAD 2>/dev/null)" ]]; then
+  local my_branch="$(git branch --show-current)"
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$branch_arg" | awk '{print $2}')"
+
+  if [[ "$branch_arg" != "$my_branch" ]]; then
     # check if branch exist
-    local remote_branch=$(git ls-remote --heads origin "$branch_arg")
     local local_branch=$(git branch --list "$branch_arg" | head -n 1)
 
     if [[ -z "$remote_branch" && -z "$local_branch" ]]; then
@@ -4056,11 +4173,15 @@ function clone() {
     eval "$_clone"
   fi
 
-  if [[ $print_readme -eq 1 ]] && command -v glow &>/dev/null; then
+  if [[ $print_readme -eq 1 ]]; then
     # find readme file
     local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
     if [[ -n "$readme_file" ]]; then
-      glow "$readme_file"
+      if command -v glow &>/dev/null; then
+        glow "$readme_file"
+      else
+        cat "$readme_file"
+      fi
     fi
   fi
 
@@ -4188,7 +4309,7 @@ function cont() {
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
   git add .
-  RET=$?
+  local RET=$?
 
   if (( RET == 0 )); then
     GIT_EDITOR=true git rebase --continue &>/dev/null
@@ -4306,7 +4427,7 @@ function repush() {
 }
 
 function recommit() {
-  eval "$(parse_flags_ "recommit_" "s" "$@")"
+  eval "$(parse_flags_ "recommit_" "sq" "$@")"
   (( recommit_is_d )) && set -x
 
   if (( recommit_is_h )); then
@@ -4380,30 +4501,28 @@ function fetch() {
     print "  ${yellow_cor}fetch <branch>${reset_cor} : to fetch a branch"
     print "  ${yellow_cor}fetch -t${reset_cor} : to fetch all tags along with branches"
     print "  ${yellow_cor}fetch -to${reset_cor} : to fetch all tags only"
-    print "  ${yellow_cor}fetch -a${reset_cor} : to fetch all remotes"
     return 0;
   fi
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  RET=0;
+  local RET=0
 
   if (( fetch_is_t )); then 
     git fetch --all --tags --prune-tags --force
     RET=$?
-    if (( pull_is_o )); then
+    if (( fetch_is_o )); then
       return $RET;
     fi
   fi
 
   if [[ -n "$1" && $1 != -* ]]; then
-    git fetch origin "$1" --prune ${@:2}
-    RET=$?
-  elif (( fetch_is_a )); then
-    git fetch --all --prune $@
+    local remote_origin="$(get_remote_origin_ "$1")"
+
+    git fetch "$remote_origin" "$1" --prune ${@:2}
     RET=$?
   else
-    git fetch origin
+    git fetch --all --prune $@
     RET=$?
   fi
 
@@ -4412,8 +4531,8 @@ function fetch() {
   for config in $(git config --get-regexp "^branch\." | awk '{print $1}'); do
     local branch_name="${config#branch.}"
 
-    if ! echo "$current_branches" | grep -q "^$branch_name$"; then
-      git config --remove-section "branch."$branch_name"" &>/dev/null
+    if ! echo "$current_branches" | grep -q "^${branch_name}$"; then
+      git config --remove-section "branch.${branch_name}" &>/dev/null
     fi
   done
 
@@ -4440,8 +4559,9 @@ function glog() {
 
   if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
 
+  print ""
   git --no-pager log main HEAD --decorate --oneline --graph --date=relative $@
-  RET=$?
+  local RET=$?
 
   cd "$_pwd"
 
@@ -4478,15 +4598,25 @@ function push() {
     return $?;
   fi
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git branch --show-current)"
 
   if [[ -z "$my_branch" ]]; then
     print " branch is detached, cannot push" >&2
     return 1;
   fi
 
-  git push --no-verify --set-upstream origin "$my_branch" $@
-  RET=$?
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
+
+  local RET=0
+
+  if [[ -z "$remote_branch" ]]; then
+    git push --no-verify --set-upstream "$remote_origin" "$my_branch" $@
+    RET=$?
+  else
+    git push --no-verify $@
+    RET=$?
+  fi
 
   if (( RET != 0 && quiet == 0 )); then
     if confirm_from_ "failed, try push force with lease?"; then
@@ -4498,7 +4628,7 @@ function push() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git --no-pager log "origin/${my_branch}@{1}..origin/${my_branch}" --decorate --oneline
+      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --decorate --oneline
       git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
@@ -4507,7 +4637,7 @@ function push() {
 }
 
 function pushf() {
-  eval "$(parse_flags_ "pushf_" "ft" "$@")"
+  eval "$(parse_flags_ "pushf_" "" "$@")"
   (( pushf_is_d )) && set -x
 
   if (( pushf_is_h )); then
@@ -4519,6 +4649,8 @@ function pushf() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
+  local RET=0
+
   if (( pushf_is_t && pushf_is_f )); then
     git push --no-verify --tags --force $@
     RET=$?
@@ -4529,25 +4661,26 @@ function pushf() {
     RET=$?
   fi
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git branch --show-current)"
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
 
-  if [[ -z "$my_branch" ]]; then
-    print " branch is detached, cannot push force" >&2
+  if [[ -z "$my_branch" || -z "$remote_origin" ]]; then
+    print " branch is detached or not tracking a remote branch, cannot force push" >&2
     return 1;
   fi
 
   if (( pushf_is_f )); then
-    git push --no-verify --force origin "$my_branch" $@
+    git push --no-verify --force "${remote_origin}" "$my_branch" $@
     RET=$?
   else
-    git push --no-verify --force-with-lease origin "$my_branch" $@
+    git push --no-verify --force-with-lease "${remote_origin}" "$my_branch" $@
     RET=$?
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git --no-pager log "origin/${my_branch}@{1}..origin/${my_branch}" --decorate --oneline
+      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --decorate --oneline
       git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
@@ -4568,7 +4701,9 @@ function dtag() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
   
-  fetch --quiet
+  prune
+
+  local remote_origin="$(get_remote_origin_)"
 
   if [[ -z "$1" ]]; then
     # list all tags suing tags command then use choose_multiple_ to select tags, then delete all selected tags
@@ -4584,29 +4719,23 @@ function dtag() {
       return 1;
     fi
     for tag in $selected_tags; do
-      git tag --delete "$tag"
-      git push origin --delete "$tag" ${@:2}
-      RET=$?
+      git tag "$remote_origin" --delete "$tag" 2>/dev/null
+      git push "$remote_origin" --delete "$tag" ${@:2} 2>/dev/null
     done
     cd "$_pwd"
-    return $RET;
+    return 0;
   fi
 
-  if ! git tag --delete "$1"; then
-    cd "$_pwd"
-    return 1;
-  fi
-
-  git push origin --delete "$1"
-  RET=$?
+  git tag "$remote_origin" --delete "$1" 2>/dev/null
+  git push "$remote_origin" --delete "$1" 2>/dev/null
 
   cd "$_pwd"
 
-  return $RET;
+  return 0; # don't care if it fails to delete, considered success
 }
 
 function pull() {
-  eval "$(parse_flags_ "pull_" "to" "$@")"
+  eval "$(parse_flags_ "pull_" "" "$@")"
   (( pull_is_d )) && set -x
 
   if (( pull_is_h )); then
@@ -4618,12 +4747,12 @@ function pull() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  (( quiet = pull_is_t || ${argv[(Ie)--quiet]} ))
+  local remote_origin="$(get_remote_origin_)"
 
-  local RET=0;
+  local RET=0
 
   if (( pull_is_t )); then
-    git pull origin --tags $@
+    git pull "$remote_origin" --tags $@
     RET=$?
     if (( pull_is_o )); then
       return $RET;
@@ -4631,14 +4760,14 @@ function pull() {
   fi
 
   if [[ -n "$1" && $1 != -* ]]; then
-    git pull origin "$1" --rebase --autostash ${@:2}
+    git pull "$remote_origin" "$1" --rebase --autostash ${@:2}
     RET=$?
   else
-    git pull origin --rebase --autostash $@
+    git pull "$remote_origin" --rebase --autostash $@
     RET=$?
   fi
 
-  if (( RET == 0 && quiet == 0 )); then
+  if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     print ""
     git --no-pager log -1 --decorate --oneline
     #git log -1 --pretty=format:'%H' | pbcopy
@@ -4699,11 +4828,11 @@ function release() {
 
   if (( release_is_h )); then
     print "  ${yellow_cor}release ${solid_yellow_cor}[<version>]${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
-    print "  ${yellow_cor}  -s${reset_cor} : skip confirmation"
+    print "  ${yellow_cor}release -s${reset_cor} : to skip confirmation"
     print "  --"
-    print "  ${yellow_cor}  -m${reset_cor} : major release"
-    print "  ${yellow_cor}  -n${reset_cor} : minor release"
-    print "  ${yellow_cor}  -p${reset_cor} : patch release"
+    print "  ${yellow_cor}release -m${reset_cor} : to create a major release"
+    print "  ${yellow_cor}release -n${reset_cor} : to create a minor release"
+    print "  ${yellow_cor}release -p${reset_cor} : to create a patch release"
     return 0;
   fi
 
@@ -4717,16 +4846,16 @@ function release() {
   if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
 
   if [[ -n "$(git status --porcelain)" ]]; then
-    print " uncommitted changes detected, cannot proceed" >&2
+    print " uncommitted changes detected, cannot create release" >&2
     st
     return 1
   fi
 
-  local current_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
 
   # check if name is conventional
-  if ! [[ "$current_branch" =~ ^(main|master|stage|staging|pro|production|release)$ || "$current_branch" == release* ]]; then
-    print " warning: unconventional branch to release: $current_branch"
+  if ! [[ "$my_branch" =~ ^(main|master|stage|staging|pro|production|release)$ || "$my_branch" == release* ]]; then
+    print " warning: unconventional branch to release: $my_branch"
   fi
 
   local tag="$1"
@@ -4802,7 +4931,7 @@ function release() {
   fi
 
   if (( ! release_is_s )); then
-    if ! confirm_from_ "create release: \"$tag\" ?"; then
+    if ! confirm_from_ "create release: $tag ?"; then
       clean
       return 1;
     fi
@@ -4814,12 +4943,22 @@ function release() {
     if ! git add .; then return 1; fi
     if ! git commit --no-verify --message="chore: release version $tag"; then return 1; fi
   fi
+  
+  if gh release view "$tag" >/dev/null 2>&1; then
+    if (( ! release_is_s )); then
+      if ! confirm_from_ "$tag has already been released, delete and release again?"; then
+        return 1;
+      fi
+    fi
+    release_is_s=1
+    gh release delete "$tag" --yes
+  fi
 
   # check if tag already exists
-  local tag_exists=$(git tag --list "$tag" 2>/dev/null)
-  if [[ -n "$tag_exists" ]]; then
+  local existing_tag="$(git tag --list "$tag" 2>/dev/null)"
+  if [[ -n "$existing_tag" ]]; then
     if (( ! release_is_s )); then
-      if ! confirm_from_ "$tag already exists, delete tag and create again?"; then
+      if ! confirm_from_ "$tag already exists, delete and release again?"; then
         return 1;
       fi
     fi
@@ -4870,7 +5009,8 @@ function tag() {
   fi
 
   git tag --annotate "$tag" --message="$tag" ${@:2}
-  RET=$?
+  local RET=$?
+
   if (( RET == 0 )); then
     git push --no-verify --tags
     RET=$?
@@ -4949,7 +5089,7 @@ function clean() {
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
   
   git clean -fd --quiet
-  RET=$?
+  local RET=$?
 
   if (( RET == 0 )); then
     restore
@@ -4970,8 +5110,8 @@ function discard() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git reset --hard
-  RET=$?
+  reseta
+  local RET=$?
 
   if (( RET == 0 )); then
     clean
@@ -4992,16 +5132,20 @@ function reseta() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  # check if current branch exists in remote
-  local remote_branch=$(git ls-remote --heads origin "$(git symbolic-ref --short HEAD 2>/dev/null)")
+  local my_branch="$(git branch --show-current)"
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+  
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
 
-  RET=0;
+  local RET=0
+  
+  fetch --quiet
 
   if [[ -n "$remote_branch" ]]; then
-    git reset --hard "origin/$(git symbolic-ref --short HEAD 2>/dev/null)"
+    git reset --hard "${remote_origin}/${my_branch}" $@
     RET=$?
   else
-    git reset --hard
+    git reset "$remote_origin" --hard $@
     RET=$?
   fi
 
@@ -5032,7 +5176,7 @@ function glr() {
   git branch -r --list "*$1*" --sort=authordate --format='%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=3)' | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e 's/\([^\ ]*\)$/\x1b[34m\x1b]8;;https:\/\/github.com\/wmgtech\/wmg2-one-app\/tree\/\1\x1b\\\1\x1b]8;;\x1b\\\x1b[0m/'
-  RET=$?
+  local RET=$?
   
   cd "$_pwd"
 
@@ -5056,7 +5200,7 @@ function gll() {
   git branch --list "*$1*" --sort=authordate --format="%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=2)" | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e 's/\([^ ]*\)$/\x1b[34m\1\x1b[0m/'
-  RET=$?
+  local RET=$?
   
   cd "$_pwd"
 
@@ -5093,7 +5237,8 @@ function gha_() {
   else
     print "\a ❌${red_cor} workflow failed (status: $workflow_status) ${reset_cor}"
 
-    local repo="$(get_repo_name_ "$(git remote get-url origin)")"
+    local remote_origin="$(get_remote_origin_)"
+    local repo="$(get_repo_name_ "$(git remote get-url "$remote_origin")")"
 
     if [[ -n "$repo" ]]; then
       repo="${repo%.git}"
@@ -5212,7 +5357,7 @@ function gha() {
     return 1;
   fi
 
-  RET=0
+  local RET=0
 
   if (( ! gha_is_a )); then
     print " checking workflow${purple_cor} $workflow_arg${reset_cor}..."
@@ -5258,7 +5403,7 @@ function gha() {
 }
 
 function co() {
-  eval "$(parse_flags_ "co_" "aprebxlc" "$@")"
+  eval "$(parse_flags_ "co_" "alprexbcq" "$@")"
   (( co_is_d )) && set -x
 
   if (( co_is_h )); then
@@ -5287,7 +5432,7 @@ function co() {
       print " detaching pull request: ${pr[3]}"
       print "  ${yellow_cor}co -b <branch>${reset_cor} to create branch"
       
-      gh pr checkout --force --detach ${pr[1]}
+      gh pr checkout --force --detach "${pr[1]}"
       return $?;
     fi
 
@@ -5297,26 +5442,36 @@ function co() {
   # co -a all branches
   if (( co_is_a )); then
     fetch --quiet
-    local branch_choice="$(select_branch_ 1 --all "$1")"
+    local auto=$([[ -n "$1" ]] && echo 1 || echo 0)
+    local branch_choice="$(select_branch_ $auto --all "$1")"
     
     if [[ -z "$branch_choice" ]]; then
       return 1;
     fi
 
-    co -e $branch_choice
+    if [[ -n "$1" ]]; then
+      co -e "$branch_choice" ${@:2}
+    else
+      co -e "$branch_choice" $@
+    fi
     return $?
   fi
 
   # co -l local branches
   if (( co_is_l )); then
     fetch --quiet
-    local branch_choice="$(select_branch_ 1 --list "$1")"
+    local auto=$([[ -n "$1" ]] && echo 1 || echo 0)
+    local branch_choice="$(select_branch_ $auto --list "$1")"
     
     if [[ -z "$branch_choice" ]]; then
       return 1;
     fi
 
-    co -e $branch_choice
+    if [[ -n "$1" ]]; then
+      co -e "$branch_choice" ${@:2}
+    else
+      co -e "$branch_choice" $@
+    fi
     return $?
   fi
 
@@ -5335,16 +5490,18 @@ function co() {
       return 1;
     fi
 
-    base_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+    base_branch="$(git branch --show-current)"
+    
+    local remote_origin="$(get_remote_origin_ "$base_branch")"
 
     fetch --quiet
-    
-    RET=0;
+    local RET=$?
+
     if [[ -n "$base_branch" ]]; then
-      git checkout -b "$branch" "origin/$base_branch"
+      git checkout -b "$branch" "${remote_origin}/$base_branch" ${@:2}
       RET=$?
     else
-      git checkout -b "$branch"
+      git checkout -b "$branch" ${@:2}
       RET=$?
       if (( RET == 0 )); then
         base_branch="$(git config --get init.defaultBranch)"
@@ -5354,8 +5511,9 @@ function co() {
     if (( RET != 0 )); then return 1; fi
 
     ll_add_node_
+    
+    local remote_branch="$(git ls-remote --heads "$remote_origin" "$base_branch" | awk '{print $2}')"
 
-    local remote_branch=$(git ls-remote --heads origin "$base_branch" | awk '{print $2}')
     if [[ -n "$remote_branch" ]]; then
       git config branch."$branch".gh-merge-base "$remote_branch"
     else
@@ -5366,7 +5524,7 @@ function co() {
   fi
 
   # co -e branch just checkout, do not create branch
-  if (( co_is_e )); then
+  if (( co_is_e || co_is_x )); then
     local branch="$1"
 
     if [[ -z "$branch" ]]; then
@@ -5377,8 +5535,8 @@ function co() {
     local current_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
     local _past_folder="$(pwd)"
 
-    git switch "$branch" --quiet
-    RET=$?
+    git switch "$branch" ${@:2}
+    local RET=$?
 
     if (( RET == 0 )); then
       ll_add_node_
@@ -5387,9 +5545,9 @@ function co() {
     return $RET;
   fi
 
-  # co (no arguments)
-  if [[ -z "$1" || -z "$2" ]]; then
-    co -a "$1"
+  # co $1 or co (no arguments)
+  if [[ -z "$2" || "$2" == --* ]]; then
+    co -l $@
     return $?;
   fi
 
@@ -5403,11 +5561,13 @@ function co() {
     return 1;
   fi
 
-  if ! git checkout -b "$branch" "$base_branch"; then return 1; fi
+  if ! git checkout -b "$branch" "$base_branch" ${@:3}; then return 1; fi
 
   ll_add_node_
+  
+  local remote_origin="$(get_remote_origin_ "$base_branch")"
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$base_branch" | awk '{print $2}')"
 
-  local remote_branch=$(git ls-remote --heads origin "$base_branch" | awk '{print $2}')
   if [[ -n "$remote_branch" ]]; then
     git config branch."$branch".gh-merge-base "$remote_branch"
   else
@@ -5514,7 +5674,7 @@ function stage() {
 }
 
 function rebase() {
-  eval "$(parse_flags_ "rebase_" "p" "$@")"
+  eval "$(parse_flags_ "rebase_" "pi" "$@")"
   (( rebase_is_d )) && set -x
 
   if (( rebase_is_h )); then
@@ -5534,22 +5694,29 @@ function rebase() {
     rebase_branch="$(git config --get init.defaultBranch)"
   fi
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git branch --show-current)"
 
   if [[ "$my_branch" == "$rebase_branch" ]]; then
     print " cannot rebase, branches are the same" >&2
     return 1;
   fi
+  
+  local remote_origin="$(get_remote_origin_ "$rebase_branch")"
 
-  git fetch origin --quiet
-  RET=$?
+  if [[ -z "$remote_origin" ]]; then
+    print " cannot find remote origin for branch: $rebase_branch" >&2
+    return 1;
+  fi
+
+  fetch --quiet
+  local RET=$?
 
   if [[ -n "$1" && $1 != -* ]]; then
-    git rebase origin/"$rebase_branch" ${@:2}
+    git rebase "${remote_origin}/${rebase_branch}" ${@:2}
     RET=$?
   else
-    print "hey: git rebase origin/"$rebase_branch" $@"
-    git rebase origin/"$rebase_branch" $@
+    print "hey: git rebase "${remote_origin}/${rebase_branch}" $@"
+    git rebase "${remote_origin}/${rebase_branch}" $@
     RET=$?
   fi
 
@@ -5582,21 +5749,28 @@ function merge() {
     merge_branch="$(git config --get init.defaultBranch)"
   fi
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local my_branch="$(git branch --show-current)"
 
   if [[ "$my_branch" == "$merge_branch" ]]; then
     print " cannot merge, branches are the same" >&2
     return 1;
   fi
+  
+  local remote_origin="$(get_remote_origin_ "$merge_branch")"
 
-  git fetch origin --quiet
-  RET=$?
+  if [[ -z "$remote_origin" ]]; then
+    print " cannot find remote origin for branch: $merge_branch" >&2
+    return 1;
+  fi
+
+  fetch --quiet
+  local RET=$?
 
   if [[ -n "$1" && $1 != -* ]]; then
-    git merge origin/"$merge_branch" --no-edit ${@:2}
+    git merge "${remote_origin}/${merge_branch}" --no-edit ${@:2}
     RET=$?
   else
-    git merge origin/"$merge_branch" --no-edit $@
+    git merge "${remote_origin}/${merge_branch}" --no-edit $@
     RET=$?
   fi
 
@@ -5621,18 +5795,37 @@ function prune() {
 
   local default_main_branch="$(git config --get init.defaultBranch)"
 
-  # delets all tags
-  git tag -l | xargs git tag -d 1>/dev/null
+  # delete all local tags
+  # git tag -l | xargs git tag -d 1>/dev/null
+
+  # Get all local tags
+  local local_tags=("${(@f)$(git tag)}")
+
+  # Get all remote tags (strip refs/tags/)
+  local remote_tags=("${(@f)$(git ls-remote --tags origin)}")
+  local remote_tag_names=()
+  for line in "${remote_tags[@]}"; do
+    [[ $line =~ refs/tags/(.+)$ ]] && remote_tag_names+=("${match[1]}")
+  done
+
+  local tag=""
+  # Remove local tags not in remote
+  for tag in "${local_tags[@]}"; do
+    if ! [[ "${remote_tag_names[@]}" == *"$tag"* ]]; then
+      git tag -d "$tag"
+    fi
+  done
+
   # fetch tags that exist in the remote
-  git fetch origin --prune --prune-tags --force
+  fetch -t --quiet
   
   # lists all branches that have been merged into the currently checked-out branch
   # that can be safely deleted without losing any unmerged work and filters out the default branch
-  local branches=$(git branch --merged | grep -v "^\*\\|$default_main_branch")
+  local branches="$(git branch --merged | grep -v "^\*\\|${default_main_branch}" | sed 's/^[ *]*//')"
 
   for branch in $branches; do
-    git config --remove-section branch."$branch" &>/dev/null
     git branch -D "$branch"
+    git config --remove-section "branch.${branch}" &>/dev/null
   done
 
   local current_branches=$(git branch --format '%(refname:short)')
@@ -5642,7 +5835,7 @@ function prune() {
     local branch_name="${config#branch.}"
 
     # Check if the branch exists locally
-    if ! echo "$current_branches" | grep -q "^$branch_name$"; then
+    if ! echo "$current_branches" | grep -q "^$branch_name\$"; then
       git config --remove-section "branch."$branch_name"" &>/dev/null
     fi
   done
@@ -5651,46 +5844,64 @@ function prune() {
 }
 
 function delb() {
-  eval "$(parse_flags_ "delb_" "s" "$@")"
+  eval "$(parse_flags_ "delb_" "sra" "$@")"
   (( delb_is_d )) && set -x
 
   if (( delb_is_h )); then
     print "  ${yellow_cor}delb${solid_yellow_cor} [<branch>]${reset_cor} : to find branches to delete"
-    print "  ${yellow_cor}delb <branch>${solid_yellow_cor} [<branch>]${reset_cor} : to find branches to delete"
-    print "  ${yellow_cor}delb -s${reset_cor} : skip confirmation"
+    print "  ${yellow_cor}delb -r${solid_yellow_cor} [<branch>]${reset_cor} : to also delete remotely"
+    print "  ${yellow_cor}delb -a${reset_cor} : to find all branches"
+    print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation"
     return 0;
   fi
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
   local branch_arg="$1"
-  local is_deleted=1;
+  local deleted_branches=();
 
-  RET=0;
-
-  local selected_branches=($(select_branch_ 0 --list "$branch_arg" 1))
-  for branch in ${selected_branches[@]}; do
-    if (( ! delb_is_s )); then
-      local confirm_msg="delete local branch: "$'\e[0;95m'$branch$'\e[0m'"?"
-      confirm_from_ $confirm_msg
-      RET=$?
-      if (( RET == 130 )); then
-        break;
-      elif (( RET == 1 )); then
-        continue;
-      fi
-    fi
-
-    git config --remove-section branch."$branch" &>/dev/null
-    git branch -D "$branch"
-    is_deleted=$?
-  done
-
-  if (( ! is_deleted )); then
-    delete_pump_workings_ "$pump_working_branch" "$proj_arg" "$selected_branches"
+  local filter=$((( delb_is_r )) && echo "-r" || echo "--list")
+  local selected_branches=($(select_branch_ 0 $filter "$branch_arg" 1 "choose branches" $delb_is_a))
+  
+  if [[ -z "$selected_branches" ]]; then
+    return 1;
   fi
 
-  cd "$_pwd"
+  local excluded_branches=("main" "master")
+
+  if (( ! delb_is_a )); then
+    excluded_branches+=("dev" "develop" "stage" "staging")
+  fi
+
+  local RET=0
+
+  for branch in ${selected_branches[@]}; do
+    if (( ! delb_is_s || delb_is_r )); then
+      local origin="$((( delb_is_r )) && echo "remote" || echo "local")"
+      confirm_from_ "delete ${origin} branch: "$'\e[0;95m'$branch$'\e[0m'" ?"
+      RET=$?
+      if (( RET == 130 )); then break; fi
+      if (( RET == 1 )); then continue; fi
+    fi
+
+    git config --remove-section "branch.${branch}" &>/dev/null
+
+    if (( delb_is_r )); then
+      local remote_origin="$(get_remote_origin_)"
+      git branch -D "$branch" &>/dev/null
+      git push --delete "$remote_origin" "$branch"
+    else
+      git branch -D "$branch"
+    fi
+    RET=$?
+    if (( RET == 0 )); then
+      deleted_branches+=("$branch")
+    fi
+  done
+
+  # if (( ${#deleted_branches[@]} )); then
+  #   delete_pump_workings_ "$pump_working_branch" "$proj_arg" "${deleted_branches[@]}"
+  # fi
 
   return $RET;
 }
@@ -5711,7 +5922,7 @@ function st() {
 
 function pro() {
   # f is to suggest adding a project for $(pwd)
-  eval "$(parse_flags_ "pro_" "aerusf" "$@")"
+  eval "$(parse_flags_ "pro_" "aerusfi" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
@@ -5720,6 +5931,7 @@ function pro() {
     print "  ${yellow_cor}pro -e <pro>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <pro>${reset_cor} : to remove a project"
     print "  ${yellow_cor}pro -u <pro>${reset_cor} : to unset project"
+    print "  ${yellow_cor}pro -i <pro>${reset_cor} : to display readme file of project"
     print "  ${yellow_cor}pro -s <pro>${reset_cor} : to show project data"
     
     if [[ -n "${PUMP_PROJECT_SHORT_NAME[*]}" ]]; then
@@ -5742,11 +5954,45 @@ function pro() {
 
   local proj_arg="$1"
 
+  if (( pro_is_i )); then
+    # display readme file of project
+    if [[ -z "$proj_arg" ]]; then
+      print " provide a project name to display readme" >&2
+      return 1;
+    fi
+
+    local _pwd="$(pwd)"
+
+    local i=0
+    for i in {1..9}; do
+      if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        if ! open_proj_for_pkg_ "${PUMP_PROJECT_FOLDER[$i]}" "readme.md"; then
+          print " project readme file not found" >&2
+          return 1;
+        fi
+
+        # find readme file
+        local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
+        if [[ -n "$readme_file" ]]; then
+          if command -v glow &>/dev/null; then
+            glow "$readme_file"
+          else
+            cat "$readme_file"
+          fi
+        fi
+        cd "$_pwd"
+        return 0;
+      fi
+    done
+
+    print " project not found: $proj_arg" >&2
+    return 1;
+  fi
+
   if (( pro_is_s )); then
     # show project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to show" >&2
-      print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
       return 1;
     fi
 
@@ -5759,7 +6005,6 @@ function pro() {
     done
 
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -5768,7 +6013,6 @@ function pro() {
     # edit project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to edit" >&2
-      print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
       return 1;
     fi
 
@@ -5796,7 +6040,6 @@ function pro() {
     done
 
     print " no more slots available, please remove one to add a new one" >&2
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
     
     return 1;
   fi
@@ -5805,7 +6048,6 @@ function pro() {
     # remove project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to delete" >&2
-      print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
       return 1;
     fi
 
@@ -5825,7 +6067,6 @@ function pro() {
     done
 
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
     return 1;
   fi # end of delete
 
@@ -5833,7 +6074,6 @@ function pro() {
     # unset project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to unset" >&2
-      print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
       return 1;
     fi
 
@@ -5847,7 +6087,6 @@ function pro() {
     done
 
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -5865,7 +6104,10 @@ function pro() {
       
       local pkg_name="$(get_from_pkg_json_ "name")"
       local proj_cmd=$(sanitize_pkg_name_ "$pkg_name")
-      local proj_repo="$(git remote get-url origin 2>/dev/null)"
+
+      local remote_origin="$(get_remote_origin_)"
+
+      local proj_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
 
       local i=0 found=0 empty=0
       for i in {1..9}; do
@@ -6156,7 +6398,7 @@ if [[ -n "$COMMIT2" ]]; then
 fi
 
 function __commit() {
-  eval "$(parse_flags_ "commit_" "a" "$@")"
+  eval "$(parse_flags_ "commit_" "" "$@")"
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
@@ -6202,9 +6444,8 @@ function __commit() {
 
     # scope is optional
     scope_commit=$(gum input --placeholder "scope")
-    if (( $? != 0 )); then
-      return 0;
-    fi
+    if (( $? != 0 )); then return 0; fi
+    
     if [[ -n "$scope_commit" ]]; then
       scope_commit="($scope_commit)"
     fi
@@ -6212,9 +6453,7 @@ function __commit() {
     local msg_arg=""
 
     msg_arg="$(gum input --value "${type_commit}${scope_commit}: ")"
-    if (( $? != 0 )); then
-      return 0;
-    fi
+    if (( $? != 0 )); then return 0; fi
 
     local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
     
@@ -6222,6 +6461,7 @@ function __commit() {
       local ticket="${match[1]} "
       local skip=0;
 
+      # check if an old commit message already contains the ticket number
       git log -n 10 --pretty=format:"%h %s" | while read -r line; do
         commit_hash=$(echo "$line" | awk '{print $1}')
         message=$(echo "$line" | cut -d' ' -f2-)
@@ -6232,14 +6472,16 @@ function __commit() {
         fi
       done
 
-      if [[ $skip -eq 0 ]]; then
+      if (( skip == 0 )); then
         msg_arg="$ticket $commit_msg"
       fi
     fi
 
     git commit --no-verify --message "$msg_arg" $@
-  else
+  elif [[ $1 != -* ]]; then
     git commit --no-verify --message "$1" ${@:2}
+  else
+    git commit --no-verify $@
   fi  
 }
 # end of commit functions =============================================
@@ -6253,6 +6495,8 @@ function help() {
     display_line_ "fab1o's pump my shell!" "${purple_cor}"
     print ""
   fi
+
+  local remote_origin="$(get_remote_origin_)"
 
   if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     print ""
@@ -6311,25 +6555,25 @@ function help() {
   print " ${blue_cor} clone ${reset_cor}\t = clone project or branch"
   
   local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PACKAGE_MANAGER $([[ $CURRENT_PUMP_PACKAGE_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
+  local max=53
 
-  max=53
-  if (( ${#_setup} > $max )); then
+  if (( ${#_setup} > max )); then
     # print " ${blue_cor} setup ${reset_cor}\t = ${_setup[1,$max]}"
     print " ${blue_cor} setup ${reset_cor}\t = run PUMP_SETUP"
   else
     print " ${blue_cor} setup ${reset_cor}\t = $_setup"
   fi
-  if (( ${#CURRENT_PUMP_RUN} > $max )); then
+  if (( ${#CURRENT_PUMP_RUN} > max )); then
     print " ${blue_cor} run ${reset_cor}\t\t = run PUMP_RUN"
   else
     print " ${blue_cor} run ${reset_cor}\t\t = $CURRENT_PUMP_RUN"
   fi
-  if (( ${#CURRENT_PUMP_RUN_STAGE} > $max )); then
+  if (( ${#CURRENT_PUMP_RUN_STAGE} > max )); then
     print " ${blue_cor} run stage ${reset_cor}\t = run PUMP_RUN_STAGE"
   else
     print " ${blue_cor} run stage ${reset_cor}\t = $CURRENT_PUMP_RUN_STAGE"
   fi
-  if (( ${#CURRENT_PUMP_RUN_PROD} > $max )); then
+  if (( ${#CURRENT_PUMP_RUN_PROD} > max )); then
     print " ${blue_cor} run prod ${reset_cor}\t = run PUMP_RUN_PROD"
   else
     print " ${blue_cor} run prod ${reset_cor}\t = $CURRENT_PUMP_RUN_PROD"
@@ -6414,7 +6658,7 @@ function help() {
   print " ${solid_cyan_cor} reset3 ${reset_cor}\t = reset soft 3 commits"
   print " ${solid_cyan_cor} reset4 ${reset_cor}\t = reset soft 4 commits"
   print " ${solid_cyan_cor} reset5 ${reset_cor}\t = reset soft 5 commits"
-  print " ${solid_cyan_cor} reseta ${reset_cor}\t = reset hard origin + clean"
+  print " ${solid_cyan_cor} reseta ${reset_cor}\t = reset hard $remote_origin + clean"
   print " ${solid_cyan_cor} restore ${reset_cor}\t = undo edits since last commit"
   
   print ""
@@ -6428,8 +6672,8 @@ function help() {
 
   display_line_ "git pull" "${solid_cyan_cor}"
   print ""
-  print " ${solid_cyan_cor} fetch ${reset_cor}\t = fetch from origin"
-  print " ${solid_cyan_cor} pull ${reset_cor}\t\t = pull all branches from origin"
+  print " ${solid_cyan_cor} fetch ${reset_cor}\t = fetch from $remote_origin"
+  print " ${solid_cyan_cor} pull ${reset_cor}\t\t = pull all branches from $remote_origin"
 
   print ""
   display_line_ "git push" "${solid_cyan_cor}"
@@ -6443,8 +6687,8 @@ function help() {
     print " ${solid_cyan_cor} $COMMIT1 <m>${reset_cor}\t = commit message"
   fi
   print " ${solid_cyan_cor} pr ${reset_cor}\t\t = create pull request"
-  print " ${solid_cyan_cor} push ${reset_cor}\t\t = push all no-verify to origin"
-  print " ${solid_cyan_cor} pushf ${reset_cor}\t = push force all to origin"
+  print " ${solid_cyan_cor} push ${reset_cor}\t\t = push all no-verify to $remote_origin"
+  print " ${solid_cyan_cor} pushf ${reset_cor}\t = push force all to $remote_origin"
   
   print ""
   display_line_ "git rebase" "${solid_cyan_cor}"

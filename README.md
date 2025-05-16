@@ -4,43 +4,52 @@ Pump-zsh is an **Oh My Zsh** plugin with a configurable set of aliases and funct
 
 ![screenshot](https://github.com/fab1o/pump-zsh/blob/main/docs/prompt-shot.png?raw=true)
 
----
-
-## Installation
+## Install
 
 Pump-zsh comes with its own install script, which is the recommended method of install.
+
+#### Requirement
+
+Pump-zsh requires:
+
+- [Oh My Zsh](https://ohmyz.sh/)
+
+Run the script below once you have Oh My Zsh:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh
 ```
----
 
-## 📦 Install Dependencies
+### Dependencies
 
-Pump-zsh comes with a script to install all the dependencies, but it requires [Homebrew](https://brew.sh/) to run:
+Pump-zsh comes with a script to install all the dependencies, but it requires [Homebrew](https://brew.sh/).
+
+Run the script below once you have Homebrew:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install_deps.zsh | zsh && zsh
 ```
 
-If you prefer to install them manually, here’s the list:
+If you prefer to install dependencies manually, here’s the list:
 
-- ✅ **Required**:
+- **Mandatory**:
   - [Oh My Zsh](https://ohmyz.sh/)
-  - [jq](https://jqlang.org/)
-- 🌟 **Recommended**:
+- **Required**:
   - [Oh My Posh](https://ohmyposh.dev/)  
     → Works best with [Nerd Fonts](https://ohmyposh.dev/docs/installation/fonts)
+  - [jq](https://jqlang.org/) - for config crud
   - [gum](https://github.com/charmbracelet/gum) – for enhanced UX
   - [glow](https://github.com/charmbracelet/glow) – for enhanced UX
   - [Github CLI](https://cli.github.com/) – for some functions such as `pr`
-- 🎨 **Optional**:
+
+
+- **Recommended (not installed by the script)**:
   - [iTerm2](https://iterm2.com/)
   - [Gruvbox iTerm2 palette](https://github.com/herrbischoff/iterm2-gruvbox) — customize terminal colors
 
 ---
 
-## 📖 Documentation
+## Support
 
 Explore the full documentation to make the most out of `pump-zsh`:
 
