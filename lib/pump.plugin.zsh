@@ -5359,8 +5359,9 @@ function co() {
   (( co_is_d )) && set -x
 
   if (( co_is_h )); then
-    print "  ${yellow_cor}co ${solid_yellow_cor}[<branch>]${reset_cor} : to switch to a branch"
-    print "  ${yellow_cor}co -l${reset_cor} : to switch to a local branch"
+    print "  ${yellow_cor}co ${solid_yellow_cor}[<branch>]${reset_cor} : to switch to a branch, displays local branches only"
+    print "  ${yellow_cor}co -a${reset_cor} : to switch to a branch, displays all branches"
+    print "  ${yellow_cor}co -l${reset_cor} : to switch to a branch, displays local branches only"
     print "  ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
     print "  --"
     print "  ${yellow_cor}co -e <branch>${reset_cor} : to switch to an exact branch"
