@@ -469,9 +469,9 @@ function choose_multiple_() {
 
   if command -v gum &>/dev/null; then
     if (( auto )); then
-      echo "$(gum choose --select-if-one --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" "${@:4}" 2>/dev/tty)"
+      echo "$(gum choose --select-if-one --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     else
-      echo "$(gum choose --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" "${@:4}" 2>/dev/tty)"
+      echo "$(gum choose --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     fi
     return 0;
   fi
@@ -501,9 +501,9 @@ function filter_one_() { # gum filter does not have
   if command -v gum &>/dev/null; then
     print "${purple_cor} $2: ${reset_cor}" >&2
     if (( auto )); then
-      echo "$(gum filter --height 20 --limit=1 --select-if-one --indicator=">" --placeholder=" $3" "${@:4}")"
+      echo "$(gum filter --height 20 --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
     else
-      echo "$(gum filter --height 20 --limit=1 --indicator=">" --placeholder=" $3" "${@:4}")"
+      echo "$(gum filter --height 20 --limit=1 --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
     fi
   else
     choose_one_ $auto "$3" 20 "$4"
@@ -521,9 +521,9 @@ function choose_one_() {
   if command -v gum &>/dev/null; then
     if (( auto )); then
       local choice=""
-      choice="$(gum choose --limit=1 --select-if-one --header="${purple} $header:${reset}" --height="$height" "${@:4}" 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --select-if-one --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     else
-      choice="$(gum choose --limit=1 --header="${purple} $header:${reset}" --height="$height" "${@:4}" 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     fi
     if (( $? != 0 )); then return 1; fi
 
@@ -2009,9 +2009,10 @@ function select_branch_() {
 
   local branch_choices=""
 
+  # | sed "s/^${remote_origin}\///" \
+
   if [[ "$filter" == "--all" || "$filter" == "-a" ]]; then
     branch_choices=$(git branch --all --format="%(refname:short)" \
-      | grep -v "${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
@@ -2019,7 +2020,6 @@ function select_branch_() {
   elif [[ "$filter" == "-r" ]]; then
     branch_choices=$(git for-each-ref --format='%(refname:short)' refs/remotes \
       | grep -v "^${remote_origin}/HEAD\$" \
-      | sed "s/^${remote_origin}\///" \
       | grep -i "$searchText" \
       | sort -fu
     )
@@ -2056,24 +2056,31 @@ function select_branch_() {
     return 1;
   fi
 
-  local select_branch_choice=""
+  local select_branch_choices=""
 
   if (( multiple )); then
     header=${5:-"choose branches"}
-    select_branch_choice=$(choose_multiple_ 0 "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+    select_branch_choices=$(choose_multiple_ 0 "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
   else
     header=${5:-"choose a branch"}
 
     local branch_choices_count=$(echo "$branch_choices" | wc -l)
     
     if [[ $branch_choices_count -gt 20 ]]; then
-      select_branch_choice=$(filter_one_ $auto "$header" "type to filter" $(echo "$branch_choices" | tr ' ' '\n'))
+      select_branch_choices=$(filter_one_ $auto "$header" "type to filter" $(echo "$branch_choices" | tr ' ' '\n'))
     else
-      select_branch_choice=$(choose_one_ $auto "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+      select_branch_choices=$(choose_one_ $auto "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
     fi
   fi
 
-  echo "$select_branch_choice"
+  local clean_branch_choices=()
+
+  for branch in "${select_branch_choices[@]}"; do
+    branch=$(echo "$branch" | sed "s/^${remote_origin}\///")
+    clean_branch_choices+=("$branch")
+  done
+
+  echo "${clean_branch_choices[@]}"
 }
 
 function select_pr_() {
@@ -3729,6 +3736,8 @@ function rev() {
     return 1;
   fi
 
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+
   local proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
   local branch_arg=""
 
@@ -3793,7 +3802,7 @@ function rev() {
   local _pwd="$(pwd)";
   local branch="";
 
-  if ! open_proj_for_git_ "$proj_folder"; then return 2; fi
+  #if ! open_proj_for_git_ "$proj_folder"; then return 2; fi
 
   if (( rev_is_e )); then
     branch="$branch_arg"
@@ -4169,18 +4178,25 @@ function renb() {
     return 0;
   fi
 
-  if [[ -z "$1" ]]; then
+  local new_name="$1"
+
+  if [[ -z "$new_name" ]]; then
     renb -h
     return 0;
   fi
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  local old_name="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local current_name="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  local base_branch="$(git config --get "branch.${current_name}.gh-merge-base" 2>/dev/null)"
 
-  git config branch."$1".gh-merge-base "$(git config --get branch."$old_name".gh-merge-base)" &>/dev/null
-  
-  git branch -m "$1" ${@:2}
+  git branch -m "$new_name" ${@:2}
+
+  if (( $? == 0 )); then
+    git config "branch.${new_name}.gh-merge-base" "$base_branch" &>/dev/null
+    git config --remove-section "branch.${current_name}" &>/dev/null
+  fi
+
 }
 
 function chp() {
@@ -5381,15 +5397,20 @@ function co() {
   # co pr
   if (( co_is_p || co_is_r )); then
     local pr=("${(@s:|:)$(select_pr_ "$1")}")
-    if [[ -n "${pr[1]}" ]]; then
-      print " detaching pull request: ${pr[3]}"
-      print "  ${yellow_cor}co -b <branch>${reset_cor} to create branch"
-      
+    
+    if [[ -z "${pr[1]}" ]]; then return 1; fi
+    
+    gum spin --title="detaching pull request: ${pr[3]}" -- \
       gh pr checkout --force --detach "${pr[1]}"
-      return $?;
+    RET=$?
+
+    if (( RET == 0 )); then
+      print " detached pull request: ${pr[3]}"
+      print " HEAD is now at $(git log -1 --pretty=format:'%h %s')"
+      print " branch is detached, type ${yellow_cor}co -b <branch>${reset_cor} to create branch"
     fi
 
-    return 0;
+    return $RET;
   fi
 
   # co -a all branches
@@ -5398,16 +5419,14 @@ function co() {
     local auto=$([[ -n "$1" ]] && echo 1 || echo 0)
     local branch_choice="$(select_branch_ $auto --all "$1")"
     
-    if [[ -z "$branch_choice" ]]; then
-      return 1;
-    fi
+    if [[ -z "$branch_choice" ]]; then return 1; fi
 
     if [[ -n "$1" ]]; then
       co -e "$branch_choice" ${@:2}
     else
       co -e "$branch_choice" $@
     fi
-    return $?
+    return $?;
   fi
 
   # co -l local branches
@@ -5416,16 +5435,14 @@ function co() {
     local auto=$([[ -n "$1" ]] && echo 1 || echo 0)
     local branch_choice="$(select_branch_ $auto --list "$1")"
     
-    if [[ -z "$branch_choice" ]]; then
-      return 1;
-    fi
+    if [[ -z "$branch_choice" ]]; then return 1; fi
 
     if [[ -n "$1" ]]; then
       co -e "$branch_choice" ${@:2}
     else
       co -e "$branch_choice" $@
     fi
-    return $?
+    return $?;
   fi
 
   # co -b or -c branch create branch
@@ -5468,9 +5485,11 @@ function co() {
     local remote_branch="$(git ls-remote --heads "$remote_origin" "$base_branch" | awk '{print $2}')"
 
     if [[ -n "$remote_branch" ]]; then
-      git config branch."$branch".gh-merge-base "$remote_branch"
+      git config "branch.${branch}.gh-merge-base" "$remote_branch"
+      print " base branch is: $remote_branch"
     else
-      git config branch."$branch".gh-merge-base "$base_branch"
+      git config "branch.${branch}.gh-merge-base" "$base_branch"
+      print " base branch is: $base_branch"
     fi
 
     return 0;
@@ -5522,9 +5541,11 @@ function co() {
   local remote_branch="$(git ls-remote --heads "$remote_origin" "$base_branch" | awk '{print $2}')"
 
   if [[ -n "$remote_branch" ]]; then
-    git config branch."$branch".gh-merge-base "$remote_branch"
+    git config "branch.${branch}.gh-merge-base" "$remote_branch"
+    print " base branch is: $remote_branch"
   else
-    git config branch."$branch".gh-merge-base "$base_branch"
+    git config "branch.${branch}.gh-merge-base" "$base_branch"
+    print " base branch is: $base_branch"
   fi
 
   return 0;
@@ -5840,6 +5861,7 @@ function delb() {
 
     if (( delb_is_r )); then
       local remote_origin="$(get_remote_origin_)"
+
       git branch -D "$branch" &>/dev/null
       git push --delete "$remote_origin" "$branch"
     else
