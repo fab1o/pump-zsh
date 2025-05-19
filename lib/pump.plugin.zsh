@@ -1085,6 +1085,7 @@ function check_proj_folder_() {
   local i="$1"
   local proj_folder="$2"
   local pkg_name="$3"
+  local proj_repo="$4"
 
   local error_msg=""
 
@@ -1096,7 +1097,7 @@ function check_proj_folder_() {
     print "  $error_msg" 2>/dev/tty >&2
 
     if (( check_proj_folder_is_s )); then
-      if save_proj_folder_ $i "$pkg_name"; then return 0; fi
+      if save_proj_folder_ $i "$pkg_name" "$proj_repo"; then return 0; fi
     fi
 
     return 1;
@@ -1224,9 +1225,8 @@ function save_proj_folder_() {
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
-  local proj_repo="$2"
-
-  local pkg_name=""
+  local pkg_name="$2"
+  local proj_repo="$3"
 
   if [[ -n "$proj_repo" ]]; then
     pkg_name="$(get_repo_name_ "$proj_repo" 1 2>/dev/tty)"
@@ -1271,7 +1271,7 @@ function save_proj_folder_() {
   proj_folder=$(choose_proj_folder_ $i "$header" "$pkg_name_sanitized" "$folder_exists")
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  if ! check_proj_folder_ $i "$proj_folder" "$pkg_name_sanitized"; then return 1; fi
+  if ! check_proj_folder_ $i "$proj_folder" "$pkg_name_sanitized" "$proj_repo"; then return 1; fi
   # clear_last_line_
 
   if (( folder_exists == 0 )); then
@@ -1474,11 +1474,11 @@ function save_proj_() {
 
       while [[ -z "$PUMP_PROJECT_FOLDER[$i]" && -z "$PUMP_PROJECT_REPO[$i]" ]]; do
         if ! save_proj_repo_ -a $i "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
-        if ! save_proj_folder_ -a $i "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
+        if ! save_proj_folder_ -a $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
       done
     else # edit
       if ! save_proj_repo_ -e $i "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
-      if ! save_proj_folder_ -e $i "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
+      if ! save_proj_folder_ -e $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
     fi
   
     if ! save_pkg_manager_ $i; then return 1; fi
@@ -1678,35 +1678,41 @@ function is_project_() {
 
 function print_current_proj_() {
   local i="$1"
-
-  print "${solid_magenta_cor} PUMP_PROJECT_SHORT_NAME_$i=${reset_cor}${PUMP_PROJECT_SHORT_NAME[$i]}"
-  print "${solid_magenta_cor} PUMP_PROJECT_FOLDER_$i=${reset_cor}${PUMP_PROJECT_FOLDER[$i]}"
-  print "${solid_magenta_cor} PUMP_PROJECT_REPO_$i=${reset_cor}${PUMP_PROJECT_REPO[$i]}"
-  print "${solid_magenta_cor} PUMP_PROJECT_SINGLE_MODE_$i=${reset_cor}${PUMP_PROJECT_SINGLE_MODE[$i]}"
-  print "${solid_magenta_cor} PUMP_PACKAGE_MANAGER_$i=${reset_cor}${PUMP_PACKAGE_MANAGER[$i]}"
-  print "${solid_magenta_cor} PUMP_RUN_$i=${reset_cor}${PUMP_RUN[$i]}"
-  print "${solid_magenta_cor} PUMP_RUN_STAGE_$i=${reset_cor}${PUMP_RUN_STAGE[$i]}"
-  print "${solid_magenta_cor} PUMP_RUN_PROD_$i=${reset_cor}${PUMP_RUN_PROD[$i]}"
-  print "${solid_magenta_cor} PUMP_SETUP_$i=${reset_cor}${PUMP_SETUP[$i]}"
-  print "${solid_magenta_cor} PUMP_CLONE_$i=${reset_cor}${PUMP_CLONE[$i]}"
-  print "${solid_magenta_cor} PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}"
-  print "${solid_magenta_cor} PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}"
-  print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
-  print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
-  print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
-  print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
-  print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
-  print "${solid_magenta_cor} PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}"
-  print "${solid_magenta_cor} PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}"
-  print "${solid_magenta_cor} PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}"
-  print "${solid_magenta_cor} PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}"
-  print "${solid_magenta_cor} PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}"
-  print "${solid_magenta_cor} PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}"
-  print "${solid_magenta_cor} PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}"
-  print "${solid_magenta_cor} PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}"
-  print "${solid_magenta_cor} PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}"
-  print "${solid_magenta_cor} PUMP_GHA_WORKFLOW_$i=${reset_cor}\"${PUMP_GHA_WORKFLOW[$i]}\""
+  
   display_line_ "" "$dark_gray_cor"
+
+  if (( i > 0 )); then
+    print "${solid_magenta_cor} PUMP_PROJECT_SHORT_NAME_$i=${reset_cor}${PUMP_PROJECT_SHORT_NAME[$i]}"
+    print "${solid_magenta_cor} PUMP_PROJECT_FOLDER_$i=${reset_cor}${PUMP_PROJECT_FOLDER[$i]}"
+    print "${solid_magenta_cor} PUMP_PROJECT_REPO_$i=${reset_cor}${PUMP_PROJECT_REPO[$i]}"
+    print "${solid_magenta_cor} PUMP_PROJECT_SINGLE_MODE_$i=${reset_cor}${PUMP_PROJECT_SINGLE_MODE[$i]}"
+    print "${solid_magenta_cor} PUMP_PACKAGE_MANAGER_$i=${reset_cor}${PUMP_PACKAGE_MANAGER[$i]}"
+    print "${solid_magenta_cor} PUMP_RUN_$i=${reset_cor}${PUMP_RUN[$i]}"
+    print "${solid_magenta_cor} PUMP_RUN_STAGE_$i=${reset_cor}${PUMP_RUN_STAGE[$i]}"
+    print "${solid_magenta_cor} PUMP_RUN_PROD_$i=${reset_cor}${PUMP_RUN_PROD[$i]}"
+    print "${solid_magenta_cor} PUMP_SETUP_$i=${reset_cor}${PUMP_SETUP[$i]}"
+    print "${solid_magenta_cor} PUMP_CLONE_$i=${reset_cor}${PUMP_CLONE[$i]}"
+    print "${solid_magenta_cor} PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}"
+    print "${solid_magenta_cor} PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}"
+    print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
+    print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
+    print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
+    print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
+    print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
+    print "${solid_magenta_cor} PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}"
+    print "${solid_magenta_cor} PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}"
+    print "${solid_magenta_cor} PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}"
+    print "${solid_magenta_cor} PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}"
+    print "${solid_magenta_cor} PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}"
+    print "${solid_magenta_cor} PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}"
+    print "${solid_magenta_cor} PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}"
+    print "${solid_magenta_cor} PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}"
+    print "${solid_magenta_cor} PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}"
+    print "${solid_magenta_cor} PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}"
+
+    return 0;
+  fi
+
   print "${pink_cor} CURRENT_PUMP_PROJECT_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJECT_SHORT_NAME"
   print "${pink_cor} CURRENT_PUMP_PROJECT_FOLDER=${reset_cor}$CURRENT_PUMP_PROJECT_FOLDER"
   print "${pink_cor} CURRENT_PUMP_PROJECT_REPO=${reset_cor}$CURRENT_PUMP_PROJECT_REPO"
@@ -1733,7 +1739,7 @@ function print_current_proj_() {
   print "${pink_cor} CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH"
   print "${pink_cor} CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README"
   print "${pink_cor} CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL"
-  print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}\"$CURRENT_PUMP_GHA_WORKFLOW\""
+  print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
 }
 
 function which_pro_index_pwd_() {
@@ -2250,7 +2256,6 @@ function load_config_entry_() {
   local i=${1:-0}
 
   keys=(
-    PUMP_PROJECT_REPO
     PUMP_PROJECT_SINGLE_MODE
     PUMP_PACKAGE_MANAGER
     PUMP_CODE_EDITOR
@@ -2333,9 +2338,6 @@ function load_config_entry_() {
 
     # store the value
     case "$key" in
-      PUMP_PROJECT_REPO)
-        PUMP_PROJECT_REPO[$i]="$value"
-        ;;
       PUMP_PROJECT_SINGLE_MODE)
         PUMP_PROJECT_SINGLE_MODE[$i]="$value"
         ;;
@@ -2434,6 +2436,16 @@ function load_config_() {
 
     PUMP_PROJECT_SHORT_NAME[$i]="$proj_cmd"
 
+    # Set project repo
+    local proj_repo=""
+    proj_repo=$(sed -n "s/^PUMP_PROJECT_REPO_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
+    if (( $? != 0 )); then
+      print " something is wrong with your config data at PUMP_PROJECT_REPO_${i}" >&2
+      continue
+    fi
+
+    PUMP_PROJECT_REPO[$i]="$proj_repo"
+
     # Set project folder path
     local proj_folder=""
     proj_folder=$(sed -n "s/^PUMP_PROJECT_FOLDER_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
@@ -2443,7 +2455,7 @@ function load_config_() {
     fi
 
     if [[ -n "$proj_folder" ]]; then
-      if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd"; then
+      if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd" "$proj_repo"; then
         print "  error in config data at PUMP_PROJECT_FOLDER_${i}" >&2
       fi
     fi
@@ -2806,15 +2818,15 @@ function covc() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_cmd"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
         if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder"; then
           return 1;
         fi
         proj_repo="${PUMP_PROJECT_REPO[$i]}"
+
+        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_cmd" "$proj_repo"; then
+          return 1;
+        fi
+        proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
         _setup="${PUMP_SETUP[$i]}"
         _clone="${PUMP_CLONE[$i]}"
@@ -3441,7 +3453,7 @@ function run() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
+        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
           return 1;
         fi
         proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
@@ -3544,7 +3556,7 @@ function setup() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
+        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
           return 1;
         fi
         proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
@@ -3649,7 +3661,7 @@ function revs() {
   local i=0
   for i in {1..9}; do
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
         return 1;
       fi
       proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
@@ -3744,15 +3756,15 @@ function rev() {
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
       found=1
 
-      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
       if ! check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "$proj_folder"; then
         return 1;
       fi
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
+
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
+        return 1;
+      fi
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
       _setup="${PUMP_SETUP[$i]}"
       _clone="${PUMP_CLONE[$i]}"
@@ -3938,15 +3950,15 @@ function clone() {
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
       found=$i
 
-      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
       if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder"; then
         return 1;
       fi
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
+
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
+        return 1;
+      fi
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
       if ! save_proj_mode_ $i "$proj_folder"; then return 1; fi
 
@@ -5244,7 +5256,7 @@ function gha() {
   local i=0
   for i in {1..9}; do
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg"; then
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
         return 1;
       fi
       proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
@@ -5931,15 +5943,15 @@ function pro() {
   if (( pro_is_s )); then
     # show project
     if [[ -z "$proj_arg" ]]; then
-      print " provide a project name to show" >&2
-      return 1;
+      print_current_proj_ 0
+      return $?;
     fi
 
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         print_current_proj_ $i
-        return 0;
+        return $?;
       fi
     done
 
@@ -6125,7 +6137,7 @@ function proj_handler_() {
 
   local proj_cmd="${PUMP_PROJECT_SHORT_NAME[$i]}"
 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_cmd"; then
+  if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_cmd" "${PUMP_PROJECT_REPO[$i]}"; then
     return 1;
   fi
 
