@@ -3845,10 +3845,10 @@ function rev() {
       return 1;
     fi
 
-    print " creating review for${green_cor} $select_pr_title${reset_cor}..."
+    print " creating review for pull request: ${green_cor}${pr[3]}${reset_cor}..."
 
     if command -v gum &>/dev/null; then
-      if ! gum spin --title="cloning... $proj_repo" -- git clone $proj_repo "$full_rev_folder" 1>/dev/tty; then return 1; fi
+      if ! gum spin --title="cloning... $proj_repo" -- git clone $proj_repo "$full_rev_folder"; then return 1; fi
     else
       print " cloning... $proj_repo";
       if ! git clone $proj_repo "$full_rev_folder" --quiet; then return 1; fi
@@ -5405,7 +5405,7 @@ function co() {
     RET=$?
 
     if (( RET == 0 )); then
-      print " detached pull request: ${pr[3]}"
+      print " detached pull request: ${green_cor}${pr[3]}${reset_cor}"
       print " HEAD is now at $(git log -1 --pretty=format:'%h %s')"
       print " branch is detached, type ${yellow_cor}co -b <branch>${reset_cor} to create branch"
     fi
@@ -5597,6 +5597,8 @@ function dev() {
     return 0;
   fi
 
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+
   if [[ -n "$(git branch --all | grep -w dev)" ]]; then
     co -e dev
   elif [[ -n "$(git branch --all | grep -w develop)" ]]; then
@@ -5617,6 +5619,8 @@ function main() {
     return 0;
   fi
 
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+
   if [[ -n "$(git branch --all | grep -w main)" ]]; then
     co -e main
   elif [[ -n "$(git branch --all | grep -w master)" ]]; then
@@ -5636,6 +5640,8 @@ function stage() {
       print "  ${yellow_cor}main${reset_cor} : to switch to stage or staging in current project"
     return 0;
   fi
+
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
   if [[ -n "$(git branch --all | grep -w stage)" ]]; then
     co -e stage
