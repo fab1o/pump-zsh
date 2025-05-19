@@ -5665,7 +5665,6 @@ function rebase() {
     git rebase "${remote_origin}/${rebase_branch}" ${@:2}
     RET=$?
   else
-    print "hey: git rebase "${remote_origin}/${rebase_branch}" $@"
     git rebase "${remote_origin}/${rebase_branch}" $@
     RET=$?
   fi
