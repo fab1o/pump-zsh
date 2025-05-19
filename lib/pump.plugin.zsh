@@ -2711,7 +2711,7 @@ function refix() {
   if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  last_commit_msg=$(git log -1 --pretty=format:'%s' | xargs -0)
+  last_commit_msg=$(git --no-pager log -1 --pretty=format:'%s' | xargs -0)
   
   if [[ "$last_commit_msg" == Merge* ]]; then
     print " last commit is a merge commit, won't do, create a new commit instead" >&2 
@@ -3019,17 +3019,6 @@ function covc() {
   print "| Lines: $(printf "%.2f" $lines1)% | Lines: $(printf "%.2f" $lines2)% |"
   print ""
 
-  # do not copy to clipboard because it could be problematic since this takes so long to finish
-  # {
-  #   echo "#### Coverage"
-  #   echo "| \`$1\` | \`${my_branch}\` |"
-  #   echo "| --- | --- |"
-  #   echo "| Statements: $(printf "%.2f" $statements1)% | Statements: $(printf "%.2f" $statements2)% |"
-  #   echo "| Branches: $(printf "%.2f" $branches1)% | Branches: $(printf "%.2f" $branches2)% |"
-  #   echo "| Functions: $(printf "%.2f" $funcs1)% | Functions: $(printf "%.2f" $funcs2)% |"
-  #   echo "| Lines: $(printf "%.2f" $lines1)% | Lines: $(printf "%.2f" $lines2)% |"
-  # } | pbcopy
-
   setopt monitor
   setopt notify
 }
@@ -3280,12 +3269,12 @@ function pr() {
   local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
 
   if [[ -n "$remote_branch" ]]; then
-    git --no-pager log --oneline --pretty=format:'%H | %s' \
+    git --no-pager log --pretty=format:'%H | %s' \
       "${remote_origin}/${default_branch}..${remote_origin}/${my_branch}" | xargs -0 | while IFS= read -r line; do
       read_commits_ "$line"
     done
   else
-    git --no-pager log --no-merges --oneline --pretty=format:'%H | %s' \
+    git --no-pager log --no-merges --pretty=format:'%H | %s' \
       $(git merge-base HEAD "${default_branch}")..HEAD | xargs -0 | while IFS= read -r line; do
       read_commits_ "$line"
     done
@@ -4281,7 +4270,7 @@ function reset1() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git log -1 --pretty=format:'%s' | xargs -0
+  git --no-pager log -1 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
   
   git reset --quiet --soft HEAD~1
@@ -4298,7 +4287,7 @@ function reset2() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git log -2 --pretty=format:'%s' | xargs -0
+  git --no-pager log -2 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
   
   git reset --quiet --soft HEAD~2
@@ -4315,7 +4304,7 @@ function reset3() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git log -3 --pretty=format:'%s' | xargs -0
+  git --no-pager log -3 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
   
   git reset --quiet --soft HEAD~3
@@ -4332,7 +4321,7 @@ function reset4() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git log -4 --pretty=format:'%s' | xargs -0
+  git --no-pager log -4 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
   
   git reset --quiet --soft HEAD~4
@@ -4349,7 +4338,7 @@ function reset5() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  git log -5 --pretty=format:'%s' | xargs -0
+  git --no-pager log -5 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
   
   git reset --quiet --soft HEAD~5
@@ -4397,7 +4386,7 @@ function recommit() {
   local last_commit_msg=$(git log -1 --pretty=format:'%s' | xargs -0 2>/dev/null)
   
   if [[ "$last_commit_msg" == Merge* ]]; then
-    print " last commit is a merge commit, won't do, create a new commit instead" >&2
+    print " cannot recommit, last commit is a merge commit" >&2
     return 1;
   fi
 
@@ -4436,8 +4425,8 @@ function recommit() {
   if git commit --message="$last_commit_msg" $@; then
     if (( ! ${argv[(Ie)--quiet]} )); then
       print ""
-      git --no-pager log -1 --pretty=format:'%H %s' | xargs -0
-      git log -1 --pretty=format:'%H %s' | pbcopy
+      git --no-pager log -1 --oneline
+      #git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
 }
@@ -4500,8 +4489,8 @@ function glog() {
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog${reset_cor} : to log last 15 commits"
-    print "  ${yellow_cor}glog ${solid_yellow_cor}-n${reset_cor} : to log last n commits"
+    print "  ${yellow_cor}glog${reset_cor} : to log all commits"
+    print "  ${yellow_cor}glog ${solid_yellow_cor}-n${reset_cor} : to log n commits"
     return 0;
   fi
 
@@ -4510,9 +4499,10 @@ function glog() {
   if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
 
   print ""
-  git --no-pager log main HEAD --decorate --oneline --graph --date=relative $@
+  git --no-pager log main HEAD --oneline --graph --date=relative $@
   local RET=$?
 
+  print ""
   cd "$_pwd"
 
   return $RET;
@@ -4578,8 +4568,8 @@ function push() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --decorate --oneline
-      git log -1 --pretty=format:'%H %s' | pbcopy
+      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --oneline
+      # git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
 
@@ -4630,8 +4620,8 @@ function pushf() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --decorate --oneline
-      git log -1 --pretty=format:'%H %s' | pbcopy
+      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --oneline
+      # git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
 
@@ -4719,8 +4709,8 @@ function pull() {
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     print ""
-    git --no-pager log -1 --decorate --oneline
-    #git log -1 --pretty=format:'%H' | pbcopy
+    git --no-pager log -1 --oneline
+    # no pbcopy for pulling
   fi
 
   return $RET;
@@ -6058,26 +6048,23 @@ function pro() {
 
       local proj_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
 
-      local i=0 found=0 empty=0
+      local i=0 foundI=0 emptyI=0
       for i in {1..9}; do
-        if [[ "$proj_repo" == "${PUMP_PROJECT_REPO[$i]}" || "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-          found=$i
+        if [[ $foundI -eq 0 && "$proj_repo" == "${PUMP_PROJECT_REPO[$i]}" || "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+          foundI=$i
         fi
-        if [[ $empty -eq 0 && -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-          empty=$i
+        if [[ $emptyI -eq 0 && -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+          emptyI=$i
         fi
       done
-    
-      local action="add"
-      if (( found )); then
-        action="edit"
-      fi
 
-      if confirm_from_ "$action this project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
-        if (( found )); then
-          save_proj_ -fe $found "$pkg_name"
+      local action="add"; (( foundI )) && action="edit"
+
+      if confirm_from_ "would you like to $action this project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
+        if (( foundI )); then
+          save_proj_ -fe $foundI "$pkg_name"
         else
-          save_proj_ -fa $empty "$pkg_name"
+          save_proj_ -fa $emptyI "$pkg_name"
         fi
         return $?;
       fi
@@ -6411,7 +6398,7 @@ function __commit() {
       local skip=0;
 
       # check if an old commit message already contains the ticket number
-      git log -n 10 --pretty=format:"%h %s" | while read -r line; do
+      git log -n 15 --pretty=format:"%h %s" | while read -r line; do
         commit_hash=$(echo "$line" | awk '{print $1}')
         message=$(echo "$line" | cut -d' ' -f2-)
 
