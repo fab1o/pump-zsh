@@ -1014,16 +1014,17 @@ function sanitize_pkg_name_() {
 
 # data checkers =========================================================
 function check_proj_cmd_() {
-  eval "$(parse_flags_ "check_proj_cmd_" "s" "$@")"
+  eval "$(parse_flags_ "check_proj_cmd_" "" "$@")"
   (( check_proj_cmd_is_d )) && set -x
 
   local i="$1"
   local typed_name="$2"
   local pkg_name="$3"
+  local flag="$4"
 
-  if ! validate_proj_cmd_strict_ "$typed_name"; then
+  if ! validate_proj_cmd_strict_ "$typed_name" 13 $flag; then
     if (( check_proj_cmd_is_s )); then
-      if save_proj_cmd_ $i "$pkg_name"; then return 0; fi
+      if save_proj_cmd_ $i "$pkg_name" $flag; then return 0; fi
     fi
 
     return 1;
@@ -1150,13 +1151,14 @@ function save_proj_cmd_() {
 
   local i="$1"
   local pkg_name="$2"
+  local flag="$3"
   
   local pkg_name_sanitized=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
 
   local typed_name=$(input_name_ "type your project alias name" "$pkg_name_sanitized")
   if [[ -z "$typed_name" ]]; then return 1; fi
   
-  if ! check_proj_cmd_ -s $i "$typed_name" "$pkg_name"; then return 1; fi
+  if ! check_proj_cmd_ $i "$typed_name" "$pkg_name" $flag; then return 1; fi
 
   if [[ -z "$TEMP_PUMP_PROJECT_SHORT_NAME" ]]; then
     update_proj_cmd_ $i "$typed_name"
@@ -1627,7 +1629,11 @@ function save_proj_() {
   if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
   
   TEMP_PUMP_PROJECT_SHORT_NAME=""
-  if ! save_proj_cmd_ $i "$pkg_name"; then return 1; fi
+  if (( save_proj_is_e )); then
+    if ! save_proj_cmd_ -e $i "$pkg_name"; then return 1; fi
+  else
+    if ! save_proj_cmd_ -a $i "$pkg_name"; then return 1; fi
+  fi
 
   print "  ${pink_cor}project name:${reset_cor} ${PUMP_PROJECT_SHORT_NAME[$i]}" >&1
 
@@ -6227,7 +6233,15 @@ function pro() {
   fi # end of delete
 
   if [[ -z "$proj_arg" ]]; then
-    print " provide a project name" >&2
+    if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+      print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor}"
+      if [[ -n "$CURRENT_PUMP_PACKAGE_MANAGER" ]]; then
+        print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PACKAGE_MANAGER}${reset_cor}"
+      fi
+      print ""
+    else
+      print " provide a project name" >&2
+    fi
     print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
@@ -6295,7 +6309,11 @@ function pro() {
   save_current_proj_ $found
 
   if (( is_refresh )); then
-    print " project set to: ${solid_blue_cor}$CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with ${solid_magenta_cor}$CURRENT_PUMP_PACKAGE_MANAGER${reset_cor}"
+    print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor}"
+    if [[ -n "$CURRENT_PUMP_PACKAGE_MANAGER" ]]; then
+      print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PACKAGE_MANAGER}${reset_cor}"
+    fi
+    print ""
 
     echo "$CURRENT_PUMP_PROJECT_SHORT_NAME" > "$PUMP_PRO_FILE"
     
@@ -6637,7 +6655,11 @@ function help() {
 
   if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     print ""
-    print "  your project is set to:${solid_blue_cor} $CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with${solid_magenta_cor} $CURRENT_PUMP_PACKAGE_MANAGER ${reset_cor}"
+    print -n "   project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor}"
+    if [[ -n "$CURRENT_PUMP_PACKAGE_MANAGER" ]]; then
+      print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PACKAGE_MANAGER}${reset_cor}"
+    fi
+    print ""
   else
     pro -a
     return $?;
@@ -6868,6 +6890,9 @@ function help() {
 }
 
 function validate_proj_cmd_strict_() {
+  eval "$(parse_flags_ "validate_proj_cmd_strict_" "" "$@")"
+  (( validate_proj_cmd_strict_is_d )) && set -x
+
   local proj_cmd="$1"
   local qty="$2"
 
@@ -6875,19 +6900,21 @@ function validate_proj_cmd_strict_() {
     return 1;
   fi
 
-  local reserved=""
-  reserved="$(whence -w "$proj_cmd" 2>/dev/null)"
+  if (( ! validate_proj_cmd_strict_is_e )); then
+    local reserved=""
+    reserved="$(whence -w "$proj_cmd" 2>/dev/null)"
 
-  if (( $? == 0 )); then
-    if [[ $reserved =~ ": command" ]]; then
-      if confirm_from_ "project name is reserved, $reserved - use it anyway?"; then
-        return 0;
-      else
-        return 1;
+    if (( $? == 0 )); then
+      if [[ $reserved =~ ": command" ]]; then
+        if confirm_from_ "project name is reserved, $reserved - use it anyway?"; then
+          return 0;
+        else
+          return 1;
+        fi
       fi
+      print " project name is reserved, $reserved" 2>/dev/tty >&2
+      return 1;
     fi
-    print " project name is reserved, $reserved" 2>/dev/tty >&2
-    return 1;
   fi
 
   return 0;
