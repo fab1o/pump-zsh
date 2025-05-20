@@ -3360,8 +3360,8 @@ function read_commit_() {
   local default_branch="$3"
   local remote_origin="$4"
 
-  local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs -0)
-  local commit_message=$(echo "$line" | cut -d'|' -f2- | xargs -0)
+  local commit_hash=$(echo "$line" | cut -d'|' -f1)
+  local commit_message=$(echo "$line" | cut -d'|' -f2-)
 
   # Check if the commit belongs to the current branch
   if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
@@ -3443,14 +3443,14 @@ function pr() {
     return 1;
   fi
 
-  fetch --quiet
-
   local my_branch="$(git branch --show-current)"
 
   if [[ -z "$my_branch" ]]; then
     print " branch is detached, cannot create pull request" >&2
     return 1;
   fi
+
+  fetch --quiet
 
   local default_branch="$(git config --get init.defaultBranch)"
   local remote_origin="$(get_remote_origin_ "$my_branch")"
@@ -6230,7 +6230,7 @@ function pro() {
 
     print " project not found: $proj_arg" >&2
     return 1;
-  fi # end of delete
+  fi # end of remove project
 
   if [[ -z "$proj_arg" ]]; then
     if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
