@@ -101,6 +101,7 @@ function print_debug_() {
 }
 
 function parse_flags_() {
+  set +x
   if [[ -z "$1" ]]; then
     print "${red_cor} fatal: parse_flags_ requires a prefix${reset_cor}" >&2
     return 1;
@@ -249,6 +250,7 @@ function update_() {
 update_
 
 function cl() {
+  set +x
   is_debug=0
   tput reset
 }
@@ -3360,40 +3362,43 @@ function read_commit_() {
   local default_branch="$3"
   local remote_origin="$4"
 
-  local commit_hash=$(echo "$line" | cut -d'|' -f1)
-  local commit_message=$(echo "$line" | cut -d'|' -f2-)
+  local commit_hash="$(echo "$line" | cut -d'|' -f1 | xargs)"
+  local commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
 
-  # Check if the commit belongs to the current branch
+  # check if the commit belongs to the current branch
   if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
     break;
   fi
 
-  local dirty_pr_title="$commit_message"
-  if [[ $dirty_pr_title =~ ^[[:space:]]*(fix|feat|docs|refactor|test|chore|style|revert)(\([^\)]*\))?:[[:space:]]+ ]]; then
-    pr_title="${dirty_pr_title/${match[0]}/}"
-  else
-    pr_title="$dirty_pr_title"
-  fi
+  # add the commit hash and message to the list
+  pr_commit_msgs+=("- $commit_hash - $commit_message")
 
-  if [[ $dirty_pr_title =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
-    local ticket="${match[1]}"
+  local ticket=""
+  local rest="$commit_message"
 
+  if [[ $rest =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+    ticket="${match[1]}"
     ticket="$(echo "$ticket" | xargs)"
 
-    if [[ $dirty_pr_title =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
-      local rest="${match[1]}"
-      
+    if [[ $rest =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
+      rest="${match[1]}"
       rest="$(echo "$rest" | xargs)"
-      pr_title="${ticket} ${rest}"
     fi
   fi
 
-  # Add the commit hash and message to the list
-  pr_commit_msgs+=("- $commit_hash - $commit_message")
+  local types="fix|feat|docs|refactor|test|chore|style|revert"
+  if [[ $rest =~ "^[[:space:]]*(${(j:|:)${(s:|:)types}}):[[:space:]]*(.*)" ]]; then
+    rest="${match[2]}"
+  fi
+
+  if [[ -n "$ticket" ]]; then
+    pr_title="${ticket} ${rest}"
+    pr_title="$(echo "$pr_title" | xargs)"
+  fi
 
   local head_commit_hash=$(git rev-parse "${remote_origin}/${default_branch}")
 
-  # # Stop if the commit is the origin/HEAD commit
+  # stop if the commit is the origin/HEAD commit
   if [[ "$commit_hash" == "$head_commit_hash" ]]; then
     break;
   fi
@@ -4631,8 +4636,9 @@ function recommit() {
 }
 
 function fetch() {
+  set +x
   eval "$(parse_flags_ "fetch_" "" "$@")"
-  (( fetch_is_d )) && set -x
+  # (( fetch_is_d )) && set -x
 
   if (( fetch_is_h )); then
     print "  ${yellow_cor}fetch${reset_cor} : to fetch all branches and reachable tags"
@@ -6586,7 +6592,8 @@ function __commit() {
       print " install gum:${blue_cor} https://github.com/charmbracelet/gum ${reset_cor}" >&2
       return 1;
     fi
-
+    
+    # types="fix|feat|docs|refactor|test|chore|style|revert"
     local type_commit=$(gum choose "fix" "feat" "docs" "refactor" "test" "chore" "style" "revert")
     if [[ -z "$type_commit" ]]; then
       return 0;
@@ -6612,11 +6619,8 @@ function __commit() {
       local skip=0;
 
       # check if an old commit message already contains the ticket number
-      git log -n 15 --pretty=format:"%h %s" | while read -r line; do
-        commit_hash=$(echo "$line" | awk '{print $1}')
-        message=$(echo "$line" | cut -d' ' -f2-)
-
-        if [[ "$message" == "$ticket"* ]]; then
+      git log -n 15 --pretty=format:"%s" | xargs -0 | while read -r line; do
+        if [[ "$line" == "$ticket"* ]]; then
           skip=1;
           break;
         fi
