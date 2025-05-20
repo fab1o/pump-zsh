@@ -604,6 +604,9 @@ function check_config_file_() {
 
 # save project data to config file
 function update_proj_cmd_() {
+  eval "$(parse_flags_ "update_proj_cmd_" "" "$@")"
+  (( update_proj_cmd_is_d )) && set -x
+
   local i="$1"
   local proj_cmd="$2"
 
@@ -635,12 +638,7 @@ function update_setting_() {
     if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
       eval "CURRENT_${general_key}=\"$value\""
     fi
-
-    if [[ "$general_key" == "PUMP_PROJECT_SHORT_NAME" ]]; then
-      PUMP_PROJECT_SHORT_NAME[$i]="$value"
-    else
-      eval "${general_key}[$i]=\"$value\""
-    fi
+    eval "${general_key}[$i]=\"$value\""
   else
     eval "CURRENT_${general_key}=\"$value\""
   fi
@@ -719,7 +717,7 @@ function choose_proj_folder_() {
 
   local folder_path=""
 
-  print " ${purple_cor} ${header}:${reset_cor}" 1>/dev/tty
+  print "${purple_cor} ${header}:${reset_cor}" 1>/dev/tty
   # print "" 1>/dev/tty
 
   cd "${HOME:-/}" # start from home
@@ -1160,8 +1158,9 @@ function save_proj_cmd_() {
   
   if ! check_proj_cmd_ -s $i "$typed_name" "$pkg_name"; then return 1; fi
 
-  if [[ -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+  if [[ -z "$TEMP_PUMP_PROJECT_SHORT_NAME" ]]; then
     update_proj_cmd_ $i "$typed_name"
+    TEMP_PUMP_PROJECT_SHORT_NAME="$typed_name"
   fi
 }
 
@@ -1225,7 +1224,10 @@ function save_proj_mode_() {
       local is_move=0;
 
       if (( single_mode )); then
-        if confirm_from_ "do you want to move the contents of the project folder to a new folder and re-clone the project?"; then
+        confirm_from_ "do you want to move contents of the project folder to a new folder and re-clone the project?"
+        RET=$?
+        if (( RET == 130 )); then return 130; fi
+        if (( RET == 0 )); then
           is_move=1;
         fi
       else
@@ -1345,7 +1347,7 @@ function save_proj_repo_() {
     if (( RET == 130 )); then return 1; fi
     if (( RET == 0 )); then return 0; fi
   elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
-    confirm_from_ "are you adding a project previously cloned?"
+    confirm_from_ "are you adding an existing project?"
     RET=$?
     if (( RET == 130 )); then return 1; fi
     if (( RET == 0 )); then
@@ -1361,9 +1363,9 @@ function save_proj_repo_() {
     fi
   fi
 
-  if [[ -z "$proj_repo" ]] && is_git_repo_ "$proj_folder" &>/dev/null; then
-    local _pwd="$(pwd)"
-    cd "$proj_folder"
+  local _pwd="$(pwd)"
+
+  if [[ -z "$proj_repo" ]] && open_proj_for_git_ "$proj_folder" &>/dev/null; then
     local remote_origin="$(get_remote_origin_)"
     remote_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
     RET=$?
@@ -1495,7 +1497,7 @@ function detect_pkg_manager_online_() {
 
   local pyproject="pyproject.toml"
 
-  if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject"; then
+  if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]'; then
     manager="poe"
   fi
 
@@ -1613,10 +1615,18 @@ function save_proj_() {
       if ! save_proj_repo_ -a $i "${PUMP_PROJECT_FOLDER[$i]}" "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
       if ! save_proj_folder_ -a $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}" "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
     done
+
+    if is_git_repo_ "${PUMP_PROJECT_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJECT_FOLDER[$i]}" &>/dev/null; then
+      PUMP_PROJECT_SINGLE_MODE[$i]=1
+    elif get_proj_for_git_ "${PUMP_PROJECT_FOLDER[$i]}" &>/dev/null; then
+      PUMP_PROJECT_SINGLE_MODE[$i]=0
+    fi
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
   if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
+  
+  TEMP_PUMP_PROJECT_SHORT_NAME=""
   if ! save_proj_cmd_ $i "$pkg_name"; then return 1; fi
 
   print "  ${pink_cor}project name:${reset_cor} ${PUMP_PROJECT_SHORT_NAME[$i]}" >&1
@@ -1626,15 +1636,15 @@ function save_proj_() {
 
   load_config_entry_ $i
 
-  if (( save_proj_is_f )); then
-    pro "${PUMP_PROJECT_SHORT_NAME[$i]}"
+  if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+    save_current_proj_ $i
+  fi
+
+  if (( save_proj_is_f )) || [[ -z "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+    pro -s "${PUMP_PROJECT_SHORT_NAME[$i]}"
   else
     print "" >&1
-    if (( ${PUMP_PROJECT_SINGLE_MODE[$i]} )); then
-      print "  now try running: ${yellow_cor}${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
-    else
-      print "  now try running: ${yellow_cor}clone ${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
-    fi
+    print "  now try running: ${yellow_cor}${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
   fi
 
   return 0;
@@ -1724,6 +1734,9 @@ function set_aliases_() {
 
 function remove_prj_() {
   i="$1"
+
+  unset_aliases_
+  unset -f "${PUMP_PROJECT_SHORT_NAME[$i]}" &>/dev/null
 
   update_setting_ $i "PUMP_PROJECT_SHORT_NAME" "" # let this one
   update_setting_ $i "PUMP_PROJECT_FOLDER" "" 1>/dev/null
@@ -2432,6 +2445,8 @@ function load_config_entry_() {
 
     # If the value is not set, provide default values for specific keys
     if [[ -z "$value" ]]; then
+      local run=$([[ $PUMP_PACKAGE_MANAGER[$i] == "yarn" ]] && echo "" || echo "run ")
+
       case "$key" in
         # PUMP_PROJECT_SINGLE_MODE) # on clone we want to let the user select the mode if nothing is set on the config
         #   value="0"
@@ -2443,28 +2458,28 @@ function load_config_entry_() {
           value="code"
           ;;
         PUMP_RUN)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run dev"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}dev"
           ;;
         PUMP_RUN_STAGE)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run stage"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}stage"
           ;;
         PUMP_RUN_PROD)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run prod"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}prod"
           ;;
         PUMP_TEST)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run test"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test"
           ;;
         PUMP_COV)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run test:coverage"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test:coverage"
           ;;
         PUMP_TEST_WATCH)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run test:watch"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test:watch"
           ;;
         PUMP_E2E)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run test:e2e"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test:e2e"
           ;;
         PUMP_E2EUI)
-          value="${PUMP_PACKAGE_MANAGER[$i]} run test:e2e-ui"
+          value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test:e2e-ui"
           ;;
         PUMP_PR_APPEND)
           value="0"
@@ -6053,7 +6068,7 @@ function st() {
 
 function pro() {
   # f is to suggest adding a project for $(pwd)
-  eval "$(parse_flags_ "pro_" "aerucfi" "$@")"
+  eval "$(parse_flags_ "pro_" "aerucfis" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
@@ -6271,12 +6286,13 @@ function pro() {
   
   local is_refresh=0
 
-  if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+  if (( pro_is_s )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     is_refresh=1
   fi
 
   # set the current project
-  save_current_proj_ $i
+  load_config_entry_ $found
+  save_current_proj_ $found
 
   if (( is_refresh )); then
     print " project set to: ${solid_blue_cor}$CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with ${solid_magenta_cor}$CURRENT_PUMP_PACKAGE_MANAGER${reset_cor}"
@@ -6624,12 +6640,9 @@ function help() {
     print "  your project is set to:${solid_blue_cor} $CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with${solid_magenta_cor} $CURRENT_PUMP_PACKAGE_MANAGER ${reset_cor}"
   else
     pro -a
-    if (( $? == 0 )) then
-      print " now run${yellow_cor} help${reset_cor} again"
-    fi
-    return 0;
+    return $?;
   fi
-  
+
   print ""
   display_line_ "get started" "${blue_cor}"
   print ""
