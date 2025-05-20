@@ -453,7 +453,8 @@ function input_from_() {
     trap - INT
   fi
 
-  # clear_last_line_
+  _input="$(echo "$_input" | xargs)"
+
   echo "$_input"
   return 0;
 }
@@ -616,11 +617,9 @@ function update_proj_cmd_() {
     fi
   fi
 
-  eval "${proj_cmd[$i]}() { proj_handler_ $i \"\$@\"; }"
+  eval "function ${proj_cmd}() { proj_handler_ $i \"\$@\"; }"
 
   update_setting_ $i "PUMP_PROJECT_SHORT_NAME" "$proj_cmd"
-  
-  print "  ${pink_cor}project name:${reset_cor} $proj_cmd" >&1
 }
 
 function update_setting_() {
@@ -632,30 +631,32 @@ function update_setting_() {
   local general_key="$2" 
   local value="$3"
 
-  if [[ $i -eq 0 || "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-    eval "CURRENT_${general_key}=\"$value\""
-  fi
-
   if (( i > 0 )); then
-    eval "${general_key}[$i]=\"$value\""
+    if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      eval "CURRENT_${general_key}=\"$value\""
+    fi
+
+    if [[ "$general_key" == "PUMP_PROJECT_SHORT_NAME" ]]; then
+      PUMP_PROJECT_SHORT_NAME[$i]="$value"
+    else
+      eval "${general_key}[$i]=\"$value\""
+    fi
+  else
+    eval "CURRENT_${general_key}=\"$value\""
   fi
 
   local key="${general_key}_${i}"
 
   if [[ "$(uname)" == "Darwin" ]]; then
     # macOS (BSD sed) requires correct handling of patterns
-    sed -i '' "s|^$key=[^[:space:]]*|$key=$value|" "$PUMP_CONFIG_FILE"
+    sed -i '' "s|^$key=.*|$key=$value|" "$PUMP_CONFIG_FILE"
   else
     # Linux (GNU sed)
-    sed -i "s|^$key=[^[:space:]]*|$key=$value|" "$PUMP_CONFIG_FILE"
+    sed -i "s|^$key=.*|$key=$value|" "$PUMP_CONFIG_FILE"
   fi
 
   if (( $? != 0 )); then
     print "  warn: failed to update $key in $PUMP_CONFIG_FILE" >&2
-  fi
-
-  if [[ "$general_key" == "PUMP_PROJECT_SHORT_NAME" && -n "$PUMP_PROJECT_SHORT_NAME" ]]; then
-    eval "${PUMP_PROJECT_SHORT_NAME[$i]}() { proj_handler_ $i \"\$@\"; }"
   fi
 
   return 0;
@@ -693,10 +694,8 @@ function input_name_() {
       fi
     fi
     if [[ -n "$typed_value" ]]; then
-      if validate_proj_cmd_ "$typed_value"; then
-        echo "$typed_value"
-        return 0;
-      fi
+      echo "$typed_value"
+      return 0;
     fi
   done
 
@@ -721,6 +720,7 @@ function choose_proj_folder_() {
   local folder_path=""
 
   print " ${purple_cor} ${header}:${reset_cor}" 1>/dev/tty
+  # print "" 1>/dev/tty
 
   cd "${HOME:-/}" # start from home
 
@@ -734,7 +734,7 @@ function choose_proj_folder_() {
         new_folder="${folder_path}/$folder_name"
       fi
 
-      confirm_between_ "do you want to use: "$'\e[94m'${new_folder}$'\e[0m'" or keep browsing?" "use" "browse"
+      confirm_between_ "set project folder to: "$'\e[94m'${new_folder}$'\e[0m'" or continue to browse further?" "set folder" "continue to browse"
       local RET=$?
       if (( RET == 130 )); then
         return 130;
@@ -753,7 +753,7 @@ function choose_proj_folder_() {
 
             if [[ "$realfolder" == "$realfolder_proj" ]]; then
               found=1
-              print "  project folder already in use, choose another one" >&2
+              print "  ${yellow_cor}project folder already in use by another project, choose a new one ${reset_cor}" >&2
               cd "$HOME"
             fi
           fi
@@ -830,7 +830,7 @@ function input_repo_() {
 
     if (( RET == 0 )); then
       local gh_owner=""
-      gh_owner=$(input_from_ "type the github owner account (user or organization)")
+      gh_owner=$(input_from_ "type the github owner account (username or organization)")
       if (( $? != 0 )); then return 1; fi
 
       if [[ -n "$gh_owner" ]]; then
@@ -1020,11 +1020,12 @@ function check_proj_cmd_() {
   (( check_proj_cmd_is_d )) && set -x
 
   local i="$1"
-  local proj_cmd="$2"
+  local typed_name="$2"
+  local pkg_name="$3"
 
-  if ! validate_proj_cmd_ "$proj_cmd"; then
+  if ! validate_proj_cmd_strict_ "$typed_name"; then
     if (( check_proj_cmd_is_s )); then
-      if save_proj_cmd_ $i "$proj_cmd"; then return 0; fi
+      if save_proj_cmd_ $i "$pkg_name"; then return 0; fi
     fi
 
     return 1;
@@ -1040,6 +1041,7 @@ function check_proj_repo_() {
   local i="$1"
   local proj_repo="$2"
   local proj_folder="$3"
+  local pkg_name="$4"
 
   local error_msg=""
 
@@ -1052,10 +1054,10 @@ function check_proj_repo_() {
     else
       if command -v gum &>/dev/null; then
         # so that the spinner can display, add to the end: 2>/dev/tty
-        gum spin --timeout=7s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet
+        gum spin --timeout=7s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet 2>/dev/tty
       else
         print " checking repository uri..."
-        git ls-remote "${proj_repo}" --quiet 1>/dev/tty
+        git ls-remote "${proj_repo}" --quiet
       fi
       if (( $? != 0 )); then
         error_msg="repository uri is invalid or no access rights: $proj_repo"
@@ -1067,7 +1069,7 @@ function check_proj_repo_() {
     print "  $error_msg" 2>/dev/tty >&2
 
     if (( check_proj_repo_is_s )); then
-      if save_proj_repo_ $i "$proj_folder"; then return 0; fi
+      if save_proj_repo_ $i "$proj_folder" "$pkg_name"; then return 0; fi
     fi
 
     return 1;
@@ -1112,6 +1114,8 @@ function check_proj_pkg_manager_() {
 
   local i="$1"
   local pkg_manager="$2"
+  local proj_folder="$3"
+  local proj_repo="$4"
 
   local error_msg=""
 
@@ -1129,7 +1133,7 @@ function check_proj_pkg_manager_() {
     print " $error_msg" 2>/dev/tty >&2
 
     if (( check_proj_pkg_manager_is_s )); then
-      if save_pkg_manager_ $i; then return 0; fi
+      if save_pkg_manager_ $i "$proj_folder" "$proj_repo"; then return 0; fi
     fi
     return 1;
   fi
@@ -1143,7 +1147,7 @@ function clear_last_line_() {
 }
 
 function save_proj_cmd_() {
-  eval "$(parse_flags_ "save_proj_cmd_" "ae" "$@")"
+  eval "$(parse_flags_ "save_proj_cmd_" "" "$@")"
   (( save_proj_cmd_is_d )) && set -x
 
   local i="$1"
@@ -1151,69 +1155,102 @@ function save_proj_cmd_() {
   
   local pkg_name_sanitized=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
 
-  local typed_name=$(input_name_ "type your project command name" "$pkg_name_sanitized")
+  local typed_name=$(input_name_ "type your project alias name" "$pkg_name_sanitized")
   if [[ -z "$typed_name" ]]; then return 1; fi
-  # clear_last_line_
+  
+  if ! check_proj_cmd_ -s $i "$typed_name" "$pkg_name"; then return 1; fi
 
-  if ! check_proj_cmd_ $i "$typed_name"; then return 1; fi
-
-  update_proj_cmd_ $i "$typed_name"
+  if [[ -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+    update_proj_cmd_ $i "$typed_name"
+  fi
 }
 
 function choose_mode_() {
-  local proj_folder=".../$(basename "$1")"
+  local proj_folder="$(basename "$1")"
 
   print ""
 
-  local multiple_title=$(gum style --align=center --margin=0 --align=left --padding="0 9" --border=none --width=40 "example of multiple")
-  local single_title=$(gum style --align=center --margin=0 --align=left --padding="0 11" --border=none --width=40 "example of single")
+  local multiple_title=$(gum style --align=center --margin="0" --align=left --padding="0 7" --border=none --width=40 --foreground 212 "example of multiple mode")
+  local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 57 "example of single mode")
 
   local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
 
   local multiple=$'
-  '"$proj_folder"'/
+  '"$(basename $(dirname "$1"))"'/
+  └── '"${proj_folder}"'/
       ├── main/
-      ├── dev/
-      ├── feature-branch/
+      ├── feature-1/
+      ├── feature-2/
       └── revs/
-          ├── pr-branch/
-          └── another-pr/'
+          ├── rev.pr-1/
+          └── rev.pr-2/'
 
   local single=$'
-  . \
-  ├── '"$proj_folder"'/ 
-  └── '"$proj_folder"'-revs/'
+  '"$(basename $(dirname "$1"))"'/
+  ├── '"${proj_folder}"'/ 
+  └── '"${proj_folder}"'-revs/
+      ├── rev.pr-1/
+      └── rev.pr-2/
+  
 
+  '
 
-  multiple=$(gum style --margin=0 --align=left --padding "1" --border=normal --width=40 --border-foreground 212 "$multiple")
-  single=$(gum style --margin=0 --align=left --padding "3" --border=normal --width=40 --border-foreground 57 "$single")
+  multiple=$(gum style --margin="0" --align=left --padding="0 0 1 0" --border=normal --width=40 --border-foreground 212 "$multiple")
+  single=$(gum style --margin="0" --align=left --padding="0 0 1 0" --border=normal --width=40 --border-foreground 57 "$single")
 
   local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
   
   gum join --align=center --vertical "$titles" "$examples"
 
   confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'"\
-      "$'\e[0m'"See the example above: "$'\n\e[0m'"       • Multiple mode creates a separate folder for each branch. "$'\n\e[0m'"       • Single mode manages all branches within a single folder." "multiple" "single" $2
+      "$'\e[0m'"see the example above: "$'\n\e[0m'"       • multiple mode creates a separate folder for new feature branches"$'\n\e[0m'"       • single mode manages all feature branches within a single folder" "multiple" "single" $2
 
 }
 
 function save_proj_mode_() {
-  eval "$(parse_flags_ "save_proj_mode_" "ae" "$@")"
+  eval "$(parse_flags_ "save_proj_mode_" "" "$@")"
   (( save_proj_mode_is_d )) && set -x
 
   local i="$1"
   local proj_folder="$2"
-  local single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
+  local single_mode="$3"
 
-  if [[ -n "$single_mode" ]] && (( single_mode == 0 || single_mode == 1 )); then return 0; fi
-    
-  choose_mode_ "$proj_folder"
-  local RET=$?
-  if (( RET == 130 )); then return 130; fi
+  if [[ -z "$single_mode" ]] || (( single_mode != 0 && single_mode != 1 )); then
+    choose_mode_ "$proj_folder"
+    local RET=$?
+    if (( RET == 130 )); then return 130; fi
+    single_mode=$RET
 
-  update_setting_ $i "PUMP_PROJECT_SINGLE_MODE" "$RET"
+    if [[ -d "$proj_folder" && -n "$(ls -A "$proj_folder")" ]]; then
+      local is_move=0;
 
-  if (( RET )); then
+      if (( single_mode )); then
+        if confirm_from_ "do you want to move the contents of the project folder to a new folder and re-clone the project?"; then
+          is_move=1;
+        fi
+      else
+        is_move=1;
+      fi
+
+      if (( is_move )); then
+        local folder_name="$(basename "$proj_folder")"
+        local parent_folder="$(dirname "$proj_folder")"
+        local new_proj_folder="${parent_folder}/${folder_name}-backup"
+
+        if [[ ! -d "$new_proj_folder" ]]; then
+          mkdir -p "$new_proj_folder"
+        fi
+
+        setopt null_glob dot_glob
+        mv "$proj_folder"/* "$proj_folder"/.* "$new_proj_folder" &>/dev/null
+        unsetopt null_glob dot_glob
+      fi
+    fi
+  fi
+
+  update_setting_ $i "PUMP_PROJECT_SINGLE_MODE" "$single_mode"
+
+  if (( single_mode )); then
     print "  ${pink_cor}project mode:${reset_cor} single" >&1
   else
     print "  ${pink_cor}project mode:${reset_cor} multiple" >&1
@@ -1221,12 +1258,17 @@ function save_proj_mode_() {
 }
 
 function save_proj_folder_() {
-  eval "$(parse_flags_ "save_proj_folder_" "are" "$@")"
+  eval "$(parse_flags_ "save_proj_folder_" "aer" "$@")"
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
   local pkg_name="$2"
   local proj_repo="$3"
+  local proj_folder="$4"
+
+  if [[ -n "$proj_folder" && "$proj_folder" == "${PUMP_PROJECT_FOLDER[$i]}"  ]]; then
+    return 0;
+  fi
 
   if [[ -n "$proj_repo" ]]; then
     pkg_name="$(get_repo_name_ "$proj_repo" 1 2>/dev/tty)"
@@ -1234,10 +1276,9 @@ function save_proj_folder_() {
 
   local pkg_name_sanitized=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
 
-  local proj_folder=""
-  local folder_exists=0
   local RET=0
-
+  local folder_exists=0
+  
   if (( save_proj_folder_is_e )); then
     if [[ -n "${PUMP_PROJECT_FOLDER[$i]}" ]]; then
       confirm_from_ "do you want to keep using project folder: "$'\e[94m'${PUMP_PROJECT_FOLDER[$i]}$'\e[0m'" ?"
@@ -1245,40 +1286,41 @@ function save_proj_folder_() {
       if (( RET == 130 )); then return 1; fi
       if (( RET == 0 )); then return 0; fi
     fi
-    
+  elif (( save_proj_folder_is_r )); then
+    RET=1
+    header="select the cloned folder"
+  elif [[ -z "$proj_folder" ]]; then
     confirm_between_ "would you like create a new folder or use an existing folder?" "create new folder" "use existing folder"
     RET=$?
-  elif [[ -z "$pkg_name_sanitized" ]]; then
-    confirm_between_ "would you like to start from scratch or use an existing project?" "start from scratch" "use existing project"
-    RET=$?
+    header="select the existing folder"
   fi
 
-  if (( RET == 130 )); then return 1; fi
-  if (( RET == 1 )); then
-    folder_exists=1
-    header="select the folder"
-  else
-    if [[ -z "$pkg_name_sanitized" ]]; then
-      confirm_from_ "do you have a git repository?"
-      RET=$?
-      if (( RET == 130 )); then return 1; fi
-      if (( RET == 0 )); then return 0; fi
+  if [[ -z "$proj_folder" ]]; then
+    if (( RET == 130 )); then return 1; fi
+    if (( RET == 1 )); then
+      folder_exists=1
+    else
+      if [[ -z "$pkg_name_sanitized" ]]; then
+        confirm_from_ "do you have a git repository?"
+        RET=$?
+        if (( RET == 130 )); then return 1; fi
+        if (( RET == 0 )); then return 0; fi
+      fi
+
+      header="choose the parent directory where the new project folder will be created"
     fi
 
-    header="choose the parent directory where the new project folder will be created"
-  fi
+    proj_folder=$(choose_proj_folder_ $i "$header" "$pkg_name_sanitized" "$folder_exists")
+    if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  proj_folder=$(choose_proj_folder_ $i "$header" "$pkg_name_sanitized" "$folder_exists")
-  if [[ -z "$proj_folder" ]]; then return 1; fi
+    if ! check_proj_folder_ $i "$proj_folder" "$pkg_name_sanitized" "$proj_repo"; then return 1; fi
+  
+    if (( folder_exists == 0 )); then
+      proj_folder="${proj_folder}/$pkg_name_sanitized"
 
-  if ! check_proj_folder_ $i "$proj_folder" "$pkg_name_sanitized" "$proj_repo"; then return 1; fi
-  # clear_last_line_
-
-  if (( folder_exists == 0 )); then
-    proj_folder="${proj_folder}/$pkg_name_sanitized"
-
-    if [[ ! -d "$proj_folder" ]]; then
-      mkdir -p "$proj_folder"
+      if [[ ! -d "$proj_folder" ]]; then
+        mkdir -p "$proj_folder"
+      fi
     fi
   fi
 
@@ -1293,64 +1335,171 @@ function save_proj_repo_() {
 
   local i="$1"
   local proj_folder="$2"
-  
-  local proj_repo=""
+  local pkg_name="$3"
+  local proj_repo="$4"
   local RET=0
 
-  if (( save_proj_repo_is_e )) && [[ -n "${PUMP_PROJECT_REPO[$i]}" ]]; then
-    confirm_from_ "do you want to keep using repository: "$'\e[94m'${PUMP_PROJECT_REPO[$i]}$'\e[0m'" ?"
+  if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
+    confirm_from_ "do you want to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'" ?"
     RET=$?
     if (( RET == 130 )); then return 1; fi
     if (( RET == 0 )); then return 0; fi
-  fi
-
-  if is_git_repo_ "$proj_folder" &>/dev/null; then
-    local _pwd="$(pwd)"
-    cd "$proj_folder"
-    local remote_origin="$(get_remote_origin_)"
-    remote_repo="$(git remote get-url $remote_origin 2>/dev/null)"
+  elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
+    confirm_from_ "are you adding a project previously cloned?"
     RET=$?
-    cd "$_pwd"
-
-    if (( RET == 0 )) && [[ -n "$remote_repo" ]]; then
-      confirm_from_ "do you want to use repository: "$'\e[94m'${remote_repo}$'\e[0m'" ?"
+    if (( RET == 130 )); then return 1; fi
+    if (( RET == 0 )); then
+      if ! save_proj_folder_ -r $i "$pkg_name"; then return 1; fi
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
+    else
+      confirm_from_ "is there a repository for this project?"
       RET=$?
       if (( RET == 130 )); then return 1; fi
-      if (( RET == 0 )); then
-        update_setting_ $i "PUMP_PROJECT_REPO" "$remote_repo"
-        print "  ${pink_cor}project repository:${reset_cor} ${remote_repo}" >&1
+      if (( RET == 1 )); then
         return 0;
       fi
     fi
   fi
 
-  proj_repo=$(input_repo_ "type the repository uri (ssh or https)" "$proj_repo")
+  if [[ -z "$proj_repo" ]] && is_git_repo_ "$proj_folder" &>/dev/null; then
+    local _pwd="$(pwd)"
+    cd "$proj_folder"
+    local remote_origin="$(get_remote_origin_)"
+    remote_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
+    RET=$?
+    cd "$_pwd"
+
+    if (( RET == 0 )) && [[ -n "$remote_repo" && "$remote_repo" != "${PUMP_PROJECT_REPO[$i]}" ]]; then
+      confirm_from_ "do you want to use repository: "$'\e[94m'${remote_repo}$'\e[0m'" ?"
+      RET=$?
+      if (( RET == 130 )); then return 1; fi
+      if (( RET == 0 )); then
+        proj_repo="$remote_repo"
+      fi
+    fi
+  fi
+
+  if (( save_proj_repo_is_a )); then
+    if [[ -z "$proj_repo" ]]; then
+      proj_repo=$(input_repo_ "type the repository uri (ssh or https)")
+    fi
+  else
+    proj_repo=$(input_repo_ "type the repository uri (ssh or https)" "$proj_repo")
+  fi
+
   if [[ -z "$proj_repo" ]]; then return 1; fi
-  
-  if ! check_proj_repo_ -s $i "$proj_repo" "$proj_folder";  then return 1; fi
-  # clear_last_line_
+
+  if [[ "$proj_repo" == "." ]]; then
+    proj_repo=""
+  else
+    # don't pass $proj_folder to check_proj_repo_ so it doesn't ask again if we want to use the same repo
+    if ! check_proj_repo_ -s $i "$proj_repo" "";  then return 1; fi
+
+    print "  ${pink_cor}project repository:${reset_cor} ${proj_repo}" >&1
+  fi
 
   update_setting_ $i "PUMP_PROJECT_REPO" "$proj_repo"
-
-  print "  ${pink_cor}project repository:${reset_cor} ${proj_repo}" >&1
 }
 
 function save_pkg_manager_() {
-  eval "$(parse_flags_ "save_pkg_manager_" "ae" "$@")"
+  eval "$(parse_flags_ "save_pkg_manager_" "" "$@")"
   (( save_pkg_manager_is_d )) && set -x
 
   local i="$1"
-  local pkg_manager="$2"
+  local proj_folder="$2"
+  local proj_repo="$3"
 
-  pkg_manager=($(choose_one_ 0 "choose package manager" 10 "npm" "yarn" "pnpm" "bun" "poe"))
-  if [[ -z "$pkg_manager" ]]; then return 1; fi
+  local pkg_manager="$(detect_pkg_manager_ "$proj_folder")"
 
-  if ! check_proj_pkg_manager_ $i "$pkg_manager"; then return 1; fi
-  # clear_last_line_
+  if [[ -n "$pkg_manager" ]]; then
+    confirm_from_ "confirm package manager: "$'\e[94m'${pkg_manager}$'\e[0m'" ?"
+    local RET=$?
+    if (( RET == 130 )); then return 1; fi
+    if (( RET == 1 )); then
+      pkg_manager=""
+      proj_repo=""
+    fi
+  fi
+
+  if [[ -z "$pkg_manager" && -n "$proj_repo" ]]; then
+    pkg_manager=$(detect_pkg_manager_online_ "$proj_repo")
+
+    if [[ -n "$pkg_manager" ]]; then
+      confirm_from_ "confirm package manager: "$'\e[94m'${pkg_manager}$'\e[0m'" ?"
+      local RET=$?
+      if (( RET == 130 )); then return 1; fi
+      if (( RET == 1 )); then
+        pkg_manager=""
+      fi
+    fi
+  fi
+
+  if [[ -z "$pkg_manager" ]]; then
+    pkg_manager=($(choose_one_ 0 "choose package manager" 10 "npm" "yarn" "pnpm" "bun" "poe"))
+    if [[ -z "$pkg_manager" ]]; then return 1; fi
+
+    if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
+  fi
 
   update_setting_ $i "PUMP_PACKAGE_MANAGER" "$pkg_manager"
   
   print "  ${pink_cor}package manager:${reset_cor} ${pkg_manager}" >&1
+}
+
+function detect_pkg_manager_online_() {
+  local repo="$1"
+  
+  if [[ -z "$repo" ]]; then
+    return 1
+  fi
+
+  local url=""
+  if [[ "$repo" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
+    local owner_repo="${match[1]}"
+    url="https://raw.githubusercontent.com/${owner_repo}/refs/heads/main"
+  else
+    return 1
+  fi
+
+  local manager=""
+
+  if command -v jq &>/dev/null; then
+    manager=$(curl -fs "${url}/package.json" | jq -r --arg key "$key_name" '.[$key]')
+    if [[ "$manager" == "null" ]]; then
+      manager=""
+    fi
+  else
+    manager=$(curl -fs "${url}/package.json" | grep -E '"'$key_name'"\s*:\s*"' | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
+  fi
+
+  if [[ -n "$manager" ]]; then
+    echo "$manager"
+    return 0;
+  fi
+
+  # 1. Lockfile-based detection (most reliable)
+  if curl -fs "${url}/bun.lockb" -o /dev/null; then
+    manager="bun"
+  elif curl -fs "${url}/pnpm-lock.yaml" -o /dev/null; then
+    manager="pnpm"
+  elif curl -fs "${url}/yarn.lock" -o /dev/null; then
+    manager="yarn"
+  elif curl -fs "${url}/package-lock.json" -o /dev/null; then
+    manager="npm"
+  fi
+
+  if [[ -n "$manager" ]]; then
+    echo "$manager"
+    return 0;
+  fi
+
+  local pyproject="pyproject.toml"
+
+  if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject"; then
+    manager="poe"
+  fi
+
+  echo "$manager"
 }
 
 function detect_pkg_manager_() {
@@ -1370,6 +1519,17 @@ function detect_pkg_manager_() {
 
   cd "$folder"
 
+  if [[ -f "$pkg_json" ]]; then
+    local line="$(get_from_pkg_json_ "packageManager" "$pkg_json")"
+    
+    if [[ $line =~ ([^\"]+) ]]; then
+      manager="${match[1]%%@*}"
+      echo "$manager"
+      cd "$_pwd"
+      return 0;
+    fi
+  fi
+
   # 1. Lockfile-based detection (most reliable)
   if [[ -f "bun.lockb" ]]; then
     manager="bun"
@@ -1381,37 +1541,19 @@ function detect_pkg_manager_() {
     manager="npm"
   fi
 
-  # 2. Parse `packageManager` field in package.json (npm >= v7)
-  if [[ -z "$manager" && -f "$pkg_json" ]]; then
-    # Grep for "packageManager" line and extract name before '@'
-    local line
-    line=$(grep -E '"packageManager"\s*:\s*"' "$pkg_json" | head -n 1)
-    if [[ $line =~ \"packageManager\"\s*:\s*\"([^\"]+)\" ]]; then
-      manager="${match[1]%%@*}"  # e.g., "pnpm@7.0.0" → "pnpm"
-    fi
+  if [[ -n "$manager" ]]; then
+    echo "$manager"
+    cd "$_pwd"
+    return 0;
   fi
 
-  if [[ -z "$manager" && -f "$pyproject" ]]; then
-    if grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject"; then
-      manager="poe"
-    fi
+  if [[ -f "$pyproject" ]] && grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject"; then
+    manager="poe"
+  else
+    manager="npm"
   fi
-
-  # # 3. Fallback: check available binaries in system PATH
-  # if [[ -z "$manager" ]]; then
-  #   for bin in bun pnpm yarn npm; do
-  #     if command -v "$bin" &>/dev/null; then
-  #       manager="$bin"
-  #       break
-  #     fi
-  #   done
-  # fi
 
   cd "$_pwd"
-
-  if [[ -z "$manager" ]]; then
-    return 1
-  fi
 
   echo "$manager"
 }
@@ -1425,7 +1567,7 @@ function save_proj_() {
   local pkg_name="$2"
 
   if [[ -z "$i" || $i -lt 1 || $i -gt 9 ]]; then
-    print " fatal: save_proj_ project index is invalid: $i"
+    print " fatal: save_proj_ index is invalid: $i"
     return 1;
   fi
 
@@ -1439,62 +1581,60 @@ function save_proj_() {
     display_line_ "add new project" "${cor}"
   fi
 
-  local proj_folder=""
-  local proj_repo=""
-  local pkg_manager=""
-  local single_mode=""
+  if (( save_proj_is_e )); then
+    if ! save_proj_repo_ -e $i "${PUMP_PROJECT_FOLDER[$i]}" "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
+    if ! save_proj_folder_ -e $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
 
-  if (( save_proj_is_f )); then
+  elif (( save_proj_is_f )); then
     # for pro pwd, all the settings come from the pwd
-    proj_folder="$(pwd)"
-    update_setting_ $i "PUMP_PROJECT_FOLDER" "$proj_folder"
-    
-    if is_git_repo_ "$proj_folder" &>/dev/null; then
-      local remote_origin="$(get_remote_origin_)"
-      proj_repo="$(git remote get-url $remote_origin 2>/dev/null)"
-    else
-      if ! save_proj_repo_ -a $i "$proj_folder"; then return 1; fi
+    PUMP_PROJECT_REPO[$i]=""
+    PUMP_PROJECT_FOLDER[$i]=""
+    PUMP_PACKAGE_MANAGER[$i]=""
+    PUMP_PROJECT_SINGLE_MODE[$i]=1
+
+    local proj_folder="$(pwd)"
+    local proj_repo="$(git remote get-url "$(get_remote_origin_)" 2>/dev/null)"
+
+    while [[ -z "${PUMP_PROJECT_FOLDER[$i]}" ]]; do
+      if ! save_proj_repo_ -a $i "$proj_folder" "$pkg_name" "$proj_repo"; then return 1; fi
+      if ! save_proj_folder_ -a $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}" "$proj_folder"; then return 1; fi
+
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
-    fi
-    update_setting_ $i "PUMP_PROJECT_REPO" "$proj_repo"
+    done
 
-    pkg_manager="$(detect_pkg_manager_ "$proj_folder")"
+  elif (( save_proj_is_a )); then
+    PUMP_PROJECT_REPO[$i]=""
+    PUMP_PROJECT_FOLDER[$i]=""
+    PUMP_PACKAGE_MANAGER[$i]=""
+    PUMP_PROJECT_SINGLE_MODE[$i]=""
 
-    if [[ -n "$proj_repo" && -n "$pkg_manager" ]]; then
-      update_setting_ $i "PUMP_PACKAGE_MANAGER" "$pkg_manager"
-      single_mode=1
-    fi
-
-    update_setting_ $i "PUMP_PROJECT_SINGLE_MODE" "$single_mode"
-
-  else
-   if (( save_proj_is_a )); then
-      PUMP_PROJECT_REPO[$i]=""
-      PUMP_PROJECT_FOLDER[$i]=""
-
-      while [[ -z "$PUMP_PROJECT_FOLDER[$i]" && -z "$PUMP_PROJECT_REPO[$i]" ]]; do
-        if ! save_proj_repo_ -a $i "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
-        if ! save_proj_folder_ -a $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
-      done
-    else # edit
-      if ! save_proj_repo_ -e $i "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
-      if ! save_proj_folder_ -e $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
-    fi
-  
-    if ! save_pkg_manager_ $i; then return 1; fi
-    if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
+    while [[ -z "${PUMP_PROJECT_FOLDER[$i]}" ]]; do
+      if ! save_proj_repo_ -a $i "${PUMP_PROJECT_FOLDER[$i]}" "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
+      if ! save_proj_folder_ -a $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}" "${PUMP_PROJECT_FOLDER[$i]}"; then return 1; fi
+    done
   fi
 
+  if ! save_pkg_manager_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
+  if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
   if ! save_proj_cmd_ $i "$pkg_name"; then return 1; fi
+
+  print "  ${pink_cor}project name:${reset_cor} ${PUMP_PROJECT_SHORT_NAME[$i]}" >&1
 
   display_line_ "" "${cor}"
   print "  ${cor}project saved!${reset_cor}" >&1
 
+  load_config_entry_ $i
+
   if (( save_proj_is_f )); then
-    eval "pro $PUMP_PROJECT_SHORT_NAME[$i]"
+    pro "${PUMP_PROJECT_SHORT_NAME[$i]}"
   else
     print "" >&1
-    print "  now try running: ${yellow_cor}${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
+    if (( ${PUMP_PROJECT_SINGLE_MODE[$i]} )); then
+      print "  now try running: ${yellow_cor}${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
+    else
+      print "  now try running: ${yellow_cor}clone ${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}" >&1
+    fi
   fi
 
   return 0;
@@ -1541,9 +1681,12 @@ function unset_aliases_() {
 }
 
 function set_aliases_() {
-  check_proj_pkg_manager_ 0 "$CURRENT_PUMP_PACKAGE_MANAGER"
+  local i="$1"
+
+  if ! check_proj_pkg_manager_ -s $i "$CURRENT_PUMP_PACKAGE_MANAGER" "$CURRENT_PUMP_PROJECT_FOLDER"; then return 1; fi
+
   if [[ -z "$CURRENT_PUMP_PACKAGE_MANAGER" ]]; then
-    return 1;
+    CURRENT_PUMP_PACKAGE_MANAGER="${PUMP_PACKAGE_MANAGER[$i]}"
   fi
 
   # Reset all aliases
@@ -1582,10 +1725,7 @@ function set_aliases_() {
 function remove_prj_() {
   i="$1"
 
-  unset_aliases_
-  unset -f "$proj_arg" &>/dev/null
-
-  update_setting_ $i "PUMP_PROJECT_SHORT_NAME" ""
+  update_setting_ $i "PUMP_PROJECT_SHORT_NAME" "" # let this one
   update_setting_ $i "PUMP_PROJECT_FOLDER" "" 1>/dev/null
   update_setting_ $i "PUMP_PROJECT_REPO" "" 1>/dev/null
   update_setting_ $i "PUMP_PROJECT_SINGLE_MODE" "" 1>/dev/null
@@ -1646,11 +1786,11 @@ function save_current_proj_() {
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
 }
 
-function clear_curr_prj_() {
-  load_config_entry_
-  
-  save_current_proj_ 0
-}
+# function clear_curr_prj_() {
+#   load_config_entry_
+#   unset_aliases_
+#   save_current_proj_ 0
+# }
 
 function get_proj_index_() {
   local proj_arg="$1"
@@ -1814,11 +1954,6 @@ function get_proj_for_pkg_from_within_() {
 function is_git_repo_() {
   local folder="$1"
 
-  if [[ -z "$1" ]]; then
-    print " fatal: no argument provided" >&2
-    return 2;
-  fi
-
   if [[ -z "$folder" || ! -d "$folder" ]]; then
     print " not a git repository (or any of the parent directories): $folder" >&2 
     return 1;
@@ -1844,8 +1979,8 @@ function get_default_folder_() {
   local default_folder="$(git config --get init.defaultBranch)"
   cd "$_pwd"
 
-  if is_git_repo_ "$proj_folder/$default_folder" &>/dev/null; then    
-    echo "$proj_folder/$default_folder"
+  if is_git_repo_ "${proj_folder}/${default_folder}" &>/dev/null; then    
+    echo "${proj_folder}/${default_folder}"
   else
     echo "$git_folder"
   fi
@@ -2242,18 +2377,20 @@ function get_clone_default_branch_() {
 
 function get_from_pkg_json_() {
   local key_name="${1:-name}"
-  
-  local pkg_json="package.json"
+  local pkg_json="${2:-"package.json"}"
 
   if [[ -f "$pkg_json" ]]; then
-    local pkg_name;
+    local value;
     if command -v jq &>/dev/null; then
-      pkg_name=$(jq -r --arg key "$key_name" '.[$key]' "$pkg_json")
+      value=$(jq -r --arg key "$key_name" '.[$key]' "$pkg_json")
+      if [[ "$value" == "null" ]]; then
+        value=""
+      fi
     else
-      pkg_name=$(grep "\"$key_name\"" "$pkg_json" | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
+      value=$(grep -E '"'$key_name'"\s*:\s*"' "$pkg_json" | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
     fi
-    if [[ -n "$pkg_name" ]]; then
-      echo "$pkg_name"
+    if [[ -n "$value" ]]; then
+      echo "$value"
       return 0;
     fi
   fi
@@ -2262,7 +2399,7 @@ function get_from_pkg_json_() {
 function load_config_entry_() {
   local i=${1:-0}
 
-  keys=(
+  local keys=(
     PUMP_PROJECT_SINGLE_MODE
     PUMP_PACKAGE_MANAGER
     PUMP_CODE_EDITOR
@@ -2289,6 +2426,7 @@ function load_config_entry_() {
     PUMP_PRINT_README
   )
 
+  local key=""
   for key in "${keys[@]}"; do
     value=$(sed -n "s/^${key}_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
 
@@ -2436,7 +2574,7 @@ function load_config_() {
 
     [[ -z "$proj_cmd" ]] && continue  # skip if not defined
 
-    if ! check_proj_cmd_ $i "$proj_cmd"; then
+    if ! validate_proj_cmd_ "$proj_cmd"; then
       print "  in config data at PUMP_PROJECT_SHORT_NAME_${i}" >&2
       continue;
     fi
@@ -2474,55 +2612,51 @@ function load_config_() {
 }
 
 function activate_pro_() {
+  local use_pwd="$1"
+
+  local pump_pro_file_value=""
+  local project_names=()
+
   # pro pwd
-  if ! pro -f "pwd" 2>/dev/null; then
-    # Read the current project short name from the PUMP_PRO_FILE if it exists
-    pump_pro_file_value=""
-    if [[ -f "$PUMP_PRO_FILE" ]]; then
-      pump_pro_file_value=$(<"$PUMP_PRO_FILE")
+  if (( use_pwd )) && pro -f "pwd" 2>/dev/null; then
+    return 0;
+  fi
 
-      if [[ -n "$pump_pro_file_value" ]]; then
-        local i=0
-        for i in {1..9}; do
-          if [[ "$pump_pro_file_value" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-            if ! check_proj_cmd_ $i "$pump_pro_file_value" &>/dev/null; then
-              rm -f "$PUMP_PRO_FILE" &>/dev/null
-              pump_pro_file_value=""
-            fi
-            break;
+  # Read the current project short name from the PUMP_PRO_FILE if it exists
+  if [[ -f "$PUMP_PRO_FILE" ]]; then
+    pump_pro_file_value=$(<"$PUMP_PRO_FILE")
+
+    if [[ -n "$pump_pro_file_value" ]]; then
+      local i=0
+      for i in {1..9}; do
+        if [[ "$pump_pro_file_value" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+          if ! validate_proj_cmd_ "$pump_pro_file_value" &>/dev/null; then
+            rm -f "$PUMP_PRO_FILE" &>/dev/null
+            pump_pro_file_value=""
+          else
+            project_names=("$pump_pro_file_value")
           fi
-        done
-      fi
-    fi
-
-    # Create an array of project names to loop through
-    project_names=("$pump_pro_file_value")
-
-    # Loop through 1 to 10 to add additional project names to the array
-    local i=0
-    for i in {1..9}; do
-      if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if [[ ! " ${project_names[@]} " =~ " ${PUMP_PROJECT_SHORT_NAME[$i]} " ]]; then
-          project_names+=("${PUMP_PROJECT_SHORT_NAME[$i]}")
-        fi
-      fi
-    done
-    
-    # Remove any empty values in the array (e.g., if $pump_pro_file_value is empty)
-    project_names=("${project_names[@]/#/}")
-
-    #print "project_names: ${project_names[@]}"
-
-    # Loop over the projects to check and execute them
-    for project in "${project_names[@]}"; do
-      if [[ -n "$project" ]]; then
-        #print " pro project: $project"
-        if pro -f "$project" 2>/dev/null; then
           break;
         fi
-      fi
-    done
+      done
+    fi
   fi
+
+  local i=0
+  for i in {1..9}; do
+    if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      if [[ ! " ${project_names[@]} " =~ " ${PUMP_PROJECT_SHORT_NAME[$i]} " ]]; then
+        project_names+=("${PUMP_PROJECT_SHORT_NAME[$i]}")
+      fi
+    fi
+  done
+
+  # Loop over the projects to check and execute them
+  for project in "${project_names[@]}"; do
+    if pro -f "$project" 2>/dev/null; then
+      break;
+    fi
+  done
 }
 
 # general functions =========================================================
@@ -2819,13 +2953,16 @@ function covc() {
   local _clone=""
   local _cov=""
   local single_mode=""
+  local found=0
 
   # find project settings
   if [[ -n "$proj_cmd" ]]; then
     local i=0
     for i in {1..9}; do
       if [[ "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder"; then
+        found=$i
+
+        if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder" "$proj_cmd"; then
           return 1;
         fi
         proj_repo="${PUMP_PROJECT_REPO[$i]}"
@@ -2850,7 +2987,7 @@ function covc() {
   fi
 
   if [[ -z "$_cov" || -z "$_setup" ]]; then
-    print " PUMP_COV or PUMP_SETUP is missing for ${blue_cor}${proj_cmd}${reset_cor} - edit your pump.zshenv then run${yellow_cor} refresh ${reset_cor}" >&2
+    print " PUMP_COV_$found or PUMP_SETUP_$found is missing for ${blue_cor}${proj_cmd}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
@@ -2898,7 +3035,7 @@ function covc() {
       pushd "$cov_folder" &>/dev/null
 
       if [[ -n "$_clone" ]]; then
-        eval "$_clone" &>/dev/null
+        eval "$_clone" &>/dev/null;
       fi
 
       git switch "$branch" --quiet &>/dev/null
@@ -3196,20 +3333,11 @@ function add() {
 local pr_commit_msgs=()
 local pr_title=""
 
-function read_commits_() {
+function read_commit_() {
   local line="$1"
-
-  local remote_origin=""
-  local my_branch="$(git branch --show-current)"
-
-  if [[ -z "$my_branch" ]]; then
-    print " branch is detached, cannot push" >&2
-    return 1;
-  fi
-  
-  local remote_origin="$(get_remote_origin_ "$my_branch")"
-
-  local default_branch="$(git config --get init.defaultBranch)"
+  local my_branch="$2"
+  local default_branch="$3"
+  local remote_origin="$4"
 
   local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs -0)
   local commit_message=$(echo "$line" | cut -d'|' -f2- | xargs -0)
@@ -3229,28 +3357,43 @@ function read_commits_() {
   if [[ $dirty_pr_title =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
     local ticket="${match[1]}"
 
-    local trimmed="${ticket#"${str%%[![:space:]]*}"}"
-    trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+    ticket="$(echo "$ticket" | xargs)"
 
-    pr_title="$trimmed"
-    
     if [[ $dirty_pr_title =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
       local rest="${match[1]}"
-      trimmed="${rest#"${str%%[![:space:]]*}"}"
-      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-
-      pr_title="$pr_title$trimmed"
+      
+      rest="$(echo "$rest" | xargs)"
+      pr_title="${ticket} ${rest}"
     fi
   fi
 
   # Add the commit hash and message to the list
-  commit_msgs+=("- $commit_hash - $commit_message")
+  pr_commit_msgs+=("- $commit_hash - $commit_message")
 
   local head_commit_hash=$(git rev-parse "${remote_origin}/${default_branch}")
 
   # # Stop if the commit is the origin/HEAD commit
   if [[ "$commit_hash" == "$head_commit_hash" ]]; then
     break;
+  fi
+}
+
+function read_commits_() {
+  local my_branch="$1"
+  local default_branch="$2"
+  local remote_origin="$3"
+  local remote_branch="$4"
+
+  if [[ -n "$remote_branch" ]]; then
+    git --no-pager log --pretty=format:'%H | %s' \
+      "${remote_origin}/${default_branch}..${remote_origin}/${my_branch}" | xargs -0 | while IFS= read -r line; do
+      read_commit_ "$line" "$my_branch" "$default_branch" "$remote_origin"
+    done
+  else
+    git --no-pager log --no-merges --pretty=format:'%H | %s' \
+      $(git merge-base HEAD "${default_branch}")..HEAD | xargs -0 | while IFS= read -r line; do
+      read_commit_ "$line" "$my_branch" "$default_branch" "$remote_origin"
+    done
   fi
 }
 
@@ -3282,31 +3425,29 @@ function pr() {
   fetch --quiet
 
   local my_branch="$(git branch --show-current)"
-  local default_branch="$(git config --get init.defaultBranch)"
-  local remote_origin="$(get_remote_origin_ "$my_branch")"
-  
-  local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
 
-  if [[ -n "$remote_branch" ]]; then
-    git --no-pager log --pretty=format:'%H | %s' \
-      "${remote_origin}/${default_branch}..${remote_origin}/${my_branch}" | xargs -0 | while IFS= read -r line; do
-      read_commits_ "$line"
-    done
-  else
-    git --no-pager log --no-merges --pretty=format:'%H | %s' \
-      $(git merge-base HEAD "${default_branch}")..HEAD | xargs -0 | while IFS= read -r line; do
-      read_commits_ "$line"
-    done
+  if [[ -z "$my_branch" ]]; then
+    print " branch is detached, cannot create pull request" >&2
+    return 1;
   fi
 
-  if [[ ! -n "$pr_commit_msgs" ]]; then
+  local default_branch="$(git config --get init.defaultBranch)"
+  local remote_origin="$(get_remote_origin_ "$my_branch")"
+  local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
+
+  pr_commit_msgs=()
+  pr_title=""
+
+  read_commits_ "$my_branch" "$default_branch" "$remote_origin" "$remote_branch"
+
+  if [[ -z "$pr_commit_msgs" || -z "$pr_title" ]]; then
     print " no commits found, cannot create pull request" >&2
     return 1;
   fi
 
   local pr_body=""
 
-  for commit in "${commit_msgs[@]}"; do
+  for commit in "${pr_commit_msgs[@]}"; do
     pr_body+="${commit}\n"
   done
 
@@ -3356,7 +3497,7 @@ function pr() {
     local i=0
     for i in {1..9}; do
       if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        if check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "${PUMP_PROJECT_FOLDER[$i]}"; then
+        if check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "${PUMP_PROJECT_FOLDER[$i]}" "$CURRENT_PUMP_PROJECT_SHORT_NAME"; then
           proj_repo="${PUMP_PROJECT_REPO[$i]}"
         fi
         break;
@@ -3449,6 +3590,7 @@ function run() {
 
   local proj_folder=""
   local _run="$CURRENT_PUMP_RUN"
+  local found=0
 
   if [[ "$_env" == "stage" ]]; then
     _run="$CURRENT_PUMP_RUN_STAGE"
@@ -3460,6 +3602,8 @@ function run() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        found=$i
+
         if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
           return 1;
         fi
@@ -3480,7 +3624,7 @@ function run() {
   fi
 
   if [[ -z "$_run" ]]; then
-    print " missing PUMP_RUN" >&2
+    print " missing PUMP_RUN_$found" >&2
     print " edit your pump.zshenv config, refresh then try again" >&2
     return 1;
   fi
@@ -3522,10 +3666,11 @@ function run() {
 
   pushd "$folder_to_run" &>/dev/null
 
-  print "folder_to_run: $folder_to_run"
-
   print " run $_env on ${gray_cor}$(shorten_path_ "$folder_to_run") ${reset_cor}:${pink_cor} $_run ${reset_cor}"
-  eval "$_run"
+  
+  if ! eval "$_run"; then
+    print " failed to run PUMP_RUN_${found}" >&2
+  fi
 }
 
 function setup() {
@@ -3558,11 +3703,14 @@ function setup() {
 
   local proj_folder="";
   local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PACKAGE_MANAGER $([[ $CURRENT_PUMP_PACKAGE_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
+  local found=0
 
   if [[ -n "$proj_arg" ]]; then
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        found=$i
+
         if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
           return 1;
         fi
@@ -3581,7 +3729,7 @@ function setup() {
   fi
 
   if [[ -z "$_setup" ]]; then
-    print " missing PUMP_SETUP" >&2
+    print " missing PUMP_SETUP_$found" >&2
     print " edit your pump.zshenv config, refresh then try again" >&2
     return 1;
   fi
@@ -3623,7 +3771,10 @@ function setup() {
   pushd "$folder_to_setup" &>/dev/null
 
   print " setup on ${gray_cor}$(shorten_path_ "$(pwd)") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
-  eval "$_setup"
+
+  if ! eval "$_setup"; then
+    print " failed to run PUMP_SETUP_${found}" >&2
+  fi
 }
 
 function revs() {
@@ -3765,7 +3916,7 @@ function rev() {
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
       found=1
 
-      if ! check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "$proj_folder"; then
+      if ! check_proj_repo_ -s $i "${PUMP_PROJECT_REPO[$i]}" "$proj_folder" "$proj_arg"; then
         return 1;
       fi
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
@@ -3952,14 +4103,14 @@ function clone() {
   local default_branch=""
   local print_readme=1
   local single_mode=""
-
   local found=0
+
   local i=0
   for i in {1..9}; do
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
       found=$i
 
-      if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder"; then
+      if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder" "$proj_arg"; then
         return 1;
       fi
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
@@ -3969,7 +4120,7 @@ function clone() {
       fi
       proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
-      if ! save_proj_mode_ $i "$proj_folder"; then return 1; fi
+      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
 
       single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
       _clone="${PUMP_CLONE[$i]}"
@@ -3996,11 +4147,11 @@ function clone() {
   fi
 
   if (( single_mode )) && [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
-    print "${solid_blue_cor} $proj_arg${reset_cor} already cloned in 'single mode': $proj_folder" >&2
+    print "${solid_blue_cor} $proj_arg${reset_cor} is already cloned in single mode: $proj_folder" >&2
     print "" >&2
-    print " to clone a different branch, edit the project to 'multiple mode':" >&2
-    print "  1. ${yellow_cor}pro -e ${proj_arg}${reset_cor}" >&2
-    print "  2. then choose 'multiple' and save project" >&2
+    print " to switch to multiple mode, remove the project then add it again:" >&2
+    print "  1. ${yellow_cor}pro -r ${proj_arg}${reset_cor}" >&2
+    print "  2. ${yellow_cor}pro -a ${proj_arg}${reset_cor} and choose multiple mode" >&2
     return 1;
   fi
 
@@ -4028,7 +4179,9 @@ function clone() {
 
     if [[ -n "$_clone" ]]; then
       print "  ${pink_cor}$_clone ${reset_cor}"
-      eval "$_clone"
+      if ! eval "$_clone"; then
+        print " failed to run PUMP_CLONE_${found}" >&2
+      fi
     fi
 
     if [[ $print_readme -eq 1 ]]; then
@@ -4112,11 +4265,11 @@ function clone() {
   git config init.defaultBranch $default_branch
 
   local my_branch="$(git branch --show-current)"
-  local remote_origin="$(get_remote_origin_ "$my_branch")"
-  local remote_branch="$(git ls-remote --heads "$remote_origin" "$branch_arg" | awk '{print $2}')"
 
   if [[ "$branch_arg" != "$my_branch" ]]; then
     # check if branch exist
+    local remote_origin="$(get_remote_origin_ "$my_branch")"
+    local remote_branch="$(git ls-remote --heads "$remote_origin" "$branch_arg" | awk '{print $2}')"
     local local_branch=$(git branch --list "$branch_arg" | head -n 1)
 
     if [[ -z "$remote_branch" && -z "$local_branch" ]]; then
@@ -4130,7 +4283,9 @@ function clone() {
 
   if [[ -n "$_clone" ]]; then
     print "  ${pink_cor}$_clone ${reset_cor}"
-    eval "$_clone"
+    if ! eval "$_clone"; then
+      print " failed to run PUMP_CLONE_${found}" >&2
+    fi
   fi
 
   if [[ $print_readme -eq 1 ]]; then
@@ -5102,7 +5257,6 @@ function reseta() {
 
   local my_branch="$(git branch --show-current)"
   local remote_origin="$(get_remote_origin_ "$my_branch")"
-  
   local remote_branch="$(git ls-remote --heads "$remote_origin" "$my_branch" | awk '{print $2}')"
 
   local RET=0
@@ -5188,7 +5342,7 @@ function gha_() {
   local workflow_id="$(gh run list --workflow="${workflow}" --limit 1 --json databaseId --jq '.[0].databaseId')"
 
   if [[ -z "$workflow_id" ]]; then
-    print "⚠️${yellow_cor} workflow not found ${reset_cor}" >&2
+    #print "⚠️${yellow_cor} workflow not found ${reset_cor}" >&2
     return 1;
   fi
 
@@ -5268,10 +5422,13 @@ function gha() {
   local proj_folder="$(pwd)"  # default is current folder
   local gha_interval=""
   local gha_workflow=""
+  local found=0
 
   local i=0
   for i in {1..9}; do
     if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      found=$i
+
       if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
         return 1;
       fi
@@ -5328,7 +5485,7 @@ function gha() {
   local RET=0
 
   if (( ! gha_is_a )); then
-    print " checking workflow${purple_cor} $workflow_arg${reset_cor}..."
+    print " checking workflow..."
     gha_ "$workflow_arg"
     RET=$?
   else
@@ -5340,7 +5497,7 @@ function gha() {
     print ""
 
     while true; do
-      print " checking workflow${purple_cor} $workflow_arg${reset_cor}..."
+      print " checking workflow..."
 
       gha_ "$workflow_arg"
       RET=$?
@@ -5358,13 +5515,7 @@ function gha() {
   if (( RET == 0 && ask_save )); then
     # ask to save the workflow
     if confirm_from_ "would you like to save \"$workflow_arg\" as the default workflow for this project?"; then
-      local i=0
-      for i in {1..9}; do
-        if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-          update_setting_ $i "PUMP_GHA_WORKFLOW" "\"$workflow_arg\""
-          break
-        fi
-      done
+      update_setting_ $found "PUMP_GHA_WORKFLOW" "\"$workflow_arg\""
     fi
     return 0;
   fi
@@ -5902,29 +6053,27 @@ function st() {
 
 function pro() {
   # f is to suggest adding a project for $(pwd)
-  eval "$(parse_flags_ "pro_" "aerusfi" "$@")"
+  eval "$(parse_flags_ "pro_" "aerucfi" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
-    print "  ${yellow_cor}pro <pro>${reset_cor} : to set a project"
-    print "  ${yellow_cor}pro -a <pro>${reset_cor} : to add a new project"
-    print "  ${yellow_cor}pro -e <pro>${reset_cor} : to edit a project"
-    print "  ${yellow_cor}pro -r <pro>${reset_cor} : to remove a project"
-    print "  ${yellow_cor}pro -u <pro>${reset_cor} : to unset project"
-    print "  ${yellow_cor}pro -i <pro>${reset_cor} : to display readme file of project"
-    print "  ${yellow_cor}pro -s <pro>${reset_cor} : to show project data"
+    print "  ${yellow_cor}pro <name>${reset_cor} : to set a project"
+    print "  ${yellow_cor}pro -c ${solid_yellow_cor}[<name>]${reset_cor} : to show project config"
+    print "  ${yellow_cor}pro -a ${solid_yellow_cor}[<name>]${reset_cor} : to add a new project"
+    print "  --"
+    print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
+    print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
+    # print "  ${yellow_cor}pro -u <name>${reset_cor} : to unset project"
+    print "  ${yellow_cor}pro -i <name>${reset_cor} : to display the project's readme"
     
     if [[ -n "${PUMP_PROJECT_SHORT_NAME[*]}" ]]; then
       print ""
-      print -n " projects: ${blue_cor} "
+      print -n " projects: | ${blue_cor}"
       local i=0
       for i in {1..9}; do
         if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
           print -n "${PUMP_PROJECT_SHORT_NAME[$i]}"
-          local j=$(( i + 1 ))
-          if [[ -n "${PUMP_PROJECT_SHORT_NAME[$j]}" ]]; then
-            print -n ", "
-          fi
+          print -n "${reset_cor} | ${blue_cor}"
         fi
       done
       print "${reset_cor}"
@@ -5938,6 +6087,7 @@ function pro() {
     # display readme file of project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to display readme" >&2
+      print " ${yellow_cor} pro -i <name>${reset_cor}" >&2
       return 1;
     fi
 
@@ -5969,8 +6119,8 @@ function pro() {
     return 1;
   fi
 
-  if (( pro_is_s )); then
-    # show project
+  if (( pro_is_c )); then
+    # show project config
     if [[ -z "$proj_arg" ]]; then
       print_current_proj_ 0
       return $?;
@@ -5993,6 +6143,7 @@ function pro() {
     # edit project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to edit" >&2
+      print " ${yellow_cor} pro -e <name>${reset_cor}" >&2
       return 1;
     fi
 
@@ -6005,7 +6156,7 @@ function pro() {
     done
     
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -a $proj_arg${reset_cor} to add project" >&2
+    print " ${yellow_cor} pro -a ${proj_arg}${reset_cor} to add project" >&2
     return 1;
   fi
   
@@ -6014,13 +6165,15 @@ function pro() {
     local i=0
     for i in {1..9}; do
       if [[ -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        if [[ -n "$proj_arg" ]]; then
+          if ! check_proj_cmd_ $i "$proj_arg"; then return 1; fi
+        fi
         save_proj_ -a $i "$proj_arg"
         return $?;
       fi
     done
 
     print " no more slots available, please remove one to add a new one" >&2
-    
     return 1;
   fi
 
@@ -6028,7 +6181,14 @@ function pro() {
     # remove project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to delete" >&2
+      print " ${yellow_cor} pro -r <name>${reset_cor}" >&2
       return 1;
+    fi
+
+    local re_activate=0;
+
+    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]] && ! is_proj_folder_ "$(pwd)" &>/dev/null; then
+      re_activate=1
     fi
 
     local i=0
@@ -6036,13 +6196,14 @@ function pro() {
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         if remove_prj_ $i; then
           print " project removed: $proj_arg"
+          
+          if (( re_activate )); then
+            activate_pro_ 0
+            return $?;
+          fi
+  
+          return 0;
         fi
-        
-        if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-          clear_curr_prj_
-          activate_pro_
-        fi
-        return 0;
       fi
     done
 
@@ -6050,29 +6211,10 @@ function pro() {
     return 1;
   fi # end of delete
 
-  if (( pro_is_u )); then
-    # unset project
-    if [[ -z "$proj_arg" ]]; then
-      print " provide a project name to unset" >&2
-      return 1;
-    fi
-
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        # unset aliases
-        clear_curr_prj_
-        return 0;
-      fi
-    done
-
-    print " project not found: $proj_arg" >&2
-    return 1;
-  fi
-
   if [[ -z "$proj_arg" ]]; then
-    pro -h
-    return 0;
+    print " provide a project name" >&2
+    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
+    return 1;
   fi
 
   # pro pwd
@@ -6086,12 +6228,11 @@ function pro() {
       local proj_cmd=$(sanitize_pkg_name_ "$pkg_name")
 
       local remote_origin="$(get_remote_origin_)"
-
       local proj_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
 
       local i=0 foundI=0 emptyI=0
       for i in {1..9}; do
-        if [[ $foundI -eq 0 && "$proj_repo" == "${PUMP_PROJECT_REPO[$i]}" || "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+        if [[ $foundI -eq 0 ]] && [[ "$proj_repo" == "${PUMP_PROJECT_REPO[$i]}" || "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
           foundI=$i
         fi
         if [[ $emptyI -eq 0 && -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -6128,10 +6269,10 @@ function pro() {
     return 1;
   fi
   
-  local is_refresh=1
+  local is_refresh=0
 
-  if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-    is_refresh=0
+  if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+    is_refresh=1
   fi
 
   # set the current project
@@ -6145,11 +6286,13 @@ function pro() {
     export CURRENT_PUMP_PROJECT_SHORT_NAME="$CURRENT_PUMP_PROJECT_SHORT_NAME"
 
     if [[ -n "$CURRENT_PUMP_PRO" ]]; then
-      eval "$CURRENT_PUMP_PRO"
+      if ! eval "$CURRENT_PUMP_PRO"; then
+        print " failed to run PUMP_PRO_${found}" >&2
+      fi
     fi
 
     unset_aliases_
-    set_aliases_
+    set_aliases_ $found
   fi
 
   return 0;
@@ -6231,14 +6374,18 @@ function proj_handler_() {
     fi
   fi
 
+  local resolved_folder=""
+
   # resolve folder_arg
   if (( single_mode )); then
-    folder_arg="$proj_folder"
+    resolved_folder="$proj_folder"
   else
     if [[ -n "$folder_arg" && -d "${proj_folder}/${folder_arg}" ]]; then
-      (( ! use_default_folder )) && folder_arg="${proj_folder}/${folder_arg}"
+      if (( ! use_default_folder )); then
+        resolved_folder="${proj_folder}/${folder_arg}"
+      fi
     else
-      folder_arg="$proj_folder"
+      resolved_folder="$proj_folder"
       
       local dirs=($(get_folders_ "$proj_folder"))
       
@@ -6246,7 +6393,7 @@ function proj_handler_() {
         local chosen_folder=($(choose_one_ 1 "choose folder to open" 20 "${dirs[@]}"))
         
         if [[ -n "$chosen_folder" ]]; then
-          folder_arg="${proj_folder}/${chosen_folder}"
+          resolved_folder="${proj_folder}/${chosen_folder}"
         fi
       fi
     fi
@@ -6254,18 +6401,15 @@ function proj_handler_() {
 
   pro "$proj_cmd"
 
-  if [[ -z "$folder_arg" ]]; then return 1; fi
-  
-  if ! pushd "$folder_arg" &>/dev/null; then return 1; fi
+  if [[ -z "$resolved_folder" ]]; then return 1; fi
+  if ! pushd "$resolved_folder" &>/dev/null; then return 1; fi
 
-  local dirs=($(get_folders_ "$proj_folder"))
-  if (( ! ${#dirs[@]} )); then
-    print " now type ${yellow_cor}clone ${proj_cmd}${reset_cor} to get started by cloning your first project."
+  if [[ -z "$(ls -A "$resolved_folder")" ]]; then
+    print " now type ${yellow_cor}clone ${proj_cmd}${reset_cor} to get started by cloning your first project"
     return 0;
   fi
 
   if (( ! single_mode )); then return 0; fi
-
   if [[ -z "$branch_arg" ]]; then return 0; fi
 
   co "$branch_arg"
@@ -6478,33 +6622,16 @@ function help() {
   if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     print ""
     print "  your project is set to:${solid_blue_cor} $CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with${solid_magenta_cor} $CURRENT_PUMP_PACKAGE_MANAGER ${reset_cor}"
-    print "  type:${solid_blue_cor} pro${reset_cor} -h for usage"
-  fi
-
-  if [[ -z "$CURRENT_PUMP_PROJECT_FOLDER" || -z "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+  else
+    print "  type ${solid_blue_cor}pro${reset_cor} to set a project"
     print ""
-    save_proj_ -a 1
-
-    if [[ -z "$CURRENT_PUMP_PROJECT_FOLDER" || -z "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-      print ""
-      print " configure${solid_yellow_cor} $PUMP_CONFIG_FILE${reset_cor} as shown in the example below:"
-      print ""
-      print " PUMP_PROJECT_SHORT_NAME_1=${PUMP_PROJECT_SHORT_NAME[1]:-pump}"
-      print " PUMP_PROJECT_FOLDER_1=${PUMP_PROJECT_FOLDER[1]:-"$HOME/pump-zsh"}"
-      print ""
-      print " then restart your terminal, then type${yellow_cor} help${reset_cor} again"
-      print ""
-    else
-      refresh
-      print " now run${yellow_cor} help${reset_cor} again"
-    fi
     return 0;
   fi
   
   print ""
   display_line_ "get started" "${blue_cor}"
   print ""
-  print "  1. set a project, type:${blue_cor} pro${reset_cor}"
+  print "  1. set a project, type:${solid_blue_cor} pro${reset_cor}"
   print "  2. clone project, type:${blue_cor} clone${reset_cor}"
   print "  3. setup project, type:${blue_cor} setup${reset_cor}"
   print "  4. run a project, type:${blue_cor} run${reset_cor}"
@@ -6725,39 +6852,52 @@ function help() {
   print "  to learn more, visit:${blue_cor} https://github.com/fab1o/pump-zsh/wiki ${reset_cor}"
 }
 
+function validate_proj_cmd_strict_() {
+  local proj_cmd="$1"
+  local qty="$2"
+
+  if ! validate_proj_cmd_ "$proj_cmd" $qty; then
+    return 1;
+  fi
+
+  local reserved=""
+  reserved="$(whence -w "$proj_cmd" 2>/dev/null)"
+
+  if (( $? == 0 )); then
+    if [[ $reserved =~ ": command" ]]; then
+      if confirm_from_ "project name is reserved, $reserved - use it anyway?"; then
+        return 0;
+      else
+        return 1;
+      fi
+    fi
+    print " project name is reserved, $reserved" 2>/dev/tty >&2
+    return 1;
+  fi
+
+  return 0;
+}
+
 function validate_proj_cmd_() {
   local proj_cmd="$1"
-  local qty=${2:-12}
+  local qty=${2:-13}
 
   local error_msg=""
 
   if [[ -z "$proj_cmd" ]]; then
     error_msg="project name is missing"
-  elif ! [[ "$proj_cmd" =~ ^[a-z0-9][a-z0-9-]*$ && ${#typed_value} -le $qty ]]; then
-    error_msg="project name is invalid: no special characters, $qty max"
+  elif [[ ${#proj_cmd} -gt $qty ]]; then
+    error_msg="project name is invalid: $qty max characters"
+  elif ! [[ "$proj_cmd" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    error_msg="project name is invalid: no special characters"
   else
-    local invalid_proj_cmds=(
-      "main" "master" "stage" "staging" "prod" "release"
-      "yarn" "npm" "pnpm" "bun" "back" "add" "new" "remove" "rm" "install" "cd" "uninstall" "update" "init" "pushd" "popd" "ls" "dir" "ll"
-      "pro" "rev" "revs" "clone" "setup" "run" "test" "testw" "covc" "cov" "e2e" "e2eui" "recommit" "refix" "clear"
-      "rdev" "dev" "stage" "prod" "gha" "pr" "push" "repush" "pushf" "add" "commit" "build" "i" "ig" "deploy" "fix" "format" "lint"
-      "tsc" "start" "sbb" "sb" "renb" "co" "reseta" "clean" "delb" "prune" "discard" "restore"
-      "st" "gconf" "fetch" "pull" "glog" "gll" "glr" "reset" "resetw" "reset1" "reset2" "reset3" "reset4" "reset5" "reset6"
-      "dtag" "tag" "tags" "pop" "stash" "stashes" "rebase" "merge" "rc" "conti" "mc" "chp" "chc" "abort"
-      "cl" "del" "help" "kill" "nver" "nlist" "path" "refresh" "pwd" "empty" "upgrade" "quiet" "skip" "." ".."
-    )
-
-    if [[ " ${invalid_proj_cmds[@]} " =~ " $proj_cmd " || "$proj_cmd" == -* ]]; then
-      error_msg="project name is invalid"
-    else
-      # check for duplicates across other indices
-      for j in {1..10}; do
-        if [[ $j -ne $i && "${PUMP_PROJECT_SHORT_NAME[$j]}" == "$proj_cmd" ]]; then
-          error_msg="project name already in use"
-          break;
-        fi
-      done
-    fi
+    # check for duplicates across other indices
+    for j in {1..10}; do
+      if [[ $j -ne $i && "${PUMP_PROJECT_SHORT_NAME[$j]}" == "$proj_cmd" ]]; then
+        error_msg="project name already in use: $proj_cmd"
+        break;
+      fi
+    done
   fi
 
   if [[ -n "$error_msg" ]]; then
@@ -6848,11 +6988,11 @@ load_config_
 local i=0
 for i in {1..9}; do
   if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-    eval "${PUMP_PROJECT_SHORT_NAME[$i]}() { proj_handler_ $i \"\$@\"; }"
+    eval "function ${PUMP_PROJECT_SHORT_NAME[$i]}() { proj_handler_ $i \"\$@\"; }"
   fi
 done
 
-activate_pro_ # set project
+activate_pro_ 1 # set project
 
 
 # ==========================================================================
