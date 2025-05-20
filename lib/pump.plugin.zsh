@@ -6623,8 +6623,10 @@ function help() {
     print ""
     print "  your project is set to:${solid_blue_cor} $CURRENT_PUMP_PROJECT_SHORT_NAME${reset_cor} with${solid_magenta_cor} $CURRENT_PUMP_PACKAGE_MANAGER ${reset_cor}"
   else
-    print "  type ${solid_blue_cor}pro${reset_cor} to set a project"
-    print ""
+    pro -a
+    if (( $? == 0 )) then
+      print " now run${yellow_cor} help${reset_cor} again"
+    fi
     return 0;
   fi
   
