@@ -3369,7 +3369,7 @@ function read_commit_() {
   fi
 
   local dirty_pr_title="$commit_message"
-  if [[ $dirty_pr_title =~ '.*\b(fix|feat|docs|refactor|test|chore|style|revert)(\s*\([^)]*\))?:\s*' ]]; then
+  if [[ $dirty_pr_title =~ ^[[:space:]]*(fix|feat|docs|refactor|test|chore|style|revert)(\([^\)]*\))?:[[:space:]]+ ]]; then
     pr_title="${dirty_pr_title/${match[0]}/}"
   else
     pr_title="$dirty_pr_title"
@@ -3872,22 +3872,19 @@ function revs() {
 
   local rev_choices=$(ls -d rev* | xargs -0 | sort -fu)
 
+  cd "$_pwd"
+
   if [[ -z "$rev_choices" ]]; then
-    cd "$_pwd"
     print " no revs for $proj_folder" >&2
     print " ${yellow_cor} rev${reset_cor} to open a review" >&2
     return 1;
   fi
 
-  local choice=$(gum choose --limit=1 --header " choose review to open:" $(echo "$rev_choices" | tr ' ' '\n'))
+  local choice=$(echo "$rev_choices" | gum choose --limit=1 --header " choose review to open:")
 
   if [[ -n "$choice" ]]; then
-    rev "$proj_arg" "${choice//rev./}" 1>/dev/null
+    rev "$proj_arg" "${choice//rev./}"
   fi
-
-  cd "$_pwd"
-
-  return 0;
 }
 
 function rev() {
@@ -4005,8 +4002,10 @@ function rev() {
 
   local full_rev_folder="$revs_folder/rev.$branch_folder"
 
+  local is_open_editor=1
+
   if [[ -d "$full_rev_folder" ]]; then
-    print " review already exist, opening${green_cor} $(shorten_path_ "$full_rev_folder") ${reset_cor} and pulling latest changes..."
+    print " opening review: ${green_cor}$(basename "$full_rev_folder")${reset_cor} and pulling latest changes..."
   else
     local remote_origin="$(get_remote_origin_ "$branch")"
     local remote_branch=$(git ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
@@ -4036,17 +4035,15 @@ function rev() {
     fi
     reseta
   fi
-  
-  local warn_msg=""
 
   git checkout "$branch" --quiet
   
+  local warn_msg=""
+  
   if ! pull --quiet; then
-    is_open_editor=1
+    is_open_editor=0
     warn_msg="${yellow_cor} warn: could not pull latest changes, probably already merged ${reset_cor}"
   fi
-
-  local is_open_editor=0
 
   if [[ -n "$_setup" ]]; then
     print "${pink_cor} $_setup ${reset_cor}"
@@ -4062,8 +4059,6 @@ function rev() {
     print "$warn_msg"
     print ""
   fi
-
-  return 0;
 }
 
 function clone() {
