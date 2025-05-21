@@ -16,13 +16,4 @@ cp -Rf README.md "$DEST_DIR"
 VERSION=$(grep '"version"' package.json | head -1 | sed -E 's/.*"version": *"([^"]+)".*/\1/')
 echo "$VERSION" > "$DEST_DIR"/.version
 
-# DEST_DIR_CONFIG="$HOME/.oh-my-zsh/plugins/pump/config"
-# DEST_CONFIG="$DEST_DIR_CONFIG/pump.zshenv"
-# SRC_CONFIG="./config/pump.zshenv"
-
-# if [ ! -f "$DEST_CONFIG" ]; then
-#   mkdir -p "$DEST_DIR_CONFIG"
-#   cp "$SRC_CONFIG" "$DEST_CONFIG"
-# fi
-
 print " pump in version $VERSION!"

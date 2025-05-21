@@ -186,6 +186,18 @@ PUMP_COV_8=
 PUMP_COV_9=
 
 # optional
+# Command to run after PUMP_COV has executed, usually to open the coverage report
+PUMP_OPEN_COV_1=
+PUMP_OPEN_COV_2=
+PUMP_OPEN_COV_3=
+PUMP_OPEN_COV_4=
+PUMP_OPEN_COV_5=
+PUMP_OPEN_COV_6=
+PUMP_OPEN_COV_7=
+PUMP_OPEN_COV_8=
+PUMP_OPEN_COV_9=
+
+# optional
 # default: PUMP_PACKAGE_MANAGER run test:watch
 # Command to run for alias `testw`
 PUMP_TEST_WATCH_1=

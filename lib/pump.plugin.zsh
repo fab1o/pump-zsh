@@ -321,7 +321,7 @@ function ll_remove_node_() {
     fi
 
     id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break
+    [[ "$id" == "$head" ]] && break;
   done
 
   return 1
@@ -337,7 +337,7 @@ function ll_traverse_() {
   while true; do
     print "pro=${PUMP_PROJECT_SHORT_NAME[${node_project[$id]}]}, folder=${node_folder[$id]}, branch=${node_branch[$id]}"
     id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break
+    [[ "$id" == "$head" ]] && break;
   done
 }
 
@@ -352,7 +352,7 @@ function ll_save_() {
   while true; do
     echo "${node_project[$id]}|${node_folder[$id]}|${node_branch[$id]}" >> "$file"
     id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break
+    [[ "$id" == "$head" ]] && break;
   done
 }
 
@@ -969,7 +969,7 @@ function delete_pump_working_() {
       if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         rm -f "${PUMP_WORKING_FILE[$i]}"
         PUMP_WORKING[$i]=""
-        break
+        break;
       fi
     done
   fi
@@ -1792,6 +1792,7 @@ function save_current_proj_() {
   CURRENT_PUMP_PRO="${PUMP_PRO[$i]}"
   CURRENT_PUMP_TEST="${PUMP_TEST[$i]}"
   CURRENT_PUMP_COV="${PUMP_COV[$i]}"
+  CURRENT_PUMP_OPEN_COV="${PUMP_OPEN_COV[$i]}"
   CURRENT_PUMP_TEST_WATCH="${PUMP_TEST_WATCH[$i]}"
   CURRENT_PUMP_E2E="${PUMP_E2E[$i]}"
   CURRENT_PUMP_E2EUI="${PUMP_E2EUI[$i]}"
@@ -1856,6 +1857,7 @@ function print_current_proj_() {
     print "${solid_magenta_cor} PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}"
     print "${solid_magenta_cor} PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}"
     print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
+    print "${solid_magenta_cor} PUMP_OPEN_COV_$i=${reset_cor}${PUMP_OPEN_COV_[$i]}"
     print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
     print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
     print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
@@ -1887,6 +1889,7 @@ function print_current_proj_() {
   print "${pink_cor} CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO"
   print "${pink_cor} CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR"
   print "${pink_cor} CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV"
+  print "${pink_cor} CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV"
   print "${pink_cor} CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST"
   print "${pink_cor} CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH"
   print "${pink_cor} CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E"
@@ -2432,6 +2435,7 @@ function load_config_entry_() {
     PUMP_PRO
     PUMP_TEST
     PUMP_COV
+    PUMP_OPEN_COV
     PUMP_TEST_WATCH
     PUMP_E2E
     PUMP_E2EUI
@@ -2539,6 +2543,9 @@ function load_config_entry_() {
       PUMP_COV)
         PUMP_COV[$i]="$value"
         ;;
+      PUMP_OPEN_COV)
+        PUMP_OPEN_COV[$i]="$value"
+        ;;
       PUMP_TEST_WATCH)
         PUMP_TEST_WATCH[$i]="$value"
         ;;
@@ -2592,10 +2599,10 @@ function load_config_() {
     proj_cmd=$(sed -n "s/^PUMP_PROJECT_SHORT_NAME_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
       print " something is wrong with your config data at PUMP_PROJECT_SHORT_NAME_${i}" >&2
-      continue
+      continue;
     fi
 
-    [[ -z "$proj_cmd" ]] && continue  # skip if not defined
+    [[ -z "$proj_cmd" ]] && continue;  # skip if not defined
 
     if ! validate_proj_cmd_ "$proj_cmd"; then
       print "  in config data at PUMP_PROJECT_SHORT_NAME_${i}" >&2
@@ -2609,7 +2616,7 @@ function load_config_() {
     proj_repo=$(sed -n "s/^PUMP_PROJECT_REPO_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
       print " something is wrong with your config data at PUMP_PROJECT_REPO_${i}" >&2
-      continue
+      continue;
     fi
 
     PUMP_PROJECT_REPO[$i]="$proj_repo"
@@ -2619,7 +2626,7 @@ function load_config_() {
     proj_folder=$(sed -n "s/^PUMP_PROJECT_FOLDER_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
       print " something is wrong with your config data at PUMP_PROJECT_FOLDER_${i}" >&2
-      continue
+      continue;
     fi
 
     if [[ -n "$proj_folder" ]]; then
@@ -2680,6 +2687,36 @@ function activate_pro_() {
       break;
     fi
   done
+}
+
+function branch_status_() {
+  local branch="$1"
+  local default_branch="$(git config --get init.defaultBranch)"
+
+  if [[ -z "$branch" ]]; then
+    branch="$(git config --get init.defaultBranch)";
+  fi
+
+  if [[ -z "$branch" ]]; then
+    return 0;
+  fi
+
+  local remote_origin="$(get_remote_origin_ "$branch")"
+
+  git fetch "$remote_origin" "$branch" --quiet
+  read behind ahead < <(git rev-list --left-right --count "$remote_origin/$branch...HEAD")
+
+  if [[ "$branch" == "$default_branch" ]]; then
+    if (( behind )); then
+      print " ${yellow_cor}warning${reset_cor}: your branch is behind "$branch" by $behind commits and ahead by $ahead commits" >&2
+    fi
+  else
+    if (( behind || ahead )); then
+      print " ${yellow_cor}warning${reset_cor}: your branch is behind "$branch" by $behind commits and ahead by $ahead commits" >&2
+    fi
+  fi
+
+  echo "$behind $ahead"
 }
 
 # general functions =========================================================
@@ -2933,7 +2970,7 @@ function refix() {
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_PUSH_ON_REFIX" 1
-            break
+            break;
           fi
         done
       fi
@@ -2963,54 +3000,27 @@ function covc() {
   if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  # local git_status=$(git status --porcelain 2>/dev/null)
-  # if [[ -n "$git_status" ]]; then
-  #   print " uncommitted changes detected, cannot switch branches";
-  #   return 1;
-  # fi
-
-  local proj_cmd="$CURRENT_PUMP_PROJECT_SHORT_NAME"
-  local proj_folder=""
-  local proj_repo=""
-  local _setup=""
-  local _clone=""
-  local _cov=""
-  local single_mode=""
-  local found=0
-
-  # find project settings
-  if [[ -n "$proj_cmd" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        found=$i
-
-        if ! check_proj_repo_ -s $i "$PUMP_PROJECT_REPO[$i]" "$proj_folder" "$proj_cmd"; then
-          return 1;
-        fi
-        proj_repo="${PUMP_PROJECT_REPO[$i]}"
-
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_cmd" "$proj_repo"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
-        _setup="${PUMP_SETUP[$i]}"
-        _clone="${PUMP_CLONE[$i]}"
-        _cov="${PUMP_COV[$i]}"
-        single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
-        break
-      fi
-    done
-  fi
-
-  if [[ -z "$proj_folder" || -z "$proj_cmd" || -z "$proj_repo" ]]; then
-    print " project settings are missing, specify a project, type ${yellow_cor}pro${reset_cor}" >&2
+  if [[ -z "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
+    print " project is not set, use ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
-  if [[ -z "$_cov" || -z "$_setup" ]]; then
-    print " PUMP_COV_$found or PUMP_SETUP_$found is missing for ${blue_cor}${proj_cmd}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
+  local i=0
+  for i in {1..9}; do
+    if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$CURRENT_PUMP_PROJECT_SHORT_NAME" "${PUMP_PROJECT_REPO[$i]}"; then
+        return 1;
+      fi
+
+      if ! check_proj_repo_ -s $i "$CURRENT_PUMP_PROJECT_REPO" "$CURRENT_PUMP_PROJECT_FOLDER" "$CURRENT_PUMP_PROJECT_SHORT_NAME"; then
+        return 1;
+      fi
+      break;
+    fi
+  done
+
+  if [[ -z "$CURRENT_PUMP_COV" || -z "$CURRENT_PUMP_SETUP" ]]; then
+    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
@@ -3028,19 +3038,12 @@ function covc() {
     return 1;
   fi
 
-  # default_branch=$(git config --get init.defaultBranch);
-  # if [[ -n "$default_branch" ]]; then
-  #   git fetch origin $default_branch --quiet
-  #   read behind ahead < <(git rev-list --left-right --count origin/$default_branch...HEAD)
-  #   if [[ $behind -ne 0 || $ahead -ne 0 ]]; then
-  #     print " warning: your branch is behind $default_branch by $behind commits and ahead by $ahead commits";
-  #   fi
-  # fi
+  branch_status_ "$branch" 1>/dev/null
 
-  if (( single_mode )); then
-    cov_folder=".$proj_folder-coverage"
+  if (( $CURRENT_PUMP_PROJECT_SINGLE_MODE )); then
+    cov_folder=".$CURRENT_PUMP_PROJECT_FOLDER-coverage"
   else
-    cov_folder="$proj_folder/.coverage"
+    cov_folder="$CURRENT_PUMP_PROJECT_FOLDER/.coverage"
   fi
 
   local RET=1
@@ -3054,7 +3057,7 @@ function covc() {
   else
     rm -rf "$cov_folder" &>/dev/null
     
-    if gum spin --title="running test coverage on $branch..." -- git clone $proj_repo "$cov_folder" --quiet; then
+    if gum spin --title="running test coverage on $branch..." -- git clone $CURRENT_PUMP_PROJECT_REPO "$cov_folder" --quiet; then
       pushd "$cov_folder" &>/dev/null
 
       if [[ -n "$_clone" ]]; then
@@ -3088,7 +3091,7 @@ function covc() {
   gum spin --title="running test coverage on $branch..." -- sh -c "read < $pipe_name" &
   spin_pid=$!
 
-  eval "$_setup" &>/dev/null
+  eval "$CURRENT_PUMP_SETUP" &>/dev/null
 
   is_delete_cov_folder=0;
 
@@ -3097,8 +3100,8 @@ function covc() {
     mkdir -p coverage &>/dev/null
   fi
 
-  if ! eval "$_cov" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1; then
-    eval "$_cov" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
+  if ! eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1; then
+    eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
   fi
 
   echo "   running test coverage on $branch..."
@@ -3142,10 +3145,10 @@ function covc() {
   gum spin --title="running test coverage on $my_branch..." -- sh -c "read < $pipe_name" &
   spin_pid=$!
 
-  eval "$_setup" &>/dev/null
+  eval "$CURRENT_PUMP_SETUP" &>/dev/null
 
-  if ! eval "$_cov" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1; then
-    eval "$_cov" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
+  if ! eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1; then
+    eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
   fi
 
   echo "   running test coverage on $my_branch..."
@@ -3272,6 +3275,11 @@ function cov() {
 
   if (( RET == 0 )); then
     print "\033[32m✅ test coverage passed on second run\033[0m"
+    
+    if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
+      eval "$CURRENT_PUMP_OPEN_COV"
+    fi
+
     return 0;
   fi
     
@@ -3496,7 +3504,7 @@ function pr() {
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_PR_RUN_TEST" 1
-            break
+            break;
           fi
         done
         print ""
@@ -3642,7 +3650,7 @@ function run() {
         elif [[ "$_env" == "prod" ]]; then
           _run="${PUMP_RUN_PROD[$i]}"
         fi
-        break
+        break;
       fi
     done
   else
@@ -3743,7 +3751,7 @@ function setup() {
         proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
         _setup="${PUMP_SETUP[$i]:-${PUMP_PACKAGE_MANAGER[$i]} $([[ ${PUMP_PACKAGE_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
-        break
+        break;
       fi
     done
 
@@ -3830,7 +3838,7 @@ function revs() {
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         proj_arg="${1:-$CURRENT_PUMP_PROJECT_SHORT_NAME}"
         valid_project=1
-        break
+        break;
       fi
     done
 
@@ -3849,7 +3857,7 @@ function revs() {
         return 1;
       fi
       proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-      break
+      break;
     fi
   done
 
@@ -3953,7 +3961,7 @@ function rev() {
       _clone="${PUMP_CLONE[$i]}"
       code_editor="${PUMP_CODE_EDITOR[$i]}"
       single_mode=$PUMP_PROJECT_SINGLE_MODE[$i]
-      break
+      break;
     fi
   done
 
@@ -3982,7 +3990,7 @@ function rev() {
     branch="$branch_arg"
   elif (( rev_is_b )); then
     fetch --quiet
-    branch=$(select_branch_ 1 -r "$branch_arg");
+    branch="$(select_branch_ 1 -r "$branch_arg")"
   else
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
     branch="${pr[2]}"
@@ -4097,7 +4105,7 @@ function clone() {
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         proj_arg="$1"
         valid_project=1
-        break
+        break;
       fi
     done
     if [[ $valid_project -eq 0 ]]; then
@@ -4147,7 +4155,7 @@ function clone() {
       _clone="${PUMP_CLONE[$i]}"
       default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
       print_readme="${PUMP_PRINT_README[$i]}"
-      break
+      break;
     fi
   done
 
@@ -4614,7 +4622,7 @@ function recommit() {
           for i in {1..9}; do
             if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
               update_setting_ $i "PUMP_COMMIT_ADD" 1
-              break
+              break;
             fi
           done
 
@@ -5419,7 +5427,7 @@ function gha() {
     for i in {1..9}; do
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         proj_arg="$1"
-        break
+        break;
       fi
     done
     if [[ -n "$proj_arg" ]]; then
@@ -5430,7 +5438,7 @@ function gha() {
     for i in {1..9}; do
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
         proj_arg="$1"
-        break
+        break;
       fi
     done
     if [[ -z "$proj_arg" ]]; then
@@ -5458,7 +5466,7 @@ function gha() {
 
       gha_interval="${PUMP_GHA_INTERVAL[$i]}"
       gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
-      break
+      break;
     fi
   done
 
@@ -5758,6 +5766,25 @@ function prev() {
 
   $head=$ll_prev[$head]
   open_working_
+}
+
+function back() {
+  eval "$(parse_flags_ "back_" "" "$@")"
+  (( back_is_d )) && set -x
+
+  if (( back_is_h )); then
+    print "  ${yellow_cor}back${reset_cor} : to go back the previous branch"
+    return 0;
+  fi
+
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+
+  git switch -
+
+  # if (( $? == 0 )); then
+  #   $head=$ll_prev[$head]
+  #   open_working_
+  # fi
 }
 
 function dev() {
@@ -6511,7 +6538,7 @@ function pop() {
     # Pop in reverse order (so indices don’t shift)
     for (( i=${#stashes[@]}-1; i>=0; i-- )); do
       echo "Popping ${stashes[i]}..."
-      git stash pop --index "${stashes[i]}" || break
+      git stash pop --index "${stashes[i]}" || break;
     done
   else
     git stash pop --index
@@ -6578,7 +6605,7 @@ function __commit() {
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_COMMIT_ADD" 1
-            break
+            break;
           fi
         done
         print ""
@@ -6778,6 +6805,7 @@ function help() {
 
   display_line_ "git branch" "${solid_cyan_cor}"
   print ""
+  print " ${solid_cyan_cor} back ${reset_cor}\t\t = go back to previous branch in the current folder"
   print " ${solid_cyan_cor} co ${reset_cor}\t\t = branch management"
   print " ${solid_cyan_cor} dev ${reset_cor}\t\t = switch to dev or develop"
   print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main"
@@ -6992,6 +7020,7 @@ typeset -g CURRENT_PUMP_RUN_PROD=""
 typeset -g CURRENT_PUMP_PRO=""
 typeset -g CURRENT_PUMP_TEST=""
 typeset -g CURRENT_PUMP_COV=""
+typeset -g CURRENT_PUMP_OPEN_COV=""
 typeset -g CURRENT_PUMP_TEST_WATCH=""
 typeset -g CURRENT_PUMP_E2E=""
 typeset -g CURRENT_PUMP_E2EUI=""
