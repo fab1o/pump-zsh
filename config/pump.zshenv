@@ -1,5 +1,5 @@
 # required
-# Short name for each project
+# short name for each project
 # make it short, use abbreviation and one word only, no spaces or special characters
 # example: pump
 PUMP_PROJECT_SHORT_NAME_1=
@@ -13,7 +13,7 @@ PUMP_PROJECT_SHORT_NAME_8=
 PUMP_PROJECT_SHORT_NAME_9=
 
 # required
-# Path to each project folder
+# path to each project folder
 # example: /Users/admin/Developer/pump-zsh
 PUMP_PROJECT_FOLDER_1=
 PUMP_PROJECT_FOLDER_2=
@@ -26,7 +26,7 @@ PUMP_PROJECT_FOLDER_8=
 PUMP_PROJECT_FOLDER_9=
 
 # required
-# Repository uri for each project
+# repository uri for each project
 PUMP_PROJECT_REPO_1=
 PUMP_PROJECT_REPO_2=
 PUMP_PROJECT_REPO_3=
@@ -39,7 +39,7 @@ PUMP_PROJECT_REPO_9=
 
 # optional
 # default: 0
-# Set to 1 for single project mode, 0 for multiple mode
+# set to 1 for single project mode, 0 for multiple mode
 PUMP_PROJECT_SINGLE_MODE_1=
 PUMP_PROJECT_SINGLE_MODE_2=
 PUMP_PROJECT_SINGLE_MODE_3=
@@ -53,7 +53,7 @@ PUMP_PROJECT_SINGLE_MODE_9=
 # optional
 # default: npm
 # options: npm, yarn, pnpm, bun, poe
-# Package manager for each project
+# package manager for each project
 PUMP_PACKAGE_MANAGER_1=
 PUMP_PACKAGE_MANAGER_2=
 PUMP_PACKAGE_MANAGER_3=
@@ -66,7 +66,7 @@ PUMP_PACKAGE_MANAGER_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run setup
-# Script to run for command `setup`
+# script to run for command `setup`
 PUMP_SETUP_1=
 PUMP_SETUP_2=
 PUMP_SETUP_3=
@@ -79,7 +79,7 @@ PUMP_SETUP_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run dev
-# Script to run for command `run` or `run dev`
+# script to run for command `run` or `run dev`
 PUMP_RUN_1=
 PUMP_RUN_2=
 PUMP_RUN_3=
@@ -92,7 +92,7 @@ PUMP_RUN_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run stage
-# Script to run for command `run stage`
+# script to run for command `run stage`
 PUMP_RUN_STAGE_1=
 PUMP_RUN_STAGE_2=
 PUMP_RUN_STAGE_3=
@@ -105,7 +105,7 @@ PUMP_RUN_STAGE_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run prod
-# Script to run for command `run prod`
+# script to run for command `run prod`
 PUMP_RUN_PROD_1=
 PUMP_RUN_PROD_2=
 PUMP_RUN_PROD_3=
@@ -118,7 +118,7 @@ PUMP_RUN_PROD_9=
 
 # optional
 # default: code
-# Code editor for reviews of each project
+# code editor for reviews of each project
 PUMP_CODE_EDITOR_1=
 PUMP_CODE_EDITOR_2=
 PUMP_CODE_EDITOR_3=
@@ -131,7 +131,7 @@ PUMP_CODE_EDITOR_9=
 
 # optional
 # default: empty
-# Script to run after command `clone`
+# script to run after command `clone`
 # example: echo 'Clone completed!'
 PUMP_CLONE_1=
 PUMP_CLONE_2=
@@ -146,7 +146,7 @@ PUMP_CLONE_9=
 # optional
 # default: node
 # options: node, deno, bun
-# JS runtime environment for each project
+# runtime environment for each project
 PUMP_USE_1=
 PUMP_USE_2=
 PUMP_USE_3=
@@ -159,7 +159,7 @@ PUMP_USE_9=
 
 # optional
 # default: empty
-# Script to run after `pro` command
+# script to run after `pro` command
 PUMP_PRO_1=
 PUMP_PRO_2=
 PUMP_PRO_3=
@@ -172,7 +172,7 @@ PUMP_PRO_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test
-# Script to run for command `test`
+# script to run for command `test`
 PUMP_TEST_1=
 PUMP_TEST_2=
 PUMP_TEST_3=
@@ -185,7 +185,7 @@ PUMP_TEST_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:coverage
-# Script to run for command `cov`
+# script to run for command `cov`
 PUMP_COV_1=
 PUMP_COV_2=
 PUMP_COV_3=
@@ -197,7 +197,7 @@ PUMP_COV_8=
 PUMP_COV_9=
 
 # optional
-# Script to run after PUMP_COV has executed, usually to open the coverage report
+# script to run after PUMP_COV has executed, usually to open the coverage report
 PUMP_OPEN_COV_1=
 PUMP_OPEN_COV_2=
 PUMP_OPEN_COV_3=
@@ -210,7 +210,7 @@ PUMP_OPEN_COV_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:watch
-# Script to run for command `testw`
+# script to run for command `testw`
 PUMP_TEST_WATCH_1=
 PUMP_TEST_WATCH_2=
 PUMP_TEST_WATCH_3=
@@ -223,7 +223,7 @@ PUMP_TEST_WATCH_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:e2e
-# Script to run for command `e2e`
+# script to run for command `e2e`
 PUMP_E2E_1=
 PUMP_E2E_2=
 PUMP_E2E_3=
@@ -236,7 +236,7 @@ PUMP_E2E_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:e2e-ui
-# Script to run for command `e2eui`
+# script to run for command `e2eui`
 PUMP_E2EUI_1=
 PUMP_E2EUI_2=
 PUMP_E2EUI_3=
@@ -277,7 +277,7 @@ PUMP_PR_REPLACE_9=
 
 # optional
 # default: 0
-# Set to 1 to append commit messages after PUMP_PR_REPLACE or 0 to replace it.
+# set to 1 to append commit messages after PUMP_PR_REPLACE or 0 to replace it.
 PUMP_PR_APPEND_1=
 PUMP_PR_APPEND_2=
 PUMP_PR_APPEND_3=
@@ -290,7 +290,7 @@ PUMP_PR_APPEND_9=
 
 # optional
 # default: 0
-# Set to 1 to run tests before pushing code and creating a pr or 0 to not run tests. If tests fail, pr is aborted.
+# set to 1 to run tests before pushing code and creating a pr or 0 to not run tests. If tests fail, pr is aborted.
 PUMP_PR_RUN_TEST_1=
 PUMP_PR_RUN_TEST_2=
 PUMP_PR_RUN_TEST_3=
@@ -302,7 +302,7 @@ PUMP_PR_RUN_TEST_8=
 PUMP_PR_RUN_TEST_9=
 
 # optional
-# Set to 1 to automatically add all changes to index before commit and recommit, 0 to not do anything
+# set to 1 to automatically add all changes to index before commit and recommit, 0 to not do anything
 PUMP_COMMIT_ADD_1=
 PUMP_COMMIT_ADD_2=
 PUMP_COMMIT_ADD_3=
@@ -314,7 +314,7 @@ PUMP_COMMIT_ADD_8=
 PUMP_COMMIT_ADD_9=
 
 # optional
-# Set to 1 to automatically push on refix, 0 to not push
+# set to 1 to automatically push on refix, 0 to not push
 PUMP_PUSH_ON_REFIX_1=
 PUMP_PUSH_ON_REFIX_2=
 PUMP_PUSH_ON_REFIX_3=
@@ -326,20 +326,8 @@ PUMP_PUSH_ON_REFIX_8=
 PUMP_PUSH_ON_REFIX_9=
 
 # optional
-# Default branch to use for cloned branches in multiple mode
-PUMP_DEFAULT_BRANCH_1=
-PUMP_DEFAULT_BRANCH_2=
-PUMP_DEFAULT_BRANCH_3=
-PUMP_DEFAULT_BRANCH_4=
-PUMP_DEFAULT_BRANCH_5=
-PUMP_DEFAULT_BRANCH_6=
-PUMP_DEFAULT_BRANCH_7=
-PUMP_DEFAULT_BRANCH_8=
-PUMP_DEFAULT_BRANCH_9=
-
-# optional
 # default: 0
-# Set 1 to display README after cloning (requires glow), 0 to not display
+# set 1 to display README after cloning (requires glow), 0 to not display
 PUMP_PRINT_README_1=1
 PUMP_PRINT_README_2=1
 PUMP_PRINT_README_3=1
@@ -352,7 +340,7 @@ PUMP_PRINT_README_9=1
 
 # optional
 # default: 10 minutes
-# Interval to run `gha` in minutes
+# interval to run `gha` in minutes
 PUMP_GHA_INTERVAL_1=
 PUMP_GHA_INTERVAL_2=
 PUMP_GHA_INTERVAL_3=
@@ -364,7 +352,7 @@ PUMP_GHA_INTERVAL_8=
 PUMP_GHA_INTERVAL_9=
 
 # optional
-# Default workflow to check for command 'gha'
+# default workflow to check for command 'gha'
 PUMP_GHA_WORKFLOW_1=
 PUMP_GHA_WORKFLOW_2=
 PUMP_GHA_WORKFLOW_3=
@@ -374,3 +362,16 @@ PUMP_GHA_WORKFLOW_6=
 PUMP_GHA_WORKFLOW_7=
 PUMP_GHA_WORKFLOW_8=
 PUMP_GHA_WORKFLOW_9=
+
+# optional
+# default: 1
+# set to 1 to display the readme file after cloning, 0 to not display
+PUMP_PRINT_README_1=
+PUMP_PRINT_README_2=
+PUMP_PRINT_README_3=
+PUMP_PRINT_README_4=
+PUMP_PRINT_README_5=
+PUMP_PRINT_README_6=
+PUMP_PRINT_README_7=
+PUMP_PRINT_README_8=
+PUMP_PRINT_README_9=

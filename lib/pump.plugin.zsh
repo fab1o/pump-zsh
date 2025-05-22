@@ -696,7 +696,7 @@ function input_branch_name_() {
     typed_value="$(input_from_ "$header")"
     if (( $? != 0 )); then return 1; fi
     
-    if git check-ref-format --branch "$typed_value"; then
+    if git check-ref-format --branch "$typed_value" 1>/dev/null; then
       echo "$typed_value"
       return 0;
     fi
@@ -1073,7 +1073,7 @@ function check_proj_repo_() {
   local error_msg=""
 
   if [[ -z "$proj_repo" ]]; then
-    error_msg="project repository is missing"
+    error_msg="project repository is missing for ${solid_blue_cor}$pkg_name${reset_cor}"
   else
     # check for duplicates across other indices
     if ! [[ "$proj_repo" =~ '^((git@[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?)|(https://[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?))$' ]]; then
@@ -1125,7 +1125,7 @@ function check_proj_folder_() {
   local error_msg=""
 
   if [[ -z "$proj_folder" ]]; then
-    error_msg="project folder is missing: $pkg_name"
+    error_msg="project folder is missing for ${solid_blue_cor}$pkg_name${reset_cor}"
   fi
 
   if [[ -n "$error_msg" ]]; then
@@ -1845,7 +1845,6 @@ function remove_prj_() {
   update_setting_ $i "PUMP_COMMIT_ADD" "" 1>/dev/null
   update_setting_ $i "PUMP_GHA_WORKFLOW" "" 1>/dev/null
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" 1>/dev/null
-  update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 1>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" 1>/dev/null
 }
 
@@ -1879,7 +1878,6 @@ function save_current_proj_() {
   CURRENT_PUMP_COMMIT_ADD="${PUMP_COMMIT_ADD[$i]}"
   CURRENT_PUMP_GHA_WORKFLOW="${PUMP_GHA_WORKFLOW[$i]}"
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
-  CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
 }
 
@@ -2007,7 +2005,6 @@ function print_current_proj_() {
     print "${solid_magenta_cor} PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}"
     print "${solid_magenta_cor} PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}"
     print "${solid_magenta_cor} PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}"
-    print "${solid_magenta_cor} PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}"
     print "${solid_magenta_cor} PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}"
     print "${solid_magenta_cor} PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}"
     print "${solid_magenta_cor} PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}"
@@ -2040,7 +2037,6 @@ function print_current_proj_() {
   print "${pink_cor} CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST"
   print "${pink_cor} CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD"
   print "${pink_cor} CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX"
-  print "${pink_cor} CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH"
   print "${pink_cor} CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README"
   print "${pink_cor} CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL"
   print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
@@ -2481,67 +2477,65 @@ function open_working_() {
 }
 
 function get_clone_default_branch_() {
-  # $1 = repo uri # $2 = folder # $3 = branch to clone
-  if [[ "$3" == "main" || "$3" == "master" ]]; then
-    echo "$3"
+  local repo_uri="$1"
+  local folder="$2"
+  local branch_arg="$3"
+
+  if [[ "$branch_arg" == "main" || "$branch_arg" == "master" ]]; then
+    echo "$branch_arg"
     return 0;
   fi
 
   if command -v gum &>/dev/null; then
-    gum spin --title="determining the default branch..." -- rm -rf "$2/.temp";
-    if ! gum spin --title="determining the default branch..." -- git clone "$1" "$2/.temp" --quiet; then return 1; fi
+    gum spin --title="determining the default branch..." -- rm -rf "${folder}/.temp";
+    if ! gum spin --title="determining the default branch..." -- git clone "$repo_uri" "${folder}/.temp" --quiet; then return 1; fi
   else
     print " determining the default branch..."
-    rm -rf "$2/.temp" &>/dev/null
-    if ! git clone "$1" "$2/.temp" --quiet; then return 1; fi
+    rm -rf "${folder}/.temp" &>/dev/null
+    if ! git clone "$repo_uri" "${folder}/.temp" --quiet; then return 1; fi
   fi
 
-  pushd "$2/.temp" &>/dev/null
+  pushd "${folder}/.temp" &>/dev/null
   
   local default_branch="$(git config --get init.defaultBranch)"
   local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
 
   popd &>/dev/null
 
-  rm -rf "$2/.temp" &>/dev/null
+  rm -rf "${folder}/.temp" &>/dev/null
 
-  local default_branch_folder="${default_branch//\\/-}"
-  default_branch_folder="${default_branch_folder//\//-}"
+  # local default_branch_folder="${default_branch//\\/-}"
+  # default_branch_folder="${default_branch_folder//\//-}"
 
-  local my_branch_folder="${my_branch//\\/-}"
-  my_branch_folder="${my_branch_folder//\//-}"
+  # local my_branch_folder="${my_branch//\\/-}"
+  # my_branch_folder="${my_branch_folder//\//-}"
 
-  if [[ -z "$3" ]]; then
-    if [[ -d "$2/$default_branch_folder" ]]; then
-      default_branch=""
-    fi
+  # if [[ -z "$branch_arg" ]]; then
+  #   if [[ -d "${folder}/$default_branch_folder" ]]; then
+  #     default_branch=""
+  #   fi
 
-    if [[ -d "$2/$my_branch_folder" ]]; then
-      my_branch=""
-    fi
-  fi
+  #   if [[ -d "${folder}/$my_branch_folder" ]]; then
+  #     my_branch=""
+  #   fi
+  # fi
 
-  local selected_branch=""
+  local selected_default_branch=""
 
-  if [[ "$my_branch" != "$default_branch" && -n "$default_branch" && -n "$my_branch" ]]; then
+  if [[ -n "$default_branch" && -n "$my_branch" && "$default_branch" != "$my_branch" ]]; then
     local default_branch_choice=""
     default_branch_choice=$(choose_one_ 1 "choose default branch" 5 "$default_branch" "$my_branch");
     if (( $? == 130 )); then return 130; fi
 
-    selected_branch="$default_branch_choice"
+    selected_default_branch="$default_branch_choice"
 
   elif [[ -n "$default_branch" ]]; then
-    selected_branch="$default_branch";
-
-  elif [[ -n "$my_branch" ]]; then
-    selected_branch="$my_branch";
+    selected_default_branch="$default_branch";
+  else
+    selected_default_branch="$my_branch";
   fi
 
-  if [[ -z "$selected_branch" ]]; then
-    return 1;
-  fi
-
-  echo "$selected_branch"
+  echo "$selected_default_branch"
 }
 
 function get_from_pkg_json_() {
@@ -2593,7 +2587,6 @@ function load_config_entry_() {
     PUMP_COMMIT_ADD
     PUMP_GHA_WORKFLOW
     PUMP_PUSH_ON_REFIX
-    PUMP_DEFAULT_BRANCH
     PUMP_PRINT_README
   )
 
@@ -2647,9 +2640,6 @@ function load_config_entry_() {
           ;;
         PUMP_GHA_INTERVAL)
           value="10"
-          ;;
-        PUMP_PRINT_README)
-          value="0"
           ;;
         *)
           continue
@@ -2724,9 +2714,6 @@ function load_config_entry_() {
         ;;
       PUMP_COMMIT_ADD)
         PUMP_COMMIT_ADD[$i]="$value"
-        ;;
-      PUMP_DEFAULT_BRANCH)
-        PUMP_DEFAULT_BRANCH[$i]="$value"
         ;;
       PUMP_GHA_WORKFLOW)
         PUMP_GHA_WORKFLOW[$i]=$value
@@ -3114,8 +3101,8 @@ function refix() {
   fi
 
   if [[ -z "$CURRENT_PUMP_PUSH_ON_REFIX" ]]; then
-    if confirm_from_ "fix done, push now?"; then
-      if confirm_from_ "save this preference and don't ask again?"; then
+    if confirm_from_ "fix done, push updates now?"; then
+      if confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -3170,7 +3157,7 @@ function covc() {
   done
 
   if [[ -z "$CURRENT_PUMP_COV" || -z "$CURRENT_PUMP_SETUP" ]]; then
-    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
+    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${solid_blue_cor}${CURRENT_PUMP_PROJECT_SHORT_NAME}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
@@ -3649,7 +3636,7 @@ function pr() {
 
   if [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
     if confirm_from_ "run tests before pull request?"; then
-      if confirm_from_ "save this preference and don't ask again?"; then
+      if confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -3769,7 +3756,7 @@ function run() {
   # Validate environment
   if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
     print " env is incorrect, valid options: dev, stage or prod" >&2
-    print " ${yellow_cor} run -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}run -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -3910,7 +3897,7 @@ function setup() {
 
     if [[ -z "$proj_folder" ]]; then
       print " not a valid project: $proj_arg" >&2
-      print " ${yellow_cor} setup -h${reset_cor} to see usage" >&2
+      print " type ${yellow_cor}setup -h${reset_cor} to see usage" >&2
       return 1;
     fi
   fi
@@ -3997,7 +3984,7 @@ function revs() {
     done
     if (( valid_project == 0 )); then
       print " not a valid project: $1" >&2
-      print " ${yellow_cor} revs -h${reset_cor} to see usage" >&2
+      print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
       return 1;
     fi
   fi
@@ -4016,7 +4003,7 @@ function revs() {
 
   if [[ -z $proj_folder ]]; then
     print " missing project folder for: $proj_arg" >&2
-    print " ${yellow_cor} revs -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -4031,7 +4018,7 @@ function revs() {
       cd "$revs_folder"
     else
       print " no revs for $proj_folder" >&2
-      print " ${yellow_cor} rev${reset_cor} to open a review" >&2
+      print " type ${yellow_cor}rev${reset_cor} to open a review" >&2
       return 1; 
     fi
   fi
@@ -4042,7 +4029,7 @@ function revs() {
 
   if [[ -z "$rev_choices" ]]; then
     print " no revs for $proj_folder" >&2
-    print " ${yellow_cor} rev${reset_cor} to open a review" >&2
+    print " type ${yellow_cor}rev${reset_cor} to open a review" >&2
     return 1;
   fi
 
@@ -4124,7 +4111,7 @@ function rev() {
 
   if (( found == 0 )); then
     print " not a valid project or no project is set" >&2
-    print " ${yellow_cor} clone -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -4182,7 +4169,7 @@ function rev() {
 
     if [[ -z "$remote_branch" ]]; then
       print " branch not found in $remote_origin: $branch" >&2
-      print " ${yellow_cor} rev -h${reset_cor} to see usage" >&2
+      print " type ${yellow_cor}rev -h${reset_cor} to see usage" >&2
       return 1;
     fi
 
@@ -4241,9 +4228,11 @@ function clone() {
     print "  ${yellow_cor}clone${reset_cor} : to clone a project"
     if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
       print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s branch, only if project is in multiple mode"
+      print "  ${yellow_cor}clone <branch> <default_branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s branch with a given default branch, only if project is in multiple mode"
     fi
     print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project directly"
     print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch, only if project is in multiple mode"
+    print "  ${yellow_cor}clone <pro> <branch> <default_branch>${reset_cor} : to clone a project's branch with a given default branch, only if project is in multiple mode"
     return 0;
   fi
 
@@ -4254,8 +4243,13 @@ function clone() {
 
   local proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
   local branch_arg=""
+  local default_branch_arg=""
 
-  if [[ -n "$2" ]]; then
+  if [[ -n "$3" ]]; then
+    proj_arg="$1"
+    branch_arg="$2"
+    default_branch_arg="$3"
+  elif [[ -n "$2" ]]; then
     proj_arg="$1"
     branch_arg="$2"
   elif [[ -n "$1" ]]; then
@@ -4268,12 +4262,12 @@ function clone() {
         break;
       fi
     done
-    if (( valid_project == 0 )); then
+    if (( ! valid_project )); then
       if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
         branch_arg="$1"
       else
         print " not a valid argument: $1" >&2
-        print " ${yellow_cor} clone -h${reset_cor} to see usage" >&2
+        print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
         return 1;
       fi
     fi
@@ -4288,7 +4282,7 @@ function clone() {
 
     if (( ${#pro_choices[@]} == 0 )); then
       print " no projects found" >&2
-      print " ${yellow_cor} pro -a${reset_cor} to add a project" >&2
+      print " type ${yellow_cor}pro -a${reset_cor} to add a project" >&2
       return 1;
     fi
 
@@ -4299,8 +4293,7 @@ function clone() {
   local proj_repo=""
   local proj_folder=""
   local _clone=""
-  local default_branch=""
-  local print_readme=1
+  local print_readme=""
   local single_mode=""
   
   local found=0
@@ -4324,7 +4317,6 @@ function clone() {
 
       single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
       _clone="${PUMP_CLONE[$i]}"
-      default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
       print_readme="${PUMP_PRINT_README[$i]}"
       break;
     fi
@@ -4332,7 +4324,7 @@ function clone() {
 
   if (( found == 0 )); then
     print " not a valid project or no project is set" >&2
-    print " ${yellow_cor} clone -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -4350,56 +4342,62 @@ function clone() {
     print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
     print "" >&2
     print " to switch to multiple mode:" >&2
-    print " ${yellow_cor} pro -e ${proj_arg}${reset_cor}" >&2
+    print " type ${yellow_cor}pro -e ${proj_arg}${reset_cor}" >&2
 
     return 1;
   fi
 
   local folders=($(get_folders_ "$proj_folder"))
 
-  if (( single_mode )) || [[ -z "$folders" ]];
-    default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg");
-    if (( $? == 130 )); then return 130; fi
-
-    if [[ -z "$default_branch" ]]; then
-      default_branch=$(input_branch_name_ "type the name of the default branch");
-    fi
-
-    if [[ -z "$default_branch" ]]; then return 1; fi
-
-    branch_arg="$default_branch"
-  fi
-
-  if [[ "$default_branch" != "${PUMP_DEFAULT_BRANCH[$found]}" ]]; then
-    if confirm_from_ "save "$'\e[94m'$default_branch$'\e[0m'" as the default branch of $proj_arg and don't ask again?"; then
-      update_setting_ $found "PUMP_DEFAULT_BRANCH" "$default_branch"
-      print ""
-    fi
-  fi
+  local branch_to_clone="$branch_arg"
 
   local folder_to_clone=""
 
   if (( single_mode )); then
     folder_to_clone="$proj_folder"
   else
-    if [[ -z "$branch_arg" ]]; then
-      branch_arg=$(input_branch_name_ "type the name of your feature branch");
+    if [[ -z "$branch_to_clone" ]]; then
+      branch_to_clone=$(input_branch_name_ "type the name of your feature branch");
     fi
-    if [[ -n "$branch_arg" ]]; then
-      local branch_folder="${branch_arg//\\/-}"
+    if [[ -n "$branch_to_clone" ]]; then
+      print " branch: $branch_to_clone"
+
+      local branch_folder="${branch_to_clone//\\/-}"
       branch_folder="${branch_folder//\//-}"
       folder_to_clone="${proj_folder}/${branch_folder}"
+
+      if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
+        print " fatal: destination path '$folder_to_clone' already exists and is not an empty directory" >&2
+        print " type ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
+        return 1;
+      fi
     else
       return 1;
     fi
   fi
 
+  local default_branch="$default_branch_arg"
+
+  if [[ -z "$default_branch" ]]; then
+    default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg")
+    if (( $? == 130 )); then return 130; fi
+
+    if [[ -z "$default_branch" ]]; then
+      default_branch=$(input_branch_name_ "type the name of the default branch");
+      if [[ -n "$default_branch" ]]; then
+        print "  $default_branch"
+      else
+        return 1;
+      fi   
+    fi
+  fi
+
   if command -v gum &>/dev/null; then
     local output=""
-    output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$folder_to_clone" 2>&1)
+    output=$(gum spin --title="cloning... $proj_repo on $branch_to_clone" -- git clone "$proj_repo" "$folder_to_clone" 2>&1)
     if (( $? != 0 )); then print "$output" >&2; return 1; fi
   else
-    print " cloning... $proj_repo on $branch_arg"
+    print " cloning... $proj_repo on $branch_to_clone"
     if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
   fi
 
@@ -4413,47 +4411,56 @@ function clone() {
   #   save_pump_working_ "$proj_arg"
   # fi
 
-  if [[ "$default_branch" != "$branch_arg" ]]; then
-    git config init.defaultBranch $default_branch
-  fi
-
   local my_branch="$(git branch --show-current)"
 
-  if [[ "$branch_arg" != "$my_branch" ]]; then
+  if [[ "$branch_to_clone" != "$my_branch" ]]; then
     # check if branch exist
     local remote_origin="$(get_remote_origin_ "$my_branch")"
-    local remote_branch="$(git ls-remote --heads "$remote_origin" "$branch_arg" | awk '{print $2}')"
-    local local_branch=$(git branch --list "$branch_arg" | head -n 1)
+    local remote_branch="$(git ls-remote --heads "$remote_origin" "$branch_to_clone" | awk '{print $2}')"
+    local local_branch=$(git branch --list "$branch_to_clone" | head -n 1)
 
     if [[ -z "$remote_branch" && -z "$local_branch" ]]; then
-      git checkout -b "$branch_arg" --quiet
+      git checkout -b "$branch_to_clone" --quiet
     else
-      git checkout "$branch_arg" --quiet
+      git checkout "$branch_to_clone" --quiet
     fi
   fi
 
-  # multiple mode
+  if [[ "$default_branch" != "$branch_to_clone" ]]; then
+    print " ${pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
+    git config init.defaultBranch "$default_branch"
+  fi
 
   if [[ -n "$_clone" ]]; then
-    print "  ${pink_cor}$_clone ${reset_cor}"
+    print " ${pink_cor}$_clone ${reset_cor}"
     if ! eval "$_clone"; then
       print " failed to run PUMP_CLONE_${found}" >&2
     fi
   fi
 
-  if [[ $print_readme -eq 1 ]]; then
-    # find readme file
+  if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
     local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
     if [[ -n "$readme_file" ]]; then
       if command -v glow &>/dev/null; then
         glow "$readme_file"
+        RET=$?
       else
         cat "$readme_file"
+        RET=$?
+      fi
+    fi
+    
+    if (( RET == 0 )) && [[ -z "$print_readme" ]]; then
+      print ""
+      if confirm_between_ "always display the readme file for future branches in "$'\e[34m'$proj_arg$'\e[0m'" when available?" "always" "never"; then
+        update_setting_ $found "PUMP_PRINT_README" 1
+      else
+        update_setting_ $found "PUMP_PRINT_README" 0
       fi
     fi
   fi
 
-  print "  default branch is ${bright_green_cor}$(git config --get init.defaultBranch) ${reset_cor}"
+  print " default branch is ${bright_green_cor}$(git config --get init.defaultBranch) ${reset_cor}"
 
   if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     pro "$proj_arg"
@@ -4737,10 +4744,10 @@ function recommit() {
     if ! git reset --quiet --soft HEAD~1 1>/dev/null; then return 1; fi
 
     if [[ -z "$CURRENT_PUMP_COMMIT_ADD" ]]; then
-      if confirm_from_ "add all changes to commit: "$'\e[94m'$last_commit_msg$'\e[0m'" ?"; then
+      if confirm_from_ "add all changes to commit "$'\e[94m'$last_commit_msg$'\e[0m'" ?"; then
         git add .
 
-        if confirm_from_ "save this preference and don't ask again?"; then
+        if  (( $? == 0 )) && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
           local i=0
           for i in {1..9}; do
             if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -5479,7 +5486,7 @@ function gha_() {
 
   if [[ -z "$workflow" ]]; then
     print " no workflow name provided" >&2
-    print " ${yellow_cor} gha -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
 
     return 1;
   fi
@@ -5627,7 +5634,7 @@ function gha() {
 
   if [[ -z "$workflow_arg" ]]; then
     print " no workflow name provided" >&2
-    print " ${yellow_cor} gha -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -6296,7 +6303,7 @@ function pro() {
     # display readme file of project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to display readme" >&2
-      print " ${yellow_cor} pro -i <name>${reset_cor}" >&2
+      print " type ${yellow_cor}pro -i <name>${reset_cor}" >&2
       return 1;
     fi
 
@@ -6352,7 +6359,7 @@ function pro() {
     # edit project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to edit" >&2
-      print " ${yellow_cor} pro -e <name>${reset_cor}" >&2
+      print " type ${yellow_cor}pro -e <name>${reset_cor}" >&2
       return 1;
     fi
 
@@ -6365,7 +6372,7 @@ function pro() {
     done
     
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -a ${proj_arg}${reset_cor} to add project" >&2
+    print " type ${yellow_cor}pro -a ${proj_arg}${reset_cor} to add project" >&2
     return 1;
   fi
   
@@ -6390,7 +6397,7 @@ function pro() {
     # remove project
     if [[ -z "$proj_arg" ]]; then
       print " provide a project name to delete" >&2
-      print " ${yellow_cor} pro -r <name>${reset_cor}" >&2
+      print " type ${yellow_cor}pro -r <name>${reset_cor}" >&2
       return 1;
     fi
 
@@ -6430,7 +6437,7 @@ function pro() {
     else
       print " provide a project name" >&2
     fi
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -6482,7 +6489,7 @@ function pro() {
 
   if (( ! found )); then
     print " project not found: $proj_arg" >&2
-    print " ${yellow_cor} pro -h${reset_cor} to see usage" >&2
+    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
   
@@ -6765,7 +6772,7 @@ function __commit() {
     if confirm_from_ "commit all changes?"; then
       git add .
 
-      if confirm_from_ "save this preference and don't ask again?"; then
+      if (( $? == 0 )) && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJECT_SHORT_NAME" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -7167,7 +7174,6 @@ typeset -gA PUMP_PR_APPEND
 typeset -gA PUMP_PR_RUN_TEST
 typeset -gA PUMP_GHA_INTERVAL
 typeset -gA PUMP_COMMIT_ADD
-typeset -gA PUMP_DEFAULT_BRANCH
 typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
@@ -7200,7 +7206,6 @@ typeset -g CURRENT_PUMP_GHA_INTERVAL=""
 typeset -g CURRENT_PUMP_COMMIT_ADD=""
 typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
-typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 
 typeset -g MULTIPLE_MODE=0
