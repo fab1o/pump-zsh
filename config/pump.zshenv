@@ -1,5 +1,5 @@
 # required
-# Short name for the project
+# Short name for each project
 # make it short, use abbreviation and one word only, no spaces or special characters
 # example: pump
 PUMP_PROJECT_SHORT_NAME_1=
@@ -13,7 +13,7 @@ PUMP_PROJECT_SHORT_NAME_8=
 PUMP_PROJECT_SHORT_NAME_9=
 
 # required
-# Path to project folder
+# Path to each project folder
 # example: /Users/admin/Developer/pump-zsh
 PUMP_PROJECT_FOLDER_1=
 PUMP_PROJECT_FOLDER_2=
@@ -26,7 +26,7 @@ PUMP_PROJECT_FOLDER_8=
 PUMP_PROJECT_FOLDER_9=
 
 # required
-# Repository uri
+# Repository uri for each project
 PUMP_PROJECT_REPO_1=
 PUMP_PROJECT_REPO_2=
 PUMP_PROJECT_REPO_3=
@@ -39,7 +39,7 @@ PUMP_PROJECT_REPO_9=
 
 # optional
 # default: 0
-# Set to 1 for single project mode, 0 for multiple project mode
+# Set to 1 for single project mode, 0 for multiple mode
 PUMP_PROJECT_SINGLE_MODE_1=
 PUMP_PROJECT_SINGLE_MODE_2=
 PUMP_PROJECT_SINGLE_MODE_3=
@@ -52,10 +52,8 @@ PUMP_PROJECT_SINGLE_MODE_9=
 
 # optional
 # default: npm
+# options: npm, yarn, pnpm, bun, poe
 # Package manager for each project
-# example: yarn
-# example: pnpm
-# example: bun
 PUMP_PACKAGE_MANAGER_1=
 PUMP_PACKAGE_MANAGER_2=
 PUMP_PACKAGE_MANAGER_3=
@@ -68,7 +66,7 @@ PUMP_PACKAGE_MANAGER_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run setup
-# Command to run for alias `setup`
+# Script to run for command `setup`
 PUMP_SETUP_1=
 PUMP_SETUP_2=
 PUMP_SETUP_3=
@@ -81,7 +79,7 @@ PUMP_SETUP_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run dev
-# Command to run for alias: `run` or `run dev`
+# Script to run for command `run` or `run dev`
 PUMP_RUN_1=
 PUMP_RUN_2=
 PUMP_RUN_3=
@@ -94,7 +92,7 @@ PUMP_RUN_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run stage
-# Command to run for alias: `run stage`
+# Script to run for command `run stage`
 PUMP_RUN_STAGE_1=
 PUMP_RUN_STAGE_2=
 PUMP_RUN_STAGE_3=
@@ -107,7 +105,7 @@ PUMP_RUN_STAGE_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run prod
-# Command to run for alias: `run prod`
+# Script to run for command `run prod`
 PUMP_RUN_PROD_1=
 PUMP_RUN_PROD_2=
 PUMP_RUN_PROD_3=
@@ -120,7 +118,7 @@ PUMP_RUN_PROD_9=
 
 # optional
 # default: code
-# Code editor for reviews
+# Code editor for reviews of each project
 PUMP_CODE_EDITOR_1=
 PUMP_CODE_EDITOR_2=
 PUMP_CODE_EDITOR_3=
@@ -133,7 +131,7 @@ PUMP_CODE_EDITOR_9=
 
 # optional
 # default: empty
-# Command to run after alias `clone`
+# Script to run after command `clone`
 # example: echo 'Clone completed!'
 PUMP_CLONE_1=
 PUMP_CLONE_2=
@@ -146,9 +144,22 @@ PUMP_CLONE_8=
 PUMP_CLONE_9=
 
 # optional
+# default: node
+# options: node, deno, bun
+# JS runtime environment for each project
+PUMP_USE_1=
+PUMP_USE_2=
+PUMP_USE_3=
+PUMP_USE_4=
+PUMP_USE_5=
+PUMP_USE_6=
+PUMP_USE_7=
+PUMP_USE_8=
+PUMP_USE_9=
+
+# optional
 # default: empty
-# Command to run after `pro`
-# example: nvm use 22
+# Script to run after `pro` command
 PUMP_PRO_1=
 PUMP_PRO_2=
 PUMP_PRO_3=
@@ -161,7 +172,7 @@ PUMP_PRO_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test
-# Command to run for alias `test`
+# Script to run for command `test`
 PUMP_TEST_1=
 PUMP_TEST_2=
 PUMP_TEST_3=
@@ -174,7 +185,7 @@ PUMP_TEST_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:coverage
-# Command to run for alias `cov`
+# Script to run for command `cov`
 PUMP_COV_1=
 PUMP_COV_2=
 PUMP_COV_3=
@@ -186,7 +197,7 @@ PUMP_COV_8=
 PUMP_COV_9=
 
 # optional
-# Command to run after PUMP_COV has executed, usually to open the coverage report
+# Script to run after PUMP_COV has executed, usually to open the coverage report
 PUMP_OPEN_COV_1=
 PUMP_OPEN_COV_2=
 PUMP_OPEN_COV_3=
@@ -199,7 +210,7 @@ PUMP_OPEN_COV_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:watch
-# Command to run for alias `testw`
+# Script to run for command `testw`
 PUMP_TEST_WATCH_1=
 PUMP_TEST_WATCH_2=
 PUMP_TEST_WATCH_3=
@@ -212,7 +223,7 @@ PUMP_TEST_WATCH_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:e2e
-# Command to run for alias `e2e`
+# Script to run for command `e2e`
 PUMP_E2E_1=
 PUMP_E2E_2=
 PUMP_E2E_3=
@@ -225,7 +236,7 @@ PUMP_E2E_9=
 
 # optional
 # default: PUMP_PACKAGE_MANAGER run test:e2e-ui
-# Command to run for alias `e2eui`
+# Script to run for command `e2eui`
 PUMP_E2EUI_1=
 PUMP_E2EUI_2=
 PUMP_E2EUI_3=
