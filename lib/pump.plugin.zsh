@@ -944,13 +944,19 @@ function display_line_() {
   local word2="$4"
   local total_width2=${5:-72}
 
-  local padding=$(( total_width1 - 2 ))
+  local factor=2
+
+  if [[ -z "$word1" ]]; then
+    factor=0
+  fi
+
+  local padding=$(( total_width1 - factor ))
   local line="$(printf '%*s' "$padding" '' | tr ' ' '─')"
 
   if [[ -n "$word1" ]]; then
     local word_length1=${#word1}
 
-    local padding1=$(( ( total_width1 > word_length1 ? total_width1 - word_length1 - 2 : word_length1 - total_width1 - 2 ) / 2 ))
+    local padding1=$(( ( total_width1 > word_length1 ? total_width1 - word_length1 - factor : word_length1 - total_width1 - factor ) / 2 ))
     local line1="$(printf '%*s' "$padding1" '' | tr ' ' '─') $word1 $(printf '%*s' "$padding1" '' | tr ' ' '─')"
 
     if (( ${#line1} < total_width1 )); then
@@ -1242,10 +1248,10 @@ function choose_mode_() {
 
   confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'" \
     "$'\e[0m'"  • "$'\e[38;5;212m'multiple$'\e[0m'" mode: "$'\n\e[0m'" \
-    "$'\e[0m'"   creates a separate folder for new feature branches"$'\n\e[0m'" \
+    "$'\e[0m'"   manages separate folders for branches"$'\n\e[0m'" \
     "$'\e[0m'"   designed for professionals with sizable teams and extensive branching workflows"$'\n\e[0m'" \
     "$'\e[0m'"  • "$'\e[38;5;99m'single$'\e[0m'" mode: "$'\n\e[0m'" \
-    "$'\e[0m'"   manages all feature branches within a single folder"$'\n\e[0m'" \
+    "$'\e[0m'"   manages all branches within a single folder"$'\n\e[0m'" \
     "$'\e[0m'"   ideal for personal projects or small teams with a limited number of branches" \
     "multiple" "single" 0 "$default" >&2
   
@@ -1305,9 +1311,16 @@ function save_proj_mode_() {
           mkdir -p "$new_proj_folder"
         fi
 
-        setopt null_glob dot_glob
-        mv "$proj_folder"/* "$proj_folder"/.* "$new_proj_folder" &>/dev/null
-        unsetopt null_glob dot_glob
+        if command -v gum &>/dev/null; then
+          gum spin --title="creating backup for ${folder_name}..." -- \
+            rsync -a --remove-source-files "${proj_folder}/" "${new_proj_folder}/"
+          gum spin --title="cleaning ${folder_name}..." -- \
+            find "$proj_folder" -type d -empty -delete
+        else
+          print " creating backup for ${folder_name}..."
+          rsync -a --remove-source-files "${proj_folder}/" "${new_proj_folder}/"
+          find "$proj_folder" -type d -empty -delete
+        fi
       fi
     fi
   fi
@@ -1724,6 +1737,7 @@ function save_proj_() {
 
   display_line_ "" "${cor}"
   print "  ${cor}project saved!${reset_cor}" >&1
+  print "" >&1
 
   load_config_entry_ $i
 
@@ -2487,7 +2501,7 @@ function get_clone_default_branch_() {
   fi
 
   if command -v gum &>/dev/null; then
-    gum spin --title="determining the default branch..." -- rm -rf "${folder}/.temp";
+    gum spin --title="determining the default branch..." -- rm -rf "${folder}/.temp"
     if ! gum spin --title="determining the default branch..." -- git clone "$repo_uri" "${folder}/.temp" --quiet; then return 1; fi
   else
     print " determining the default branch..."
@@ -2904,11 +2918,13 @@ function del() {
 
   if [[ -z "$1" ]]; then
     local files;
+    
     if (( del_is_a )); then
-      files=(*(DN)) # include dotfiles, but not . and ..
+      files=(*(DN)) &>/dev/null; # include dotfiles, but not . and ..
     else
-      files=(*)
+      files=(*) &>/dev/null;
     fi
+
     if (( ${#files[@]} )); then
       local selected_files=("${(@f)$(choose_multiple_ 1 "choose what to delete" 20 "${files[@]}")}")
       if [[ -z "$selected_files" ]]; then
@@ -2941,11 +2957,10 @@ function del() {
           print "${magenta_cor} deleted${blue_cor} $file ${reset_cor}"
         fi
       done
-      #ls
-    # else
-    #   print " no files"
+      return 0;
     fi
-    return 0;
+    # print " no matches found" >&2 # this does not get printed any way
+    return 1
   fi
 
   setopt dot_glob null_glob
@@ -3076,14 +3091,14 @@ function refix() {
   pipe_name=$(mktemp -u)
   mkfifo "$pipe_name" &>/dev/null
 
-  gum spin --title="refixing \"$last_commit_msg\"..." -- sh -c "read < $pipe_name" &
+  gum spin --title="refixing... \"$last_commit_msg\"" -- sh -c "read < $pipe_name" &
   spin_pid=$!
 
   $CURRENT_PUMP_PACKAGE_MANAGER run format &>/dev/null
   $CURRENT_PUMP_PACKAGE_MANAGER run lint &>/dev/null
   $CURRENT_PUMP_PACKAGE_MANAGER run format &>/dev/null
 
-  print "   refixing \"$last_commit_msg\"..."
+  print "   refixing... \"$last_commit_msg\""
 
   echo "done" > "$pipe_name" &>/dev/null
   rm "$pipe_name"
@@ -3194,7 +3209,7 @@ function covc() {
   else
     rm -rf "$cov_folder" &>/dev/null
     
-    if gum spin --title="running test coverage on $branch..." -- git clone $CURRENT_PUMP_PROJECT_REPO "$cov_folder"; then
+    if gum spin --title="running test coverage on ${branch}..." -- git clone $CURRENT_PUMP_PROJECT_REPO "$cov_folder"; then
       pushd "$cov_folder" &>/dev/null
 
       if [[ -n "$_clone" ]]; then
@@ -3225,7 +3240,7 @@ function covc() {
   pipe_name=$(mktemp -u)
   mkfifo "$pipe_name" &>/dev/null
 
-  gum spin --title="running test coverage on $branch..." -- sh -c "read < $pipe_name" &
+  gum spin --title="running test coverage on ${branch}..." -- sh -c "read < $pipe_name" &
   spin_pid=$!
 
   eval "$CURRENT_PUMP_SETUP" &>/dev/null
@@ -3241,7 +3256,7 @@ function covc() {
     eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
   fi
 
-  echo "   running test coverage on $branch..."
+  echo "   running test coverage on ${branch}..."
 
   echo "done" > "$pipe_name" &>/dev/null
   # kill $spin_pid &>/dev/null
@@ -3279,7 +3294,7 @@ function covc() {
   pipe_name=$(mktemp -u)
   mkfifo "$pipe_name" &>/dev/null
 
-  gum spin --title="running test coverage on $my_branch..." -- sh -c "read < $pipe_name" &
+  gum spin --title="running test coverage on ${my_branch}..." -- sh -c "read < $pipe_name" &
   spin_pid=$!
 
   eval "$CURRENT_PUMP_SETUP" &>/dev/null
@@ -3288,7 +3303,7 @@ function covc() {
     eval "$CURRENT_PUMP_COV" --coverageReporters=text-summary > "coverage/coverage-summary.txt" 2>&1
   fi
 
-  echo "   running test coverage on $my_branch..."
+  echo "   running test coverage on ${my_branch}..."
 
   echo "done" > "$pipe_name" &>/dev/null
   # kill $spin_pid &>/dev/null
@@ -4356,23 +4371,26 @@ function clone() {
   if (( single_mode )); then
     folder_to_clone="$proj_folder"
   else
-    if [[ -z "$branch_to_clone" ]]; then
-      branch_to_clone=$(input_branch_name_ "type the name of your feature branch");
-    fi
-    if [[ -n "$branch_to_clone" ]]; then
-      print " branch: $branch_to_clone"
+    if [[ -n "$(get_folders_ "$proj_folder" 2>/dev/null)" ]]; then
+      if [[ -z "$branch_to_clone" ]]; then
+        branch_to_clone=$(input_branch_name_ "type the name of your feature branch");
+      fi
+      if [[ -n "$branch_to_clone" ]]; then
+        print " branch: $branch_to_clone"
 
-      local branch_folder="${branch_to_clone//\\/-}"
-      branch_folder="${branch_folder//\//-}"
-      folder_to_clone="${proj_folder}/${branch_folder}"
+        local branch_folder="${branch_to_clone//\\/-}"
+        branch_folder="${branch_folder//\//-}"
+  
+        folder_to_clone="${proj_folder}/${branch_folder}"
 
-      if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
-        print " fatal: destination path '$folder_to_clone' already exists and is not an empty directory" >&2
-        print " type ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
+        if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
+          print " fatal: destination path '$folder_to_clone' already exists and is not an empty directory" >&2
+          print " type ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
+          return 1;
+        fi
+      else
         return 1;
       fi
-    else
-      return 1;
     fi
   fi
 
@@ -4390,6 +4408,16 @@ function clone() {
         return 1;
       fi   
     fi
+  fi
+
+  if [[ -z "$branch_to_clone" ]]; then
+    branch_to_clone="$default_branch"
+  fi
+  if [[ -z "$folder_to_clone" ]]; then
+    local branch_folder="${branch_to_clone//\\/-}"
+    branch_folder="${branch_folder//\//-}"
+
+    folder_to_clone="${proj_folder}/${branch_folder}"
   fi
 
   if command -v gum &>/dev/null; then
@@ -6842,7 +6870,7 @@ function __commit() {
 function help() {
   #tput reset
   if command -v gum &>/dev/null; then
-    gum style --border=rounded --margin=0 --padding="1 16" --border-foreground=212 --width=69 \
+    gum style --border=rounded --margin=0 --padding="1 16" --border-foreground=212 --width=71 \
       --align=center "welcome to $(gum style --foreground 212 "fab1o's pump my shell! v$PUMP_VERSION")" 2>/dev/tty
   else
     display_line_ "fab1o's pump my shell!" "${purple_cor}"
