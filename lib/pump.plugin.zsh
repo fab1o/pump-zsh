@@ -2316,6 +2316,7 @@ function select_branch_() {
   local multiple=${4:-0}
   local header="" # $5
   local include_special_branches=${6:-1}
+  local excluded_branch="$7"
 
   local remote_origin="$(get_remote_origin_)"
 
@@ -2344,20 +2345,22 @@ function select_branch_() {
     )
   fi
 
+  local excluded_branches=($excluded_branch)
+
   if (( ! include_special_branches )); then
-    local excluded_branches=("main" "master" "dev" "develop" "stage" "staging" "prod" "production" "release")
-
-    local branch_choices_array=($(echo "$branch_choices" | tr '\n' ' '))
-    local filtered_branches=()
-
-    for branch in "${branch_choices_array[@]}"; do
-      if [[ ! " ${excluded_branches[@]} " == *" $branch "* ]]; then
-        filtered_branches+=("$branch")
-      fi
-    done
-
-    branch_choices="${filtered_branches[@]}"
+    excluded_branches+=("main" "master" "dev" "develop" "stage" "staging" "prod" "production" "release")
   fi
+
+  local branch_choices_array=($(echo "$branch_choices" | tr '\n' ' '))
+  local filtered_branches=()
+
+  for branch in "${branch_choices_array[@]}"; do
+    if [[ ! " ${excluded_branches[@]} " == *" $branch "* ]]; then
+      filtered_branches+=("$branch")
+    fi
+  done
+
+  branch_choices="${filtered_branches[@]}"
 
   if [[ -z "$branch_choices" ]]; then
     if [[ -n "$searchText" ]]; then
@@ -5776,7 +5779,6 @@ function co() {
 
   # co -l local branches
   if (( co_is_l )); then
-    fetch --quiet
     local auto=$([[ -n "$1" ]] && echo 1 || echo 0)
     local branch_choice="$(select_branch_ $auto --list "$1")"
     
@@ -6032,12 +6034,13 @@ function stage() {
 }
 
 function rebase() {
-  eval "$(parse_flags_ "rebase_" "pi" "$@")"
+  eval "$(parse_flags_ "rebase_" "api" "$@")"
   (( rebase_is_d )) && set -x
 
   if (( rebase_is_h )); then
-    print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branch on top of the HEAD commit of $(git config --get init.defaultBranch)"
-    print "  ${yellow_cor}rebase ${solid_yellow_cor}<branch>${reset_cor} : to apply the commits from your branch on top of the HEAD commit of a branch"
+    print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branches on top of the HEAD commit of $(git config --get init.defaultBranch)"
+    print "  ${yellow_cor}rebase ${solid_yellow_cor}<branch>${reset_cor} : to apply the commits from given branch on top of the HEAD commit of a branch"
+    print "  ${yellow_cor}rebase -a${reset_cor} : to rebase multiple branches"
     print "  ${yellow_cor}rebase -p${reset_cor} : push after rebase succeeds with no conflicts"
     return 0;
   fi
@@ -6052,10 +6055,44 @@ function rebase() {
     rebase_branch="$(git config --get init.defaultBranch)"
   fi
 
+  if (( rebase_is_a )); then
+    local selected_branches=($(select_branch_ 0 --list "" 1 "choose branches to rebase of $rebase_branch" 0 "$rebase_branch"))
+    if [[ -z "$selected_branches" ]]; then
+      return 1;
+    fi
+
+    local RET=0
+
+    for branch in ${selected_branches[@]}; do
+      if ! git switch "$branch"; then
+        RET=1
+        break;
+      fi
+
+      if (( rebase_is_p )); then
+        print ""
+        print " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch} then pushing${reset_cor}"
+        if ! rebase -p "$rebase_branch" ${@:2}; then
+          RET=1
+          break;
+        fi
+      else
+        print ""
+        print " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch}${reset_cor}"
+        if ! rebase "$rebase_branch" ${@:2}; then
+          RET=1
+          break;
+        fi
+      fi
+    done
+
+    return $RET;
+  fi
+
   local my_branch="$(git branch --show-current)"
 
   if [[ "$my_branch" == "$rebase_branch" ]]; then
-    print " cannot rebase, branches are the same" >&2
+    print " cannot rebase, branches are the same: $my_branch" >&2
     return 1;
   fi
   
@@ -6065,7 +6102,7 @@ function rebase() {
     print " cannot find remote origin for branch: $rebase_branch" >&2
     return 1;
   fi
-
+  
   fetch --quiet
   local RET=$?
 
@@ -6086,12 +6123,13 @@ function rebase() {
 }
 
 function merge() {
-  eval "$(parse_flags_ "merge_" "p" "$@")"
+  eval "$(parse_flags_ "merge_" "ap" "$@")"
   (( merge_is_d )) && set -x
 
   if (( merge_is_h )); then
     print "  ${yellow_cor}merge${reset_cor} : to create a new merge commit from $(git config --get init.defaultBranch)"
     print "  ${yellow_cor}merge ${solid_yellow_cor}<branch>${reset_cor} : to create a new merge commit from a branch"
+    print "  ${yellow_cor}merge -a${reset_cor} : to merge multiple branches"
     print "  ${yellow_cor}merge -p${reset_cor} : push after merge succeeds with no conflicts"
     return 0;
   fi
@@ -6106,10 +6144,44 @@ function merge() {
     merge_branch="$(git config --get init.defaultBranch)"
   fi
 
+  if (( merge_is_a )); then
+    local selected_branches=($(select_branch_ 0 --list "" 1 "choose branches to merge from $merge_branch" 0 "$merge_branch"))
+    if [[ -z "$selected_branches" ]]; then
+      return 1;
+    fi
+
+    local RET=0
+
+    for branch in ${selected_branches[@]}; do
+      if ! git switch "$branch"; then
+        RET=1
+        break;
+      fi
+
+      if (( merge_is_p )); then
+        print ""
+        print " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch} then pushing${reset_cor}"
+        if ! merge -p "$merge_branch" ${@:2}; then
+          RET=1
+          break;
+        fi
+      else
+        print ""
+        print " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch}${reset_cor}"
+        if ! merge "$merge_branch" ${@:2}; then
+          RET=1
+          break;
+        fi
+      fi
+    done
+
+    return $RET;
+  fi
+
   local my_branch="$(git branch --show-current)"
 
   if [[ "$my_branch" == "$merge_branch" ]]; then
-    print " cannot merge, branches are the same" >&2
+    print " cannot merge, branches are the same: $my_branch" >&2
     return 1;
   fi
   
@@ -6223,12 +6295,6 @@ function delb() {
   
   if [[ -z "$selected_branches" ]]; then
     return 1;
-  fi
-
-  local excluded_branches=("main" "master")
-
-  if (( ! delb_is_a )); then
-    excluded_branches+=("dev" "develop" "stage" "staging")
   fi
 
   local RET=0
