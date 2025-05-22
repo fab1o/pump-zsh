@@ -487,11 +487,15 @@ function choose_multiple_() {
   local height="${3:-20}"
 
   if command -v gum &>/dev/null; then
+    local choice=""
     if (( auto )); then
-      echo "$(gum choose --select-if-one --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --select-if-one --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     else
-      echo "$(gum choose --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     fi
+    RET=$?
+    if (( RET != 0 )); then return $RET; fi
+    echo "$choice"
     return 0;
   fi
 
@@ -519,11 +523,15 @@ function filter_one_() {
 
   if command -v gum &>/dev/null; then
     print "${purple_cor} $2: ${reset_cor}" >&2
+    local choice=""
     if (( auto )); then
-      echo "$(gum filter --height 20 --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
+      choice="$(gum filter --height 20 --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
     else
-      echo "$(gum filter --height 20 --limit=1 --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
+      choice="$(gum filter --height 20 --limit=1 --indicator=">" --placeholder=" $3" ${@:4} 2>/dev/tty)"
     fi
+    RET=$?
+    if (( RET != 0 )); then return $RET; fi
+    echo "$choice"
   else
     choose_one_ $auto "$3" 20 "$4"
   fi
@@ -538,11 +546,15 @@ function choose_one_() {
   local reset=$'\e[0m'
 
   if command -v gum &>/dev/null; then
+    local choice=""
     if (( auto )); then
-      echo "$(gum choose --limit=1 --select-if-one --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --select-if-one --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     else
-      echo "$(gum choose --limit=1 --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
     fi
+    RET=$?
+    if (( RET != 0 )); then return $RET; fi
+    echo "$choice"
     return 0;
   fi
   
@@ -2394,11 +2406,10 @@ function select_pr_() {
   if [[ $count -gt 20 ]]; then
     print "${purple_cor} choose pull request: ${reset_cor}" >&2
     select_pr_title=$(echo "$titles" | gum filter --limit 1 --select-if-one --height 20  --indicator=">" --placeholder=" type to filter");
-    if (( $? == 130 )); then return 130; fi
   else
     select_pr_title=$(echo "$titles" | gum choose --limit 1 --select-if-one --height 20 --header=" choose pull request:");
-    if (( $? == 130 )); then return 130; fi
   fi
+  if (( $? == 130 )); then return 130; fi
 
   if [[ -z "$select_pr_title" ]]; then
     return 1;
@@ -2510,24 +2521,27 @@ function get_clone_default_branch_() {
     fi
   fi
 
-
-  local default_branch_choice="";
+  local selected_branch=""
 
   if [[ "$my_branch" != "$default_branch" && -n "$default_branch" && -n "$my_branch" ]]; then
+    local default_branch_choice=""
     default_branch_choice=$(choose_one_ 1 "choose default branch" 5 "$default_branch" "$my_branch");
     if (( $? == 130 )); then return 130; fi
 
+    selected_branch="$default_branch_choice"
+
   elif [[ -n "$default_branch" ]]; then
-    default_branch_choice="$default_branch";
+    selected_branch="$default_branch";
+
   elif [[ -n "$my_branch" ]]; then
-    default_branch_choice="$my_branch";
+    selected_branch="$my_branch";
   fi
 
-  if [[ -z "$default_branch_choice" ]]; then
+  if [[ -z "$selected_branch" ]]; then
     return 1;
   fi
 
-  echo "$default_branch_choice"
+  echo "$selected_branch"
 }
 
 function get_from_pkg_json_() {
@@ -4032,7 +4046,9 @@ function revs() {
     return 1;
   fi
 
-  local choice=$(echo "$rev_choices" | gum choose --limit=1 --header " choose review to open:")
+  local choice=""
+  choice=$(echo "$rev_choices" | gum choose --limit=1 --header " choose review to open:")
+  if (( $? == 130 )); then return 130; fi
 
   if [[ -n "$choice" ]]; then
     rev "$proj_arg" "${choice//rev./}"
@@ -5638,7 +5654,10 @@ function gha() {
       return 1;
     fi
     
-    local chosen_workflow=$(gh workflow list | cut -f1 | gum choose --header " choose workflow:");
+    local chosen_workflow=""
+    chosen_workflow=$(gh workflow list | cut -f1 | gum choose --header " choose workflow:");
+    if (( $? == 130 )); then return 130; fi
+    
     if [[ -z "$chosen_workflow" ]]; then
       cd "$_pwd"
       return 1;
