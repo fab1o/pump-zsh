@@ -6806,7 +6806,7 @@ function help() {
   display_line_ "git branch" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} back ${reset_cor}\t\t = go back to previous branch in the current folder"
-  print " ${solid_cyan_cor} co ${reset_cor}\t\t = branch management"
+  print " ${solid_cyan_cor} co ${reset_cor}\t\t = switch branch (checkout)"
   print " ${solid_cyan_cor} dev ${reset_cor}\t\t = switch to dev or develop"
   print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main"
   print " ${solid_cyan_cor} next ${reset_cor}\t\t = go to the next working folder/branch"
