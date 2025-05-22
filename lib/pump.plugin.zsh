@@ -3322,7 +3322,7 @@ function e2eui() {
 
   if (( e2eui_is_h )); then
     print "  ${yellow_cor}e2eui${reset_cor} : to run PUMP_E2EUI"
-    print "  ${yellow_cor}e2eui ${solid_yellow_cor}<project>${reset_cor} : to run PUMP_E2EUI --project"
+    print "  ${yellow_cor}e2eui ${solid_yellow_cor}<test_project>${reset_cor} : to run PUMP_E2EUI --project"
     return 0;
   fi
 
@@ -3564,11 +3564,12 @@ function run() {
     print "  ${yellow_cor}run prod${reset_cor} : to run prod in current folder"
     print "  --"
     if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-      print "  ${yellow_cor}run <folder>${reset_cor} : to run a folder on dev environment for $CURRENT_PUMP_PROJECT_SHORT_NAME"
-      print "  ${yellow_cor}run${solid_yellow_cor} [<folder>] [<env>]${reset_cor} : to run a folder on environment for $CURRENT_PUMP_PROJECT_SHORT_NAME"
+      print "  ${yellow_cor}run <folder>${reset_cor} : to run a ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s folder on dev environment"
+      print "  ${yellow_cor}run <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s folder on given environment"
       print "  --"
     fi
-    print "  ${yellow_cor}run <pro>${solid_yellow_cor} [<folder>] [<env>]${reset_cor} : to run a folder on environment for a project"
+    print "  ${yellow_cor}run <pro> <folder>${reset_cor} : to run a project's folder on dev environment"
+    print "  ${yellow_cor}run <pro> <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a project's folder on a given environment"
     return 0;
   fi
 
@@ -3711,7 +3712,8 @@ function setup() {
         print "  ${yellow_cor}setup <folder>${reset_cor} : to setup a folder for $CURRENT_PUMP_PROJECT_SHORT_NAME"
       fi
       print "  --"
-    print "  ${yellow_cor}setup <pro>${solid_yellow_cor} [<folder>]${reset_cor} : to setup a folder for a project"
+    print "  ${yellow_cor}setup <pro>${reset_cor} : to setup a project"
+    print "  ${yellow_cor}setup <pro> ${solid_yellow_cor}<folder>${reset_cor} : to setup a project's folder"
     return 0;
   fi
 
@@ -3830,15 +3832,14 @@ function revs() {
     local i=0
     for i in {1..9}; do
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        proj_arg="${1:-$CURRENT_PUMP_PROJECT_SHORT_NAME}"
+        proj_arg="$1"
         valid_project=1
         break;
       fi
     done
-
     if (( valid_project == 0 )); then
       print " not a valid project: $1" >&2
-      print " ${yellow_cor} pro${reset_cor} to see options" >&2
+      print " ${yellow_cor} revs -h${reset_cor} to see usage" >&2
       return 1;
     fi
   fi
@@ -3856,7 +3857,7 @@ function revs() {
   done
 
   if [[ -z $proj_folder ]]; then
-    print " not a valid project: $proj_arg" >&2
+    print " missing project folder for: $proj_arg" >&2
     print " ${yellow_cor} revs -h${reset_cor} to see usage" >&2
     return 1;
   fi
@@ -3902,7 +3903,9 @@ function rev() {
     print "  ${yellow_cor}rev${reset_cor} : open review by pull requests"
     print "  ${yellow_cor}rev -b${reset_cor} : open review by branches"
     print "  ${yellow_cor}rev -e <branch>${reset_cor} : open review by an exact branch"
-    print "  ${yellow_cor}rev <pro>${solid_yellow_cor} [<branch>]${reset_cor} : to open a review for a project"
+    print "  --"
+    print "  ${yellow_cor}rev <pro>${reset_cor} : to open a review for a project"
+    print "  ${yellow_cor}rev <pro> ${solid_yellow_cor}<branch>${reset_cor} : to open a review for a project's branch"
     return 0;
   fi
 
@@ -4076,10 +4079,10 @@ function clone() {
 
   if (( clone_is_h )); then
     if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone $CURRENT_PUMP_PROJECT_SHORT_NAME branch"
-      print "  ${yellow_cor}clone $CURRENT_PUMP_PROJECT_SHORT_NAME${solid_yellow_cor} [<branch>]${reset_cor} : to clone $CURRENT_PUMP_PROJECT_SHORT_NAME branch"
+      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s branch"
     fi
-      print "  ${yellow_cor}clone <pro>${solid_yellow_cor} [<branch>]${reset_cor} : to clone another project"
+    print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project"
+    print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch"
     return 0;
   fi
 
@@ -4095,7 +4098,7 @@ function clone() {
     proj_arg="$1"
     branch_arg="$2"
   elif [[ -n "$1" ]]; then
-    valid_project=0
+    local valid_project=0
     local i=0
     for i in {1..9}; do
       if [[ "$1" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
@@ -4104,8 +4107,14 @@ function clone() {
         break;
       fi
     done
-    if [[ $valid_project -eq 0 ]]; then
-      branch_arg="$1"
+    if (( valid_project == 0 )); then
+      if [[ -n "$proj_arg" ]]; then
+        branch_arg="$1"
+      else
+        print " not a valid argument: $1" >&2
+        print " ${yellow_cor} clone -h${reset_cor} to see usage" >&2
+        return 1;
+      fi
     fi
   else
     pro_choices=()
@@ -4844,7 +4853,8 @@ function dtag() {
   (( dtag_is_d )) && set -x
 
   if (( dtag_is_h )); then
-    print "  ${yellow_cor}dtag ${solid_yellow_cor}[<name>]${reset_cor} : to delete a tag"
+    print "  ${yellow_cor}dtag${reset_cor} : to delete a tag"
+    print "  ${yellow_cor}dtag ${solid_yellow_cor}<name>${reset_cor} : to delete a tag directly"
     return 0;
   fi
 
@@ -4890,7 +4900,8 @@ function pull() {
   (( pull_is_d )) && set -x
 
   if (( pull_is_h )); then
-    print "  ${yellow_cor} pull ${solid_yellow_cor}[<branch>]${reset_cor} : to pull from origin branch"
+    print "  ${yellow_cor} pull${reset_cor} : to pull from origin"
+    print "  ${yellow_cor} pull ${solid_yellow_cor}<branch>${reset_cor} : to pull a branch from origin"
     print "  ${yellow_cor} pull -t${reset_cor} : to pull all tags along with branches"
     print "  ${yellow_cor} pull -to${reset_cor} : to pull all tags only"
     return 0;
@@ -4934,7 +4945,8 @@ function drelease() {
   (( drelease_is_d )) && set -x
 
   if (( drelease_is_h )); then
-    print "  ${yellow_cor}drelease ${solid_yellow_cor}[<tag>]${reset_cor} : to delete a release"
+    print "  ${yellow_cor}drelease <tag>${reset_cor} : to delete a release"
+    print "  ${yellow_cor}drelease ${solid_yellow_cor}<tag>${reset_cor} : to delete a release directly"
     return 0;
   fi
 
@@ -4979,12 +4991,13 @@ function release() {
   (( release_is_d )) && set -x
 
   if (( release_is_h )); then
-    print "  ${yellow_cor}release ${solid_yellow_cor}[<version>]${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
+    print "  ${yellow_cor}release${reset_cor} : to create a new release of package.json version"
+    print "  ${yellow_cor}release ${solid_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
     print "  ${yellow_cor}release -s${reset_cor} : to skip confirmation"
     print "  --"
-    print "  ${yellow_cor}release -m${reset_cor} : to create a major release"
-    print "  ${yellow_cor}release -n${reset_cor} : to create a minor release"
-    print "  ${yellow_cor}release -p${reset_cor} : to create a patch release"
+    print "  ${yellow_cor}release -m${reset_cor} : to bump the major version by 1 and create a release"
+    print "  ${yellow_cor}release -n${reset_cor} : to bump the minor version by 1 and create a release"
+    print "  ${yellow_cor}release -p${reset_cor} : to bump the patch version by 1 and create a release"
     return 0;
   fi
 
@@ -5129,7 +5142,8 @@ function tag() {
   (( tag_is_d )) && set -x
 
   if (( tag_is_h )); then
-    print " release_ = ${yellow_cor}tag ${solid_yellow_cor}[<name>]${reset_cor} : to create a new tag"
+    print " release_ = ${yellow_cor}tag${reset_cor} : to create a new tag from package.json version"
+    print " release_ = ${yellow_cor}tag ${solid_yellow_cor}<name>${reset_cor} : to create a new tag directly"
     return 0;
   fi
 
@@ -5391,8 +5405,9 @@ function gha() {
   (( gha_is_d )) && set -x
 
   if (( gha_is_h )); then
-    print "  ${yellow_cor}gha${solid_yellow_cor} [<workflow>]${reset_cor} : to check status of workflow in current project"
-    print "  ${yellow_cor}gha <pro>${solid_yellow_cor} [<workflow>]${reset_cor} : to check status of a workflow for a project"
+    print "  ${yellow_cor}gha${reset_cor} : to check status of a workflow in current project"
+    print "  ${yellow_cor}gha ${solid_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow in current project"
+    print "  ${yellow_cor}gha <pro> ${solid_yellow_cor}[<workflow>]${reset_cor} : to check status of a given workflow for a project"
     print "  ${yellow_cor}gha -a${reset_cor} : to run in auto mode"
     return 0;
   fi
@@ -5541,7 +5556,9 @@ function co() {
   (( co_is_d )) && set -x
 
   if (( co_is_h )); then
-    print "  ${yellow_cor}co ${solid_yellow_cor}[<branch>]${reset_cor} : to switch to a branch, displays local branches only"
+    print "  ${yellow_cor}co${reset_cor} : to switch to a branch, displays local branches only"
+    print "  ${yellow_cor}co ${solid_yellow_cor}<branch>${reset_cor} : to switch to a given branch, displays local branches only if partial match"
+    print "  --"
     print "  ${yellow_cor}co -a${reset_cor} : to switch to a branch, displays all branches"
     print "  ${yellow_cor}co -l${reset_cor} : to switch to a branch, displays local branches only"
     print "  ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
@@ -5844,7 +5861,7 @@ function rebase() {
 
   if (( rebase_is_h )); then
     print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branch on top of the HEAD commit of $(git config --get init.defaultBranch)"
-    print "  ${yellow_cor}rebase${solid_yellow_cor} [<branch>]${reset_cor} : to apply the commits from your branch on top of the HEAD commit of a branch"
+    print "  ${yellow_cor}rebase ${solid_yellow_cor}<branch>${reset_cor} : to apply the commits from your branch on top of the HEAD commit of a branch"
     print "  ${yellow_cor}rebase -p${reset_cor} : push after rebase succeeds with no conflicts"
     return 0;
   fi
@@ -5898,7 +5915,7 @@ function merge() {
 
   if (( merge_is_h )); then
     print "  ${yellow_cor}merge${reset_cor} : to create a new merge commit from $(git config --get init.defaultBranch)"
-    print "  ${yellow_cor}merge${solid_yellow_cor} [<branch>]${reset_cor} : to create a new merge commit from a branch"
+    print "  ${yellow_cor}merge ${solid_yellow_cor}<branch>${reset_cor} : to create a new merge commit from a branch"
     print "  ${yellow_cor}merge -p${reset_cor} : push after merge succeeds with no conflicts"
     return 0;
   fi
@@ -6012,8 +6029,9 @@ function delb() {
   (( delb_is_d )) && set -x
 
   if (( delb_is_h )); then
-    print "  ${yellow_cor}delb${solid_yellow_cor} [<branch>]${reset_cor} : to find branches to delete"
-    print "  ${yellow_cor}delb -r${solid_yellow_cor} [<branch>]${reset_cor} : to also delete remotely"
+    print "  ${yellow_cor}delb${reset_cor} : to delete a branch, displays local branches only"
+    print "  ${yellow_cor}delb ${solid_yellow_cor}<branch>${reset_cor} : to delete a given branch, displays local branches only if partial match"
+    print "  ${yellow_cor}delb -r ${solid_yellow_cor}<branch>${reset_cor} : to delete a remote branch, displays remote branches"
     print "  ${yellow_cor}delb -a${reset_cor} : to find all branches"
     print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation"
     return 0;
@@ -6092,11 +6110,12 @@ function pro() {
 
   if (( pro_is_h )); then
     print "  ${yellow_cor}pro <name>${reset_cor} : to set a project"
-    print "  ${yellow_cor}pro -c ${solid_yellow_cor}[<name>]${reset_cor} : to show project config"
     print "  ${yellow_cor}pro -a ${solid_yellow_cor}[<name>]${reset_cor} : to add a new project"
-    print "  --"
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
+    print "  --"
+    print "  ${yellow_cor}pro -c${reset_cor} : to show current project config"
+    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project config"
     # print "  ${yellow_cor}pro -u <name>${reset_cor} : to unset project"
     print "  ${yellow_cor}pro -i <name>${reset_cor} : to display the project's readme"
     
@@ -6467,9 +6486,10 @@ function stash() {
   (( stash_is_d )) && set -x
 
   if (( stash_is_h )); then
-    print "  ${yellow_cor}stash [<name>]${reset_cor} : to stash files"
-    print "  ${yellow_cor}stash -v ${solid_yellow_cor}[n]${reset_cor} : to view latest nth stash"
-    print "  ${yellow_cor}stash -l ${solid_yellow_cor}[n]${reset_cor} : to list stashes, limit by n"
+    print "  ${yellow_cor}stash${reset_cor} : to stash all files"
+    print "  ${yellow_cor}stash ${solid_yellow_cor}<name>${reset_cor} : to stash files"
+    print "  ${yellow_cor}stash -v ${solid_yellow_cor}n${reset_cor} : to view latest nth stash"
+    print "  ${yellow_cor}stash -l ${solid_yellow_cor}n${reset_cor} : to list stashes, limit by n"
     return 0;
   fi
 
