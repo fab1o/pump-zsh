@@ -4238,11 +4238,12 @@ function clone() {
   (( clone_is_d )) && set -x
 
   if (( clone_is_h )); then
+    print "  ${yellow_cor}clone${reset_cor} : to clone a project"
     if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s branch"
+      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT_SHORT_NAME}'s branch, only if project is in multiple mode"
     fi
-    print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project"
-    print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch"
+    print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project directly"
+    print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch, only if project is in multiple mode"
     return 0;
   fi
 
@@ -4268,7 +4269,7 @@ function clone() {
       fi
     done
     if (( valid_project == 0 )); then
-      if [[ -n "$proj_arg" ]]; then
+      if [[ -n "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
         branch_arg="$1"
       else
         print " not a valid argument: $1" >&2
@@ -4285,11 +4286,14 @@ function clone() {
       fi
     done
 
-    proj_arg=$(choose_one_ 1 "choose project to clone" 20 "${pro_choices[@]}")
-    if (( $? == 130 )); then return 130; fi
-    if [[ -z "$proj_arg" ]]; then
+    if (( ${#pro_choices[@]} == 0 )); then
+      print " no projects found" >&2
+      print " ${yellow_cor} pro -a${reset_cor} to add a project" >&2
       return 1;
     fi
+
+    proj_arg=$(choose_one_ 1 "choose project to clone" 20 "${pro_choices[@]}")
+    if [[ -z "$proj_arg" ]]; then return 1; fi
   fi
 
   local proj_repo=""
@@ -4298,6 +4302,7 @@ function clone() {
   local default_branch=""
   local print_readme=1
   local single_mode=""
+  
   local found=0
 
   local i=0
@@ -4341,128 +4346,76 @@ function clone() {
     return 1;
   fi
 
-  if (( single_mode )) && [[ -n "$(ls "$proj_folder" 2>/dev/null)" ]]; then
-    print "${solid_blue_cor} $proj_arg${reset_cor} is already cloned in single mode: $proj_folder" >&2
+  if (( single_mode )) && [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
+    print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
     print "" >&2
-    print " to switch to multiple mode, remove the project then add it again:" >&2
-    print "  1. ${yellow_cor}pro -r ${proj_arg}${reset_cor}" >&2
-    print "  2. ${yellow_cor}pro -a ${proj_arg}${reset_cor} and choose multiple mode" >&2
+    print " to switch to multiple mode:" >&2
+    print " ${yellow_cor} pro -e ${proj_arg}${reset_cor}" >&2
+
     return 1;
   fi
 
-  if (( single_mode )); then
-    branch_arg=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg");
-    if (( $? == 130 )); then return 130; fi
+  local folders=($(get_folders_ "$proj_folder"))
 
-    if [[ -z "$branch_arg" ]]; then
-      return 0;
-    fi
-
-    if command -v gum &>/dev/null; then
-      local output=""
-      output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$proj_folder" 2>&1)
-      if (( $? != 0 )); then print "$output" >&2; return 1; fi
-    else
-      print " cloning... $proj_repo on $branch_arg"
-      if ! git clone --quiet "$proj_repo" "$proj_folder"; then return 1; fi
-    fi
-
-    if ! pushd "$proj_folder" &>/dev/null; then return 1; fi
-
-    git checkout "$branch_arg" --quiet &>/dev/null
-
-    # if (( $? == 0 )); then
-    #   save_pump_working_ "$proj_arg"
-    # fi
-
-    if [[ -n "$_clone" ]]; then
-      print "  ${pink_cor}$_clone ${reset_cor}"
-      if ! eval "$_clone"; then
-        print " failed to run PUMP_CLONE_${found}" >&2
-      fi
-    fi
-
-    if [[ $print_readme -eq 1 ]]; then
-      # find readme file
-      local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
-      if [[ -n "$readme_file" ]]; then
-        if command -v glow &>/dev/null; then
-          glow "$readme_file"
-        else
-          cat "$readme_file"
-        fi
-      fi
-    fi
-
-    print "  default branch is ${bright_green_cor}$(git config --get init.defaultBranch) ${reset_cor}"
-
-    if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
-      pro $proj_arg
-    fi
-
-    return 0;
-  fi
-  # end of (( single_mode ))
-
-  # multiple mode (requires passing a branch name, unless first time user is cloning)
-
-  local branch_to_clone=""
-  
-  if [[ -z "$branch_arg" ]]; then
-    local folders=($(get_folders_ "$proj_folder"))
-    if [[ -z "$folders" ]]; then # first time user is cloning
-      branch_arg=$(get_clone_default_branch_ "$proj_repo" "$proj_folder");
-      if (( $? == 130 )); then return 130; fi
-    fi
-
-    if [[ -z "$branch_arg" ]]; then
-      branch_arg=$(input_branch_name_ "type the name of the branch");
-    fi
-
-    if [[ -z "$branch_arg" ]]; then
-      return 0;
-    fi
-  fi
-
-  if [[ -z "$default_branch" ]]; then
+  if (( single_mode )) || [[ -z "$folders" ]];
     default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg");
     if (( $? == 130 )); then return 130; fi
 
     if [[ -z "$default_branch" ]]; then
-      return 0;
+      default_branch=$(input_branch_name_ "type the name of the default branch");
     fi
 
-    if confirm_from_ "save "$'\e[94m'$default_branch$'\e[0m'" as the default branch and don't ask again?"; then
-      if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$found]}" ]]; then
-        update_setting_ $found "PUMP_DEFAULT_BRANCH" "$default_branch"
-      fi
+    if [[ -z "$default_branch" ]]; then return 1; fi
+
+    branch_arg="$default_branch"
+  fi
+
+  if [[ "$default_branch" != "${PUMP_DEFAULT_BRANCH[$found]}" ]]; then
+    if confirm_from_ "save "$'\e[94m'$default_branch$'\e[0m'" as the default branch of $proj_arg and don't ask again?"; then
+      update_setting_ $found "PUMP_DEFAULT_BRANCH" "$default_branch"
       print ""
     fi
   fi
 
-  local branch_to_clone_folder="${branch_arg//\\/-}"
-  branch_to_clone_folder="${branch_to_clone_folder//\//-}"
+  local folder_to_clone=""
+
+  if (( single_mode )); then
+    folder_to_clone="$proj_folder"
+  else
+    if [[ -z "$branch_arg" ]]; then
+      branch_arg=$(input_branch_name_ "type the name of your feature branch");
+    fi
+    if [[ -n "$branch_arg" ]]; then
+      local branch_folder="${branch_arg//\\/-}"
+      branch_folder="${branch_folder//\//-}"
+      folder_to_clone="${proj_folder}/${branch_folder}"
+    else
+      return 1;
+    fi
+  fi
 
   if command -v gum &>/dev/null; then
     local output=""
-    output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "${proj_folder}/${branch_to_clone_folder}" 2>&1)
+    output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$folder_to_clone" 2>&1)
     if (( $? != 0 )); then print "$output" >&2; return 1; fi
   else
     print " cloning... $proj_repo on $branch_arg"
-    if ! git clone --quiet "$proj_repo" "${proj_folder}/${branch_to_clone_folder}"; then return 1; fi
+    if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
   fi
 
   # multiple mode
 
   local past_folder="$(pwd)"
 
-  pushd "${proj_folder}/${branch_to_clone_folder}" &>/dev/null
+  pushd "$folder_to_clone" &>/dev/null
 
   # if (( $? == 0 )); then
   #   save_pump_working_ "$proj_arg"
   # fi
-  
-  git config init.defaultBranch $default_branch
+
+  if [[ "$default_branch" != "$branch_arg" ]]; then
+    git config init.defaultBranch $default_branch
+  fi
 
   local my_branch="$(git branch --show-current)"
 
