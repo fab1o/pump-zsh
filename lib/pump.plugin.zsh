@@ -3424,6 +3424,10 @@ function cov() {
   
   if (( RET == 0 )); then
     print "\033[32m✅ test coverage passed on first run\033[0m"
+
+    if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
+      eval "$CURRENT_PUMP_OPEN_COV"
+    fi
     return 0
   fi
 
@@ -3436,7 +3440,6 @@ function cov() {
     if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
       eval "$CURRENT_PUMP_OPEN_COV"
     fi
-
     return 0;
   fi
     
