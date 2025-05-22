@@ -4722,7 +4722,7 @@ function glog() {
 }
 
 function push() {
-  eval "$(parse_flags_ "push_" "" "$@")"
+  eval "$(parse_flags_ "push_" "" "$@")" # do not pass flags because we want the user to pass any flags
   (( push_is_d )) && set -x
 
   if (( push_is_h )); then
@@ -4912,12 +4912,13 @@ function pull() {
     fi
   fi
 
-  if [[ -n "$1" && $1 != -* ]]; then
-    git pull "$remote_origin" "$1" --rebase --autostash ${@:2}
-    RET=$?
-  else
-    git pull "$remote_origin" --rebase --autostash $@
-    RET=$?
+  git pull "$remote_origin" $@ 2>/dev/null
+  if (( $? != 0 )); then
+    git pull "$remote_origin" --rebase $@ 2>/dev/null
+    if (( $? != 0 )); then
+      git pull "$remote_origin" --rebase --autostash $@
+      RET=$?
+    fi
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
