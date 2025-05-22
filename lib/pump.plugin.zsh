@@ -5229,7 +5229,6 @@ function restore() {
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
   git restore --quiet .
-  git reset HEAD .
 }
 
 function clean() {
@@ -5244,14 +5243,6 @@ function clean() {
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
   
   git clean -fd --quiet
-  local RET=$?
-
-  if (( RET == 0 )); then
-    restore
-    RET=$?
-  fi
-
-  return $RET;
 }
 
 function discard() {
@@ -5265,15 +5256,9 @@ function discard() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  reseta
-  local RET=$?
-
-  if (( RET == 0 )); then
-    clean
-    RET=$?
-  fi
-
-  return $RET;
+  git reset HEAD .
+  clean
+  restore
 }
 
 function reseta() {
@@ -5299,7 +5284,7 @@ function reseta() {
     git reset --hard "${remote_origin}/${my_branch}" $@
     RET=$?
   else
-    git reset "$remote_origin" --hard $@
+    git reset --hard "$remote_origin" $@
     RET=$?
   fi
 
