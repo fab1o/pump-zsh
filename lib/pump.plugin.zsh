@@ -5229,6 +5229,7 @@ function restore() {
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
   git restore --quiet .
+  git reset HEAD .
 }
 
 function clean() {
@@ -7064,7 +7065,6 @@ for i in {1..9}; do
 done
 
 activate_pro_ 1 # set project
-
 
 # ==========================================================================
 # 1>/dev/null or >/dev/null	  Hide stdout, show stderr

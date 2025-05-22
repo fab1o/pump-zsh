@@ -15,6 +15,7 @@
     "url": "git+https://github.com/fab1o/pump-zsh.git"
   },
   "scripts": {
+    "setup": "echo 'this is a setup script'",
     "check_zshrc": "zsh ./scripts/check_zshrc.zsh",
     "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
     "install_deps": "bash ./scripts/install_deps.sh",
