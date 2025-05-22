@@ -381,6 +381,7 @@ function confirm_between_() {
   local option1="$2"
   local option2="$3"
   local is_echod="${4:-0}"
+  local default="$5"
 
   local opt1="${option1[1]}"
   local opt2="${option2[1]}"
@@ -390,7 +391,24 @@ function confirm_between_() {
   local RET=0
 
   if command -v gum &>/dev/null; then
-    gum confirm ""mode:$'\e[0m'" $1" --no-show-help --affirmative="$option1" --negative="$option2" 2>/dev/tty
+    if [[ -n "$default" && "$default" == "$option2" ]]; then
+      change_default=1
+    else
+      change_default=0
+    fi
+
+    if (( change_default )); then
+      gum confirm ""mode:$'\e[0m'" $1" \
+        --no-show-help \
+        --default=false \
+        --affirmative="$option1" \
+        --negative="$option2" 2>/dev/tty
+    else
+      gum confirm ""mode:$'\e[0m'" $1" \
+        --no-show-help \
+        --affirmative="$option1" \
+        --negative="$option2" 2>/dev/tty
+    fi
     RET=$?
     if (( RET == 130 )); then return 130; fi
     if (( RET == 0 )); then
@@ -1174,6 +1192,7 @@ function save_proj_cmd_() {
 
 function choose_mode_() {
   local proj_folder="$(basename "$1")"
+  local mode="$2"
 
   local multiple_title=$(gum style --align=center --margin="0" --align=left --padding="0 7" --border=none --width=40 --foreground 212 "example of multiple mode")
   local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 57 "example of single mode")
@@ -1207,6 +1226,8 @@ function choose_mode_() {
   
   gum join --align=center --vertical "$titles" "$examples" >&2
 
+  local default="$((( mode )) && echo "single" || echo "multiple")"
+
   confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'" \
     "$'\e[0m'"  • "$'\e[38;5;212m'multiple$'\e[0m'" mode: "$'\n\e[0m'" \
     "$'\e[0m'"   creates a separate folder for new feature branches"$'\n\e[0m'" \
@@ -1214,7 +1235,7 @@ function choose_mode_() {
     "$'\e[0m'"  • "$'\e[38;5;99m'single$'\e[0m'" mode: "$'\n\e[0m'" \
     "$'\e[0m'"   manages all feature branches within a single folder"$'\n\e[0m'" \
     "$'\e[0m'"   ideal for personal projects or small teams with a limited number of branches" \
-    "multiple" "single" >&2
+    "multiple" "single" 0 "$default" >&2
   
   local RET=$?
 
@@ -1236,15 +1257,15 @@ function choose_mode_() {
 }
 
 function save_proj_mode_() {
-  eval "$(parse_flags_ "save_proj_mode_" "" "$@")"
+  eval "$(parse_flags_ "save_proj_mode_" "afe" "$@")"
   (( save_proj_mode_is_d )) && set -x
 
   local i="$1"
   local proj_folder="$2"
   local single_mode="$3"
 
-  if [[ -z "$single_mode" ]] || (( single_mode != 0 && single_mode != 1 )); then
-    choose_mode_ "$proj_folder"
+  if (( save_proj_mode_is_e )) || [[ -z "$single_mode" ]] || (( single_mode != 0 && single_mode != 1 )); then
+    choose_mode_ "$proj_folder" "$single_mode"
     local RET=$?
     if (( RET == 130 )); then return 130; fi
     single_mode=$RET
@@ -1619,6 +1640,8 @@ function save_proj_() {
     display_line_ "add new project" "${cor}"
   fi
 
+  TEMP_PUMP_PROJECT_SHORT_NAME=""
+
   pkg_name=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
 
   if (( save_proj_is_f )); then
@@ -1641,7 +1664,7 @@ function save_proj_() {
       proj_repo="${PUMP_PROJECT_REPO[$i]}"
     done
 
-    if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
+    if ! save_proj_mode_ -f $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
 
   elif (( save_proj_is_e )); then
     # editing a project
@@ -1650,7 +1673,7 @@ function save_proj_() {
     if ! save_proj_repo_ -e $i "${PUMP_PROJECT_FOLDER[$i]}" "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
 
-    if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" ""; then return 1; fi
+    if ! save_proj_mode_ -e $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
 
   elif (( save_proj_is_a )); then
     # adding a new project
@@ -1671,7 +1694,7 @@ function save_proj_() {
     elif get_proj_for_git_ "${PUMP_PROJECT_FOLDER[$i]}" &>/dev/null; then
       PUMP_PROJECT_SINGLE_MODE[$i]=0
     fi
-    if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" ""; then return 1; fi
+    if ! save_proj_mode_ -a $i "${PUMP_PROJECT_FOLDER[$i]}" ""; then return 1; fi
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
