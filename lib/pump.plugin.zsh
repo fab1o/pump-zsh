@@ -1915,6 +1915,11 @@ function get_node_version_() {
     return 1
   fi
 
+  proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
+  if [[ -z "$proj_folder" ]]; then
+    return 1;
+  fi
+
   local package_json="${proj_folder}/package.json"
 
   if [[ ! -f $package_json ]]; then
