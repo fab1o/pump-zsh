@@ -553,10 +553,10 @@ function choose_one_() {
 }
 
 function get_folders_() {
-  local _pwd=$(pwd)
-
   if [[ -n "$1" && -d "$1" ]]; then
     cd "$1"
+  else
+    return 1;
   fi
 
   #dirs=(*(/))
@@ -564,6 +564,7 @@ function get_folders_() {
   #dirs=(*(N/on))  # n = sort by name
   local dirs=(*(/N/on))
   local filtered=()
+
   local name=""
   for name in "${dirs[@]}"; do
     [[ $name != "revs" ]] && filtered+=$name
@@ -584,10 +585,7 @@ function get_folders_() {
     fi
   done
 
-
   echo "${ordered[@]}"
-  
-  cd "$_pwd"
 }
 
 function check_config_file_() {
@@ -1106,6 +1104,10 @@ function check_proj_folder_() {
     return 1;
   fi
 
+  if (( check_proj_folder_is_s )); then
+    mkdir -p "$proj_folder"
+  fi
+
   return 0;
 }
 
@@ -1203,7 +1205,7 @@ function choose_mode_() {
 
   local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
   
-  gum join --align=center --vertical "$titles" "$examples"
+  gum join --align=center --vertical "$titles" "$examples" >&2
 
   confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'"\
       "$'\e[0m'"see the example above: "$'\n\e[0m'"       • multiple mode creates a separate folder for new feature branches"$'\n\e[0m'"       • single mode manages all feature branches within a single folder" "multiple" "single" $2
@@ -1521,8 +1523,6 @@ function detect_pkg_manager_() {
     return 1
   fi
 
-  local _pwd="$(pwd)"
-
   cd "$folder"
 
   if [[ -f "$pkg_json" ]]; then
@@ -1531,7 +1531,6 @@ function detect_pkg_manager_() {
     if [[ $line =~ ([^\"]+) ]]; then
       manager="${match[1]%%@*}"
       echo "$manager"
-      cd "$_pwd"
       return 0;
     fi
   fi
@@ -1549,7 +1548,6 @@ function detect_pkg_manager_() {
 
   if [[ -n "$manager" ]]; then
     echo "$manager"
-    cd "$_pwd"
     return 0;
   fi
 
@@ -1558,8 +1556,6 @@ function detect_pkg_manager_() {
   else
     manager="npm"
   fi
-
-  cd "$_pwd"
 
   echo "$manager"
 }
@@ -1998,10 +1994,8 @@ function get_default_folder_() {
     return 1;
   fi
 
-  local _pwd=$(pwd)
   cd "$git_folder"
   local default_folder="$(git config --get init.defaultBranch)"
-  cd "$_pwd"
 
   if is_git_repo_ "${proj_folder}/${default_folder}" &>/dev/null; then    
     echo "${proj_folder}/${default_folder}"
@@ -3057,7 +3051,7 @@ function covc() {
   else
     rm -rf "$cov_folder" &>/dev/null
     
-    if gum spin --title="running test coverage on $branch..." -- git clone $CURRENT_PUMP_PROJECT_REPO "$cov_folder" --quiet; then
+    if gum spin --title="running test coverage on $branch..." -- git clone $CURRENT_PUMP_PROJECT_REPO "$cov_folder"; then
       pushd "$cov_folder" &>/dev/null
 
       if [[ -n "$_clone" ]]; then
@@ -4032,7 +4026,9 @@ function rev() {
     print " creating review for pull request: ${green_cor}${pr[3]}${reset_cor}..."
 
     if command -v gum &>/dev/null; then
-      if ! gum spin --title="cloning... $proj_repo" -- git clone $proj_repo "$full_rev_folder"; then return 1; fi
+      local output=""
+      output=$(gum spin --title="cloning... $proj_repo" -- git clone "$proj_repo" "$full_rev_folder" 2>&1)
+      if (( $? != 0 )); then print "$output" >&2; return 1; fi
     else
       print " cloning... $proj_repo";
       if ! git clone $proj_repo "$full_rev_folder" --quiet; then return 1; fi
@@ -4149,7 +4145,7 @@ function clone() {
       fi
       proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
-      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJECT_SINGLE_MODE[$i]}"; then return 1; fi
+      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJECT_SINGLE_MODE[$i]}" >/dev/null; then return 1; fi
 
       single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
       _clone="${PUMP_CLONE[$i]}"
@@ -4175,7 +4171,7 @@ function clone() {
     return 1;
   fi
 
-  if (( single_mode )) && [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
+  if (( single_mode )) && [[ -n "$(ls "$proj_folder" 2>/dev/null)" ]]; then
     print "${solid_blue_cor} $proj_arg${reset_cor} is already cloned in single mode: $proj_folder" >&2
     print "" >&2
     print " to switch to multiple mode, remove the project then add it again:" >&2
@@ -4191,10 +4187,11 @@ function clone() {
     fi
 
     if command -v gum &>/dev/null; then
-      if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$proj_folder" --quiet; then return 1; fi
-      print "   cloning... $proj_repo on $branch_arg"
+      local output=""
+      output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "$proj_folder" 2>&1)
+      if (( $? != 0 )); then print "$output" >&2; return 1; fi
     else
-      print "  cloning... $proj_repo on $branch_arg"
+      print " cloning... $proj_repo on $branch_arg"
       if ! git clone --quiet "$proj_repo" "$proj_folder"; then return 1; fi
     fi
 
@@ -4236,7 +4233,7 @@ function clone() {
   fi
   # end of (( single_mode ))
 
-  # multiple mode (requires passing a branch name)
+  # multiple mode (requires passing a branch name, unless first time user is cloning)
 
   local branch_to_clone=""
   
@@ -4274,10 +4271,11 @@ function clone() {
   branch_to_clone_folder="${branch_to_clone_folder//\//-}"
 
   if command -v gum &>/dev/null; then
-    if ! gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "${proj_folder}/${branch_to_clone_folder}" --quiet; then return 1; fi
-    print "   cloning... $proj_repo on $branch_arg"
+    local output=""
+    output=$(gum spin --title="cloning... $proj_repo on $branch_arg" -- git clone "$proj_repo" "${proj_folder}/${branch_to_clone_folder}" 2>&1)
+    if (( $? != 0 )); then print "$output" >&2; return 1; fi
   else
-    print "  cloning... $proj_repo on $branch_arg"
+    print " cloning... $proj_repo on $branch_arg"
     if ! git clone --quiet "$proj_repo" "${proj_folder}/${branch_to_clone_folder}"; then return 1; fi
   fi
 
@@ -4963,7 +4961,7 @@ function drelease() {
 
     for tag in $selected_tags; do
       if command -v gum &>/dev/null; then
-        if ! gum spin --title="deleting release: $tag" -- gh release delete "$tag" --cleanup-tag -y 1>/dev/tty; then continue; fi
+        if ! gum spin --title="deleting release: $tag" -- gh release delete "$tag" --cleanup-tag -y; then continue; fi
       else
         print " deleting release: $tag"
         if ! gh release delete "$tag" --cleanup-tag -y; then continue; fi
