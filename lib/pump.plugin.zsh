@@ -570,7 +570,7 @@ function get_folders_() {
     [[ $name != "revs" ]] && filtered+=$name
   done
 
-  local priorities=(main stage dev develop staging master)
+  local priorities=(main stage dev develop staging master production)
   local ordered=()
 
   for name in "${priorities[@]}"; do
@@ -1014,17 +1014,17 @@ function sanitize_pkg_name_() {
 
 # data checkers =========================================================
 function check_proj_cmd_() {
-  eval "$(parse_flags_ "check_proj_cmd_" "" "$@")"
+  eval "$(parse_flags_ "check_proj_cmd_" "s" "$@")"
   (( check_proj_cmd_is_d )) && set -x
 
   local i="$1"
-  local typed_name="$2"
+  local typed_proj_cmd="$2"
   local pkg_name="$3"
-  local flag="$4"
+  local old_proj_cmd="$4"
 
-  if ! validate_proj_cmd_strict_ "$typed_name" 13 $flag; then
+  if ! validate_proj_cmd_strict_ "$typed_proj_cmd" 13 "$old_proj_cmd"; then
     if (( check_proj_cmd_is_s )); then
-      if save_proj_cmd_ $i "$pkg_name" $flag; then return 0; fi
+      if save_proj_cmd_ $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
     fi
 
     return 1;
@@ -1155,25 +1155,23 @@ function save_proj_cmd_() {
 
   local i="$1"
   local pkg_name="$2"
-  local flag="$3"
+  local old_proj_cmd="$3"
   
   local pkg_name_sanitized=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
 
-  local typed_name=$(input_name_ "type your project alias name" "$pkg_name_sanitized")
-  if [[ -z "$typed_name" ]]; then return 1; fi
+  local typed_proj_cmd=$(input_name_ "type your project alias name" "$pkg_name_sanitized")
+  if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
   
-  if ! check_proj_cmd_ $i "$typed_name" "$pkg_name" $flag; then return 1; fi
+  if ! check_proj_cmd_ -s $i "$typed_proj_cmd" "$pkg_name" "$old_proj_cmd"; then return 1; fi
 
   if [[ -z "$TEMP_PUMP_PROJECT_SHORT_NAME" ]]; then
-    update_proj_cmd_ $i "$typed_name"
-    TEMP_PUMP_PROJECT_SHORT_NAME="$typed_name"
+    update_proj_cmd_ $i "$typed_proj_cmd"
+    TEMP_PUMP_PROJECT_SHORT_NAME="$typed_proj_cmd"
   fi
 }
 
 function choose_mode_() {
   local proj_folder="$(basename "$1")"
-
-  print ""
 
   local multiple_title=$(gum style --align=center --margin="0" --align=left --padding="0 7" --border=none --width=40 --foreground 212 "example of multiple mode")
   local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 57 "example of single mode")
@@ -1207,9 +1205,28 @@ function choose_mode_() {
   
   gum join --align=center --vertical "$titles" "$examples" >&2
 
-  confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'"\
-      "$'\e[0m'"see the example above: "$'\n\e[0m'"       • multiple mode creates a separate folder for new feature branches"$'\n\e[0m'"       • single mode manages all feature branches within a single folder" "multiple" "single" $2
+  confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'" \
+    "$'\e[0m'"  • "$'\e[38;5;212m'multiple$'\e[0m'" mode: "$'\n\e[0m'" \
+    "$'\e[0m'"   creates a separate folder for new feature branches"$'\n\e[0m'" \
+    "$'\e[0m'"   designed for professionals with sizable teams and extensive branching workflows"$'\n\e[0m'" \
+    "$'\e[0m'"  • "$'\e[38;5;99m'single$'\e[0m'" mode: "$'\n\e[0m'" \
+    "$'\e[0m'"   manages all feature branches within a single folder"$'\n\e[0m'" \
+    "$'\e[0m'"   ideal for personal projects or small teams with a limited number of branches" \
+    "multiple" "single" >&2
 
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
+  clear_last_line_
 }
 
 function save_proj_mode_() {
@@ -1429,7 +1446,7 @@ function save_pkg_manager_() {
     fi
   fi
 
-  if [[ -z "$pkg_manager" && -n "$proj_repo" ]]; then
+  if [[ -z "$pkg_manager" ]]; then
     pkg_manager=$(detect_pkg_manager_online_ "$proj_repo")
 
     if [[ -n "$pkg_manager" ]]; then
@@ -1461,10 +1478,11 @@ function detect_pkg_manager_online_() {
     return 1
   fi
 
-  local url=""
+  local urls=()
   if [[ "$repo" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
     local owner_repo="${match[1]}"
-    url="https://raw.githubusercontent.com/${owner_repo}/refs/heads/main"
+    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/main")
+    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
   else
     return 1
   fi
@@ -1472,12 +1490,23 @@ function detect_pkg_manager_online_() {
   local manager=""
 
   if command -v jq &>/dev/null; then
-    manager=$(curl -fs "${url}/package.json" | jq -r --arg key "$key_name" '.[$key]')
-    if [[ "$manager" == "null" ]]; then
-      manager=""
-    fi
+    for url in "${urls[@]}"; do
+      manager=$(curl -fs "${url}/package.json" | jq -r --arg key "packageManager" '.[$key]')
+      if [[ "$manager" == "null" ]]; then
+        manager=""
+      elif [[ -n "$manager" ]]; then
+        manager="${manager%%@*}"
+        break;
+      fi
+    done
   else
-    manager=$(curl -fs "${url}/package.json" | grep -E '"'$key_name'"\s*:\s*"' | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
+    for url in "${urls[@]}"; do
+      manager=$(curl -fs "${url}/package.json" | grep -E '"'packageManager'"\s*:\s*"' | head -1 | sed -E "s/.*\"packageManager\": *\"([^\"]+)\".*/\1/")
+      if [[ -n "$manager" ]]; then
+        manager="${manager%%@*}"
+        break;
+      fi
+    done
   fi
 
   if [[ -n "$manager" ]]; then
@@ -1486,15 +1515,17 @@ function detect_pkg_manager_online_() {
   fi
 
   # 1. Lockfile-based detection (most reliable)
-  if curl -fs "${url}/bun.lockb" -o /dev/null; then
-    manager="bun"
-  elif curl -fs "${url}/pnpm-lock.yaml" -o /dev/null; then
-    manager="pnpm"
-  elif curl -fs "${url}/yarn.lock" -o /dev/null; then
-    manager="yarn"
-  elif curl -fs "${url}/package-lock.json" -o /dev/null; then
-    manager="npm"
-  fi
+  for url in "${urls[@]}"; do
+    if curl -fs "${url}/bun.lockb" -o /dev/null; then
+      manager="bun"
+    elif curl -fs "${url}/pnpm-lock.yaml" -o /dev/null; then
+      manager="pnpm"
+    elif curl -fs "${url}/yarn.lock" -o /dev/null; then
+      manager="yarn"
+    elif curl -fs "${url}/package-lock.json" -o /dev/null; then
+      manager="npm"
+    fi
+  done
 
   if [[ -n "$manager" ]]; then
     echo "$manager"
@@ -1503,9 +1534,11 @@ function detect_pkg_manager_online_() {
 
   local pyproject="pyproject.toml"
 
-  if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]'; then
-    manager="poe"
-  fi
+  for url in "${urls[@]}"; do
+    if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]'; then
+      manager="poe"
+    fi
+  done
 
   echo "$manager"
 }
@@ -1584,11 +1617,12 @@ function save_proj_() {
   fi
 
   if (( save_proj_is_e )); then
+    # editing a project
     if ! save_proj_repo_ -e $i "${PUMP_PROJECT_FOLDER[$i]}" "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$pkg_name" "${PUMP_PROJECT_REPO[$i]}"; then return 1; fi
 
   elif (( save_proj_is_f )); then
-    # for pro pwd, all the settings come from the pwd
+    # for pro pwd, all the settings come from $(pwd)
     PUMP_PROJECT_REPO[$i]=""
     PUMP_PROJECT_FOLDER[$i]=""
     PUMP_PACKAGE_MANAGER[$i]=""
@@ -1606,6 +1640,7 @@ function save_proj_() {
     done
 
   elif (( save_proj_is_a )); then
+    # adding a new project
     PUMP_PROJECT_REPO[$i]=""
     PUMP_PROJECT_FOLDER[$i]=""
     PUMP_PACKAGE_MANAGER[$i]=""
@@ -1628,9 +1663,10 @@ function save_proj_() {
   
   TEMP_PUMP_PROJECT_SHORT_NAME=""
   if (( save_proj_is_e )); then
-    if ! save_proj_cmd_ -e $i "$pkg_name"; then return 1; fi
+    # editing a project, pass the old name
+    if ! save_proj_cmd_ $i "$pkg_name" "$pkg_name"; then return 1; fi
   else
-    if ! save_proj_cmd_ -a $i "$pkg_name"; then return 1; fi
+    if ! save_proj_cmd_ $i "$pkg_name"; then return 1; fi
   fi
 
   print "  ${pink_cor}project name:${reset_cor} ${PUMP_PROJECT_SHORT_NAME[$i]}" >&1
@@ -2186,7 +2222,7 @@ function select_branch_() {
   fi
 
   if (( ! include_special_branches )); then
-    local excluded_branches=("main" "master" "dev" "develop" "stage" "staging")
+    local excluded_branches=("main" "master" "dev" "develop" "stage" "staging" "prod" "production" "release")
 
     local branch_choices_array=($(echo "$branch_choices" | tr '\n' ' '))
     local filtered_branches=()
@@ -5801,13 +5837,11 @@ function dev() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  if [[ -n "$(git branch --all | grep -w dev)" ]]; then
-    co -e dev
-  elif [[ -n "$(git branch --all | grep -w develop)" ]]; then
-    co -e develop
-  else
-    print " did not match a dev or develop branch known to git: dev or develop" >&2
-    return 1;
+  if ! co -e dev &>/dev/null; then
+    if ! co -e develop &>/dev/null; then
+      print " did not match any branch known to git: dev or develop" >&2
+      return 1;
+    fi
   fi
 }
 
@@ -5823,13 +5857,31 @@ function main() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  if [[ -n "$(git branch --all | grep -w main)" ]]; then
-    co -e main
-  elif [[ -n "$(git branch --all | grep -w master)" ]]; then
-    co -e master
-  else
-    print " did not match a main branch known to git: main or master" >&2
-    return 1;
+  if ! co -e main &>/dev/null; then
+    if ! co -e master &>/dev/null; then
+      print " did not match any branch known to git: main" >&2
+      return 1;
+    fi
+  fi
+}
+
+function prod() {
+  # checkout prod branch
+  eval "$(parse_flags_ "prod_" "" "$@")"
+  (( prod_is_d )) && set -x
+
+  if (( prod_is_h )); then
+      print "  ${yellow_cor}prod${reset_cor} : to switch to prod or production in current project"
+    return 0;
+  fi
+
+  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+
+  if ! co -e prod &>/dev/null; then
+    if ! co -e production &>/dev/null; then
+      print " did not match any branch known to git: prod or production" >&2
+      return 1;
+    fi
   fi
 }
 
@@ -5839,19 +5891,17 @@ function stage() {
   (( stage_is_d )) && set -x
 
   if (( stage_is_h )); then
-      print "  ${yellow_cor}main${reset_cor} : to switch to stage or staging in current project"
+      print "  ${yellow_cor}stage${reset_cor} : to switch to stage or staging in current project"
     return 0;
   fi
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
-  if [[ -n "$(git branch --all | grep -w stage)" ]]; then
-    co -e stage
-  elif [[ -n "$(git branch --all | grep -w staging)" ]]; then
-    co -e staging
-  else
-    print " did not match a stage or staging branch known to git: stage or staging" >&2
-    return 1;
+  if ! co -e stage &>/dev/null; then
+    if ! co -e staging &>/dev/null; then
+      print " did not match any branch known to git: stage or staging" >&2
+      return 1;
+    fi
   fi
 }
 
@@ -6812,12 +6862,13 @@ function help() {
   print ""
   print " ${solid_cyan_cor} back ${reset_cor}\t\t = go back to previous branch in the current folder"
   print " ${solid_cyan_cor} co ${reset_cor}\t\t = switch branch (checkout)"
-  print " ${solid_cyan_cor} dev ${reset_cor}\t\t = switch to dev or develop"
-  print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main"
+  print " ${solid_cyan_cor} dev ${reset_cor}\t\t = switch to dev or develop branch"
+  print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main branch"
   print " ${solid_cyan_cor} next ${reset_cor}\t\t = go to the next working folder/branch"
   print " ${solid_cyan_cor} prev ${reset_cor}\t\t = go to the previous working folder/branch"
+  print " ${solid_cyan_cor} prod ${reset_cor}\t = switch to prod or production branch"
   print " ${solid_cyan_cor} renb <b>${reset_cor}\t = rename branch"
-  print " ${solid_cyan_cor} stage ${reset_cor}\t = switch to stage or staging"
+  print " ${solid_cyan_cor} stage ${reset_cor}\t = switch to stage or staging branch"
 
   print ""
   display_line_ "git clean" "${solid_cyan_cor}"
@@ -6927,15 +6978,15 @@ function validate_proj_cmd_strict_() {
 
   local proj_cmd="$1"
   local qty="$2"
+  local old_proj_cmd="$3"
 
   if ! validate_proj_cmd_ "$proj_cmd" $qty; then
     return 1;
   fi
 
-  if (( ! validate_proj_cmd_strict_is_e )); then
+  if [[ "$old_proj_cmd" != "$proj_cmd" ]]; then
     local reserved=""
     reserved="$(whence -w "$proj_cmd" 2>/dev/null)"
-
     if (( $? == 0 )); then
       if [[ $reserved =~ ": command" ]]; then
         if confirm_from_ "project name is reserved, $reserved - use it anyway?"; then
