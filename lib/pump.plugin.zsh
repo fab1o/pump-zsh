@@ -3613,6 +3613,10 @@ function pr() {
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
 
+  if gh pr view --web &>/dev/null; then
+    return 0;
+  fi
+
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -n "$git_status" ]]; then
     print " uncommitted changes detected, cannot create pull request" >&2;
@@ -4867,26 +4871,44 @@ function gconf() {
 }
 
 function glog() {
-  eval "$(parse_flags_ "glog_" "" "$@")"
+  eval "$(parse_flags_ "glog_" "c" "$@")"
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
     print "  ${yellow_cor}glog${reset_cor} : to log all commits"
     print "  ${yellow_cor}glog ${solid_yellow_cor}-n${reset_cor} : to log n commits"
+    print "  ${yellow_cor}glog ${solid_yellow_cor}-c${reset_cor} : to log commits from current branch for posting in comments (and to clipboard)"
     return 0;
   fi
 
-  local _pwd="$(pwd)";
+  local RET=0
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if (( glog_is_c )); then
+    if ! is_git_repo_ "$(pwd)"; then return 2; fi
+    print ""
+
+    local merge_commits=""
+    merge_commits=($(git log -100 --pretty=format:"%H %P" | awk '{ if (NF > 2) print $1 }'))
+
+    local merge_hash="${merge_commits[1]}"
+    local first=$(git rev-parse "$(git log -1 --pretty=format:"%H")")
+    local last=$(git rev-parse "${merge_hash}^2")
+
+    git --no-pager log --oneline --graph --date=relative --no-merges --first-parent "$first" "^$last"
+    git log --no-merges --first-parent "$first" "^$last" --pretty=format:'- %H - %s' | pbcopy
+    RET=$?
+  else
+    local _pwd="$(pwd)";
+    if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+    
+    print ""
+    git --no-pager log main HEAD --oneline --graph --date=relative $@
+    RET=$?
+
+    cd "$_pwd"
+  fi
 
   print ""
-  git --no-pager log main HEAD --oneline --graph --date=relative $@
-  local RET=$?
-
-  print ""
-  cd "$_pwd"
-
   return $RET;
 }
 
