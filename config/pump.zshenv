@@ -184,6 +184,19 @@ PUMP_TEST_8=
 PUMP_TEST_9=
 
 # optional
+# default: 0
+# set to 1 to re-try tests if they fail, 0 to not re-try
+PUMP_RETRY_TEST_1=
+PUMP_RETRY_TEST_2=
+PUMP_RETRY_TEST_3=
+PUMP_RETRY_TEST_4=
+PUMP_RETRY_TEST_5=
+PUMP_RETRY_TEST_6=
+PUMP_RETRY_TEST_7=
+PUMP_RETRY_TEST_8=
+PUMP_RETRY_TEST_9=
+
+# optional
 # default: PUMP_PACKAGE_MANAGER run test:coverage
 # script to run for command `cov`
 PUMP_COV_1=

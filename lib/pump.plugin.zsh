@@ -1846,6 +1846,7 @@ function remove_prj_() {
   update_setting_ $i "PUMP_PRO" "" 1>/dev/null
   update_setting_ $i "PUMP_USE" "" 1>/dev/null
   update_setting_ $i "PUMP_TEST" "" 1>/dev/null
+  update_setting_ $i "PUMP_RETRY_TEST" "" 1>/dev/null
   update_setting_ $i "PUMP_COV" "" 1>/dev/null
   update_setting_ $i "PUMP_OPEN_COV" "" 1>/dev/null
   update_setting_ $i "PUMP_TEST_WATCH" "" 1>/dev/null
@@ -1879,6 +1880,7 @@ function save_current_proj_() {
   CURRENT_PUMP_PRO="${PUMP_PRO[$i]}"
   CURRENT_PUMP_USE="${PUMP_USE[$i]}"
   CURRENT_PUMP_TEST="${PUMP_TEST[$i]}"
+  CURRENT_PUMP_RETRY_TEST="${PUMP_RETRY_TEST[$i]}"
   CURRENT_PUMP_COV="${PUMP_COV[$i]}"
   CURRENT_PUMP_OPEN_COV="${PUMP_OPEN_COV[$i]}"
   CURRENT_PUMP_TEST_WATCH="${PUMP_TEST_WATCH[$i]}"
@@ -2015,6 +2017,7 @@ function print_current_proj_() {
     print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
     print "${solid_magenta_cor} PUMP_OPEN_COV_$i=${reset_cor}${PUMP_OPEN_COV_[$i]}"
     print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
+    print "${solid_magenta_cor} PUMP_RETRY_TEST_$i=${reset_cor}${PUMP_RETRY_TEST[$i]}"
     print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
     print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
     print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
@@ -2047,6 +2050,7 @@ function print_current_proj_() {
   print "${pink_cor} CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV"
   print "${pink_cor} CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV"
   print "${pink_cor} CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST"
+  print "${pink_cor} CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST"
   print "${pink_cor} CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH"
   print "${pink_cor} CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E"
   print "${pink_cor} CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI"
@@ -2596,6 +2600,7 @@ function load_config_entry_() {
     PUMP_PRO
     PUMP_USE
     PUMP_TEST
+    PUMP_RETRY_TEST
     PUMP_COV
     PUMP_OPEN_COV
     PUMP_TEST_WATCH
@@ -2644,6 +2649,9 @@ function load_config_entry_() {
           ;;
         PUMP_TEST)
           value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test"
+          ;;
+        PUMP_RETRY_TEST)
+          value="0"
           ;;
         PUMP_COV)
           value="${PUMP_PACKAGE_MANAGER[$i]} ${run}test:coverage"
@@ -2703,6 +2711,9 @@ function load_config_entry_() {
         ;;
       PUMP_TEST)
         PUMP_TEST[$i]="$value"
+        ;;
+      PUMP_RETRY_TEST)
+        PUMP_RETRY_TEST[$i]="$value"
         ;;
       PUMP_COV)
         PUMP_COV[$i]="$value"
@@ -3387,12 +3398,14 @@ function test() {
     return 0
   fi
 
-  (eval "$CURRENT_PUMP_TEST" $@)
-  RET=$?
+  if (( CURRENT_PUMP_RETRY_TEST )); then
+    (eval "$CURRENT_PUMP_TEST" $@)
+    RET=$?
 
-  if (( RET == 0 )); then
-    print "\033[32m✅ test passed on second run\033[0m"
-    return 0;
+    if (( RET == 0 )); then
+      print "\033[32m✅ test passed on second run\033[0m"
+      return 0;
+    fi
   fi
     
   print "\033[31m❌ test failed\033[0m"
@@ -3434,16 +3447,18 @@ function cov() {
     return 0
   fi
 
-  (eval "$CURRENT_PUMP_COV" $@)
-  RET=$?
+  if (( CURRENT_PUMP_RETRY_TEST )); then
+    (eval "$CURRENT_PUMP_COV" $@)
+    RET=$?
 
-  if (( RET == 0 )); then
-    print "\033[32m✅ test coverage passed on second run\033[0m"
-    
-    if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
-      eval "$CURRENT_PUMP_OPEN_COV"
+    if (( RET == 0 )); then
+      print "\033[32m✅ test coverage passed on second run\033[0m"
+      
+      if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
+        eval "$CURRENT_PUMP_OPEN_COV"
+      fi
+      return 0;
     fi
-    return 0;
   fi
     
   print "\033[31m❌ test coverage failed\033[0m"
@@ -7288,6 +7303,7 @@ typeset -gA PUMP_RUN_PROD
 typeset -gA PUMP_PRO
 typeset -gA PUMP_USE
 typeset -gA PUMP_TEST
+typeset -gA PUMP_RETRY_TEST
 typeset -gA PUMP_COV
 typeset -gA PUMP_TEST_WATCH
 typeset -gA PUMP_E2E
@@ -7317,6 +7333,7 @@ typeset -g CURRENT_PUMP_RUN_PROD=""
 typeset -g CURRENT_PUMP_PRO=""
 typeset -g CURRENT_PUMP_USE=""
 typeset -g CURRENT_PUMP_TEST=""
+typeset -g CURRENT_PUMP_RETRY_TEST=""
 typeset -g CURRENT_PUMP_COV=""
 typeset -g CURRENT_PUMP_OPEN_COV=""
 typeset -g CURRENT_PUMP_TEST_WATCH=""
