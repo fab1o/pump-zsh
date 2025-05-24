@@ -4891,8 +4891,8 @@ function glog() {
 
   if (( glog_is_h )); then
     print "  ${yellow_cor}glog${reset_cor} : to log all commits"
-    print "  ${yellow_cor}glog ${solid_yellow_cor}-n${reset_cor} : to log n commits"
-    print "  ${yellow_cor}glog ${solid_yellow_cor}-c${reset_cor} : to log commits from current branch for posting in comments (and to clipboard)"
+    print "  ${yellow_cor}glog -n${reset_cor} : to log n commits"
+    print "  ${yellow_cor}glog -c${reset_cor} : to log commits from current branch for posting in comments (and to clipboard)"
     return 0;
   fi
 
@@ -5059,7 +5059,7 @@ function dtag() {
 
   local _pwd="$(pwd)";
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
   
   prune
 
@@ -5091,7 +5091,7 @@ function dtag() {
 
   cd "$_pwd"
 
-  return 0; # don't care if it fails to delete, considered success
+  return 0; # don't care if it fails to delete, consider success
 }
 
 function pull() {
@@ -5144,7 +5144,7 @@ function drelease() {
   (( drelease_is_d )) && set -x
 
   if (( drelease_is_h )); then
-    print "  ${yellow_cor}drelease <tag>${reset_cor} : to delete a release"
+    print "  ${yellow_cor}drelease${reset_cor} : to delete a release"
     print "  ${yellow_cor}drelease ${solid_yellow_cor}<tag>${reset_cor} : to delete a release directly"
     return 0;
   fi
@@ -5155,6 +5155,8 @@ function drelease() {
     return 1;
   fi
 
+  local _pwd="$(pwd)";
+
   if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
 
   local tag="$1"
@@ -5162,11 +5164,14 @@ function drelease() {
   if [[ -z "$tag" ]]; then
     local tags=$(tags 2>/dev/null)
     if [[ -z "$tags" ]]; then
+      cd "$_pwd"
       print " no tags found to delete" >&2
       return 0;
     fi
+
     local selected_tags=($(choose_multiple_ 0 "select tags to delete" 20 $(echo "$tags" | tr '\n' ' ')))
     if [[ -z "$selected_tags" ]]; then
+      cd "$_pwd"
       return 1;
     fi
 
@@ -5179,10 +5184,16 @@ function drelease() {
       fi
       print " deleted release: $tag"
     done
+
+    cd "$_pwd"
     return 0;
   fi
 
   gh release delete "$tag" --cleanup-tag -y
+
+  cd "$_pwd"
+
+  return 0; # don't care if it fails to delete, consider success
 }
 
 function release() {
@@ -5202,23 +5213,28 @@ function release() {
 
   if ! command -v gh &>/dev/null; then
     print " release requires gh" >&2
-    print " install gh:${blue_cor} https://github.com/cli/cli ${reset_cor}" >&2
+    print " install gh: ${blue_cor}https://github.com/cli/cli ${reset_cor}" >&2
     return 1;
   fi
 
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
   if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
 
+  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+
+  if [[ -z "$my_branch" ]]; then
+    print " branch is detached, cannot create release" >&2
+    return 1;
+  fi
+
   if [[ -n "$(git status --porcelain)" ]]; then
     print " uncommitted changes detected, cannot create release" >&2
     st
-    return 1
+    return 1;
   fi
 
-  local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
-
   # check if name is conventional
-  if ! [[ "$my_branch" =~ ^(main|master|stage|staging|pro|production|release)$ || "$my_branch" == release* ]]; then
+  if ! [[ "$my_branch" =~ ^(main|master|stage|staging|prod|production|release)$ || "$my_branch" == release* ]]; then
     print " warning: unconventional branch to release: $my_branch"
   fi
 
@@ -5269,6 +5285,7 @@ function release() {
 
     if [[ -z "$tag" ]]; then
       print " fatal: cannot determine version" >&2
+      print " please provide a version or tag name" >&2
       return 1;
     fi
   else
@@ -5346,8 +5363,6 @@ function tag() {
     return 0;
   fi
 
-  local _pwd="$(pwd)";
-
   if ! is_git_repo_ "$(pwd)"; then return 2; fi
   if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
   
@@ -5366,11 +5381,7 @@ function tag() {
 
   if [[ -z "$tag" ]]; then
     tag=$(input_path_ "type the tag name");
-  fi
-
-  if [[ -z "$tag" ]]; then
-    cd "$_pwd"
-    return 1;
+    if [[ -z "$tag" ]]; then return 1; fi
   fi
 
   git tag --annotate "$tag" --message="$tag" ${@:2}
@@ -5380,8 +5391,6 @@ function tag() {
     git push --no-verify --tags
     RET=$?
   fi
-
-  cd "$_pwd"
 
   return $RET;
 }
