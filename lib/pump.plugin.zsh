@@ -17,6 +17,7 @@ typeset -g bright_yellow_cor="\e[1m\e[38;5;228m"
 typeset -g solid_yellow_cor="\e[33m"
 typeset -g yellow_cor="\e[93m"
 
+typeset -g bright_magenta_cor="\e[38;5;201m"
 typeset -g solid_magenta_cor="\e[35m"
 typeset -g magenta_cor="\e[95m"
 
@@ -222,7 +223,7 @@ function update_() {
     print " new version available for pump-zsh: ${magenta_cor}${PUMP_VERSION}${reset_cor} -> ${purple_cor}${latest_version}${reset_cor}"
     
     if (( ! update_is_f )); then
-      if ! confirm_from_ "do you want to install new version?"; then
+      if ! confirm_from_ "would you like to install new version?"; then
         return 0;
       fi
     fi
@@ -746,7 +747,6 @@ function choose_proj_folder_() {
   local folder_path=""
 
   print "${purple_cor} ${header}:${reset_cor}" 1>/dev/tty
-  # print "" 1>/dev/tty
 
   cd "${HOME:-/}" # start from home
 
@@ -762,9 +762,7 @@ function choose_proj_folder_() {
 
       confirm_between_ "set project folder to: "$'\e[94m'${new_folder}$'\e[0m'" or continue to browse further?" "set folder" "continue to browse"
       local RET=$?
-      if (( RET == 130 )); then
-        return 130;
-      fi
+      if (( RET == 130 )); then return 130; fi
       if (( RET == 1 )); then
         cd "$folder_path"
       else
@@ -792,9 +790,7 @@ function choose_proj_folder_() {
       fi
     fi
 
-    folder_path=""
-    
-    local dirs=($(get_folders_ 2>/dev/null))
+    local dirs=($(get_folders_ "$folder_path" 2>/dev/null))
     if (( ! ${#dirs[@]} )); then
       cd "${HOME:-/}"
     fi
@@ -841,7 +837,7 @@ function validate_repo_() {
     return 0;
   fi
 
-  print "  repository must be a valid ssh or https uri" 2>/dev/tty >&2
+  print "  repository must be a valid ssh or https uri" 2>/dev/tty
   return 1;
 }
 
@@ -850,7 +846,7 @@ function input_repo_() {
   local placeholder="$2"
 
   if command -v gh &>/dev/null; then
-    confirm_from_ "do you want to access your Github account to choose from a list of repositories?"
+    confirm_from_ "would you like to access your Github account to choose from a list of repositories?"
     local RET=$?
     if (( RET == 130 )); then return 130; fi
 
@@ -884,7 +880,7 @@ function input_repo_() {
             return 0;
           fi
         else
-          print "  no repositories found for $gh_owner" 2>/dev/tty >&2
+          print "  no repositories found for $gh_owner" 2>/dev/tty
         fi
       fi
     fi
@@ -1099,7 +1095,7 @@ function check_proj_repo_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" 2>/dev/tty >&2
+    print "  $error_msg" 2>/dev/tty
 
     if (( check_proj_repo_is_s )); then
       if (( check_proj_repo_is_a )); then
@@ -1135,7 +1131,7 @@ function check_proj_folder_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" 2>/dev/tty >&2
+    print "  $error_msg" 2>/dev/tty
 
     if (( check_proj_folder_is_s )); then
       if save_proj_folder_ $i "$pkg_name" "$proj_repo"; then return 0; fi
@@ -1173,7 +1169,7 @@ function check_proj_pkg_manager_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print " $error_msg" 2>/dev/tty >&2
+    print " $error_msg" 2>/dev/tty
 
     if (( check_proj_pkg_manager_is_s )); then
       if save_pkg_manager_ $i "$proj_folder" "$proj_repo"; then return 0; fi
@@ -1186,7 +1182,7 @@ function check_proj_pkg_manager_() {
 # end of data checkers
 
 function clear_last_line_() {
-  print -n "\033[1A\033[2K" 2>/dev/tty >&2
+  print -n "\033[1A\033[2K" 2>/dev/tty
 }
 
 function save_proj_cmd_() {
@@ -1213,36 +1209,49 @@ function choose_mode_() {
   local mode="$2"
 
   local multiple_title=$(gum style --align=center --margin="0" --align=left --padding="0 7" --border=none --width=40 --foreground 212 "example of multiple mode")
-  local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 57 "example of single mode")
+  local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 99 "example of single mode")
 
   local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
 
-  local multiple=$'
-  '"$(basename $(dirname "$1"))"'/
-  └── '"${proj_folder}"'/
-      ├── main/
-      ├── feature-1/
-      ├── feature-2/
-      └── revs/
-          ├── rev.pr-1/
-          └── rev.pr-2/'
+  local multiple=$'  '/"$(basename $(dirname "$1"))"'/
+   └── '"${proj_folder}"'/
+       ├── main/
+       ├── feature-1/
+       └── feature-2/'
 
-  local single=$'
-  '"$(basename $(dirname "$1"))"'/
-  ├── '"${proj_folder}"'/ 
-  └── '"${proj_folder}"'-revs/
-      ├── rev.pr-1/
-      └── rev.pr-2/
-  
+  local single=$'  '/"$(basename $(dirname "$1"))"'/
+   └── '"${proj_folder}"'/
+
 
   '
 
-  multiple=$(gum style --margin="0" --align=left --padding="0 0 1 0" --border=normal --width=40 --border-foreground 212 "$multiple")
-  single=$(gum style --margin="0" --align=left --padding="0 0 1 0" --border=normal --width=40 --border-foreground 57 "$single")
+  # local multiple=$'
+  # '/"$(basename $(dirname "$1"))"'/
+  #  └── '"${proj_folder}"'/
+  #      ├── main/
+  #      ├── feature-1/
+  #      ├── feature-2/
+  #      └── .revs/
+  #          ├── rev.pr-1/
+  #          └── rev.pr-2/'
+
+  # local single=$'
+  # '/"$(basename $(dirname "$1"))"'/
+  #  ├── '"${proj_folder}"'/ 
+  #  └── '."${proj_folder}"'-revs/
+  #      ├── rev.pr-1/
+  #      └── rev.pr-2/
+  
+
+  # '
+
+  multiple=$(gum style --margin="0" --align=left --padding="0 0 0 0" --border=normal --width=40 --border-foreground 212 "$multiple")
+  single=$(gum style --margin="0" --align=left --padding="0 0 0 0" --border=normal --width=40 --border-foreground 99 "$single")
 
   local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
   
-  gum join --align=center --vertical "$titles" "$examples" >&2
+  print "" 1>/dev/tty
+  gum join --align=center --vertical "$titles" "$examples"
 
   local default="$((( mode )) && echo "single" || echo "multiple")"
 
@@ -1253,25 +1262,89 @@ function choose_mode_() {
     "$'\e[0m'"  • "$'\e[38;5;99m'single$'\e[0m'" mode: "$'\n\e[0m'" \
     "$'\e[0m'"   manages all branches within a single folder"$'\n\e[0m'" \
     "$'\e[0m'"   ideal for personal projects or small teams with a limited number of branches" \
-    "multiple" "single" 0 "$default" >&2
+    "multiple" "single" 0 "$default"
   
   local RET=$?
 
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
-  clear_last_line_
+  for i in {1..9}; do
+    clear_last_line_
+  done
 
   return $RET;
+}
+
+function print_tree_ascii_() {
+  local dir="${1:-$PWD}"
+  local cor="${2:-$green_cor}"
+  local max="$3"
+  local is_deep="$4"
+
+  if [[ ! -d "$dir" ]]; then return 1; fi
+
+  if [[ -z ${(f)"$(echo "$dir"/*)"} ]]; then
+    return 1;
+  fi
+
+  local dir_name="$(basename "$dir")"
+
+  print "  ${cor}/${dir_name}/${reset_cor}" >&2
+  local total=$(print_tree_ "$dir" "$cor" "$max" "$is_deep")
+
+  ((total++))
+
+  confirm_from_ "would you like to move the contents to a new folder and re-clone the project?"
+  local RET=$?
+
+  for i in {1..$total}; do
+    clear_last_line_
+  done
+
+  return $RET;
+}
+
+function print_tree_() {
+  local path="$1"
+  local cor="$2"
+  local max="${3:-0}"
+  local is_deep="${4:-0}"
+  local prefix="$5"
+
+  # Enable proper globbing
+  setopt local_options null_glob
+
+  local -a entries=()
+  for f in "$path"/*; do
+    [[ -e "$f" ]] && entries+=("$f")
+  done
+
+  local total=${#entries}
+  local count=0
+
+  for entry in "${entries[@]}"; do
+    ((count++))
+    local name="${entry:t}"  # filename
+    local is_last=0; (( count == total )) && is_last=1
+    local connector="├──"; (( is_last )) && connector="└──"
+
+    if [[ -d "$entry" ]]; then
+      print "   ${cor}${prefix}${connector} ${name}/${reset_cor}" >&2
+      local new_prefix="   ${prefix}"
+      (( is_last )) && new_prefix+="    " || new_prefix+="│   "
+
+      if (( is_deep )); then
+        print_tree_ "$entry" "$cor" "$max" "$is_deep" "$new_prefix"
+      fi
+    else
+      print "   ${cor}${prefix}${connector} ${name}${reset_cor}" >&2
+    fi
+    if (( count == max )); then
+      ((count++))
+      print "   ${cor}${prefix}└── ...${reset_cor}" >&2
+      break;
+    fi
+  done
+
+  echo $count
 }
 
 function save_proj_mode_() {
@@ -1288,11 +1361,13 @@ function save_proj_mode_() {
     if (( RET == 130 )); then return 130; fi
     single_mode=$RET
 
-    if [[ -d "$proj_folder" && -n "$(ls "$proj_folder")" ]]; then
+    local folder_contents="$(ls "$proj_folder")"
+
+    if [[ -d "$proj_folder" && -n "$folder_contents" ]]; then
       local is_move=0;
 
       if (( single_mode )); then
-        confirm_from_ "do you want to move contents of the project folder to a new folder and re-clone the project?"
+        print_tree_ascii_ "$proj_folder" "$green_cor" 4
         RET=$?
         if (( RET == 130 )); then return 130; fi
         if (( RET == 0 )); then
@@ -1357,7 +1432,7 @@ function save_proj_folder_() {
   
   if (( save_proj_folder_is_e )); then
     if [[ -n "${PUMP_PROJECT_FOLDER[$i]}" ]]; then
-      confirm_from_ "do you want to keep using project folder: "$'\e[94m'${PUMP_PROJECT_FOLDER[$i]}$'\e[0m'" ?"
+      confirm_from_ "would you like to keep using project folder: "$'\e[94m'${PUMP_PROJECT_FOLDER[$i]}$'\e[0m'" ?"
       RET=$?
       if (( RET == 130 )); then return 130; fi
       if (( RET == 0 )); then
@@ -1418,7 +1493,7 @@ function save_proj_repo_() {
   local RET=0
 
   if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
-    confirm_from_ "do you want to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'" ?"
+    confirm_from_ "would you like to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'" ?"
     RET=$?
     if (( RET == 130 )); then return 130; fi
     if (( RET == 0 )); then
@@ -1426,7 +1501,7 @@ function save_proj_repo_() {
       return 0;
     fi
   elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
-    confirm_from_ "are you adding an existing project?"
+    confirm_from_ "are you adding an existing cloned project?"
     RET=$?
     if (( RET == 130 )); then return 130; fi
     if (( RET == 0 )); then
@@ -1593,7 +1668,7 @@ function detect_pkg_manager_online_() {
 }
 
 function detect_pkg_manager_() {
-  local folder="$1"
+  local folder="${1:-$PWD}"
 
   local manager=""
   local pkg_json="package.json"
@@ -1741,7 +1816,11 @@ function save_proj_() {
 
   load_config_entry_ $i
 
-  eval "${PUMP_PROJECT_SHORT_NAME[$i]}"
+  if (( save_proj_is_f )); then
+    pro "${PUMP_PROJECT_SHORT_NAME[$i]}"
+  else
+    print " now try running: ${yellow_cor}${PUMP_PROJECT_SHORT_NAME[$i]}${reset_cor}"
+  fi
 }
 # end of save project data to config file =========================================
 
@@ -2085,7 +2164,7 @@ function which_pro_pwd_() {
     if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" && -n "${PUMP_PROJECT_FOLDER[$i]}" ]]; then
       local proj_path=""
       proj_path=$(realpath "${PUMP_PROJECT_FOLDER[$i]}" 2>/dev/null)
-      if (( $? == 0 )) && [[ -n "$proj_path" && $PWD == $proj_path* ]]; then
+      if (( $? == 0 )) && [[ -n "$proj_path" && ${PWD}/ == ${proj_path}/* ]]; then
         echo "${PUMP_PROJECT_SHORT_NAME[$i]}"
         return 0;
       fi
@@ -2105,14 +2184,9 @@ function is_proj_folder_() {
 }
 
 function get_proj_for_pkg_from_within_() {
-  local folder="$1"
+  local folder="${1:-$PWD}"
 
-  if [[ -z "$1" ]]; then
-    print " fatal: no argument provided" >&2
-    return 2;
-  fi
-
-  if [[ -n "$folder" && -d "$folder" ]]; then
+  if [[ -d "$folder" ]]; then
     if [[ -f "$folder/package.json" || -f "$folder/pyproject.toml" ]]; then # || -f "$folder/environment.yml" || -f "$folder/Cargo.toml"  ]]; then
       echo "$folder"
       return 0;
@@ -2127,7 +2201,7 @@ function get_proj_for_pkg_from_within_() {
     done
   fi
 
-  print " not a project folder: $1" >&2
+  print " not a project folder: $folder" >&2
 
   return 1;
 }
@@ -2161,6 +2235,8 @@ function get_default_folder_() {
   else
     echo "$git_folder"
   fi
+
+  return 0;
 }
 
 function shorten_path_() {
@@ -2195,10 +2271,10 @@ function shorten_path_() {
 }
 
 function open_proj_for_pkg_() {
-  local folder="$1"
+  local folder="${1:-$PWD}"
   local file="$2"
 
-  if [[ -z "$1" ]]; then
+  if [[ -z "$folder" ]]; then
     print " fatal: no argument provided" >&2
     return 1;
   fi
@@ -2209,6 +2285,7 @@ function open_proj_for_pkg_() {
   fi
 
   cd "$proj_folder"
+  return 0;
 }
 
 function get_proj_for_pkg_() {
@@ -2249,9 +2326,9 @@ function get_proj_for_pkg_() {
 }
 
 function open_proj_for_git_() {
-  local folder="${1-$PWD}"
+  local folder="${1:-$PWD}"
 
-  if [[ -z "$1" ]]; then
+  if [[ -z "$folder" ]]; then
     print " fatal: no argument provided" >&2
     return 1;
   fi
@@ -2264,10 +2341,11 @@ function open_proj_for_git_() {
   fi
 
   cd "$git_folder"
+  return 0;
 }
 
 function get_proj_for_git_() {
-  local folder="${1:$PWD}"
+  local folder="${1:-$PWD}"
 
   if is_git_repo_ "$folder"; then
     echo "$folder"
@@ -2306,6 +2384,7 @@ function get_remote_origin_() {
   fi
 
   echo "$remote_origin"
+  return 0;
 }
 
 function select_branch_() {
@@ -2412,7 +2491,6 @@ function select_pr_() {
 
   if [[ -z "$pr_list" ]]; then
     print " no pull requests found" >&2
-    print "" >&2
     return 1;
   fi
 
@@ -2441,7 +2519,6 @@ function select_pr_() {
   fi
 
   echo "${select_pr_choice}|${select_pr_branch}|${select_pr_title}"
-
   return 0;
 }
 
@@ -2476,6 +2553,7 @@ function get_repo_name_() {
   fi
 
   echo "$repo"
+  return 0;
 }
 
 function open_working_() {
@@ -2558,14 +2636,16 @@ function get_clone_default_branch_() {
   fi
 
   echo "$selected_default_branch"
+  return 0;
 }
 
 function get_from_pkg_json_() {
-  local key_name="${1:-name}"
+  local key_name="${1:-"name"}"
   local pkg_json="${2:-"package.json"}"
+  
+  local value="";
 
   if [[ -f "$pkg_json" ]]; then
-    local value;
     if command -v jq &>/dev/null; then
       value=$(jq -r --arg key "$key_name" '.[$key]' "$pkg_json")
       if [[ "$value" == "null" ]]; then
@@ -2574,11 +2654,10 @@ function get_from_pkg_json_() {
     else
       value=$(grep -E '"'$key_name'"\s*:\s*"' "$pkg_json" | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
     fi
-    if [[ -n "$value" ]]; then
-      echo "$value"
-      return 0;
-    fi
   fi
+
+  echo "$value"
+  return 0;
 }
 
 function load_config_entry_() {
@@ -2766,14 +2845,14 @@ function load_config_() {
     local proj_cmd=""
     proj_cmd=$(sed -n "s/^PUMP_PROJECT_SHORT_NAME_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_PROJECT_SHORT_NAME_${i}" 2>/dev/tty >&2
+      print " something is wrong with your config data at PUMP_PROJECT_SHORT_NAME_${i}" 2>/dev/tty
       continue;
     fi
 
     [[ -z "$proj_cmd" ]] && continue;  # skip if not defined
 
     if ! validate_proj_cmd_strict_ "$proj_cmd"; then
-      print "  in config data at PUMP_PROJECT_SHORT_NAME_${i}" 2>/dev/tty >&2
+      print "  in config data at PUMP_PROJECT_SHORT_NAME_${i}" 2>/dev/tty
       continue;
     fi
 
@@ -2781,7 +2860,7 @@ function load_config_() {
     local proj_repo=""
     proj_repo=$(sed -n "s/^PUMP_PROJECT_REPO_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_PROJECT_REPO_${i}" 2>/dev/tty >&2
+      print " something is wrong with your config data at PUMP_PROJECT_REPO_${i}" 2>/dev/tty
       continue;
     fi
 
@@ -2789,13 +2868,13 @@ function load_config_() {
     local proj_folder=""
     proj_folder=$(sed -n "s/^PUMP_PROJECT_FOLDER_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_PROJECT_FOLDER_${i}" 2>/dev/tty >&2
+      print " something is wrong with your config data at PUMP_PROJECT_FOLDER_${i}" 2>/dev/tty
       continue;
     fi
 
     if [[ -n "$proj_folder" ]]; then
       if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd" "$proj_repo"; then
-        print "  error in config data at PUMP_PROJECT_FOLDER_${i}" 2>/dev/tty >&2
+        print "  error in config data at PUMP_PROJECT_FOLDER_${i}" 2>/dev/tty
       fi
     fi
 
@@ -3053,8 +3132,8 @@ function del() {
           fi
         fi
       fi
-
-      _count=$(( _count + 1 ))
+  
+      ((_count++))
 
       # if [[ -d "$f" && -n "$pump_working_branch" && -n "$_pro" ]]; then
       #   delete_pump_working_ $(basename "$f") "$pump_working_branch" "$_pro"
@@ -4003,18 +4082,37 @@ function setup() {
 
 function get_revs_folder_() {
   local proj_folder="$1"
+  local single_mode="$2"
+  local even_if_empty="$3"
 
-  local revs_folder="${proj_folder}/revs"
-  local rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
+  local parent_folder="$(dirname "$proj_folder")"
+  local revs_folder_single_mode="${parent_folder}/.${proj_folder}-revs"
+  local revs_folder_multiple_mode="${proj_folder}/.revs"
 
-  if [[ -z "$rev_options" ]]; then
-    revs_folder=".${proj_folder}-revs"
-    rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
+  local revs_folder_single_mode_content="$(ls "${revs_folder_single_mode}/rev.*" 2>/dev/null)"
+  local revs_folder_multiple_mode_content="$(ls "${revs_folder_multiple_mode}/rev.*" 2>/dev/null)"
 
-    if [[ -z "$rev_options" ]]; then return 1; fi
+  if (( single_mode )); then
+    if [[ -n "$revs_folder_single_mode_content" ]]; then
+      echo "$revs_folder_single_mode"
+      return 0;
+    fi
   fi
 
-  echo "$revs_folder"
+  if [[ -n "$revs_folder_multiple_mode_content" ]]; then
+    echo "$revs_folder_multiple_mode"
+    return 0;
+  fi
+
+  if (( even_if_empty )); then
+    if (( single_mode )); then
+      echo "$revs_folder_single_mode"
+      mkdir -p "$revs_folder_single_mode" &>/dev/null
+    else
+      echo "$revs_folder_multiple_mode"
+      mkdir -p "$revs_folder_multiple_mode" &>/dev/null
+    fi
+  fi
 }
 
 function revs() {
@@ -4088,7 +4186,7 @@ function revs() {
     return 1; 
   fi
 
-  local rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
+  local rev_options="$(ls "${revs_folder}/rev.*" 2>/dev/null)"
 
   local rev_choice=$(echo "$rev_options" | xargs -0 | sort -fu | gum choose --limit=1 --header " choose review to open:")
   if [[ -z "$rev_choice" ]]; then return 1; fi
@@ -4203,23 +4301,15 @@ function rev() {
     if [[ -z "$branch" ]]; then return 1; fi
   else
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
+    if [[ -z "$pr" ]]; then return 1; fi
     branch="${pr[2]}"
-    if [[ -z "$branch" ]]; then return 1; fi
   fi
 
   local branch_folder="${branch//\\/-}";
   branch_folder="${branch_folder//\//-}";
 
-  local revs_folder=""
-  if (( single_mode )); then
-    revs_folder=".$proj_folder-revs"
-  else
-    revs_folder="$proj_folder/revs"
-  fi
-
+  local revs_folder="$(get_revs_folder_ "$proj_folder" "$single_mode" 1)"
   local full_rev_folder="${revs_folder}/rev.${branch_folder}"
-
-  local is_open_editor=1
 
   if [[ -d "$full_rev_folder" ]]; then
     print " opening review: ${green_cor}$(basename "$full_rev_folder")${reset_cor} and pulling latest changes..."
@@ -4228,8 +4318,7 @@ function rev() {
     local remote_branch=$(git ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
 
     if [[ -z "$remote_branch" ]]; then
-      print " branch not found in $remote_origin: $branch" >&2
-      print " type ${yellow_cor}rev -h${reset_cor} to see usage" >&2
+      print " branch not found in ${remote_origin}: $branch" >&2
       return 1;
     fi
 
@@ -4243,6 +4332,7 @@ function rev() {
       print " cloning... $proj_repo";
       if ! git clone $proj_repo "$full_rev_folder" --quiet; then return 1; fi
     fi
+    # end of cloning
   fi
 
   pushd "$full_rev_folder" &>/dev/null
@@ -4258,10 +4348,11 @@ function rev() {
   git checkout "$branch" --quiet
   
   local warn_msg=""
+  local is_open_editor=1
   
   if ! pull --quiet; then
     is_open_editor=0
-    warn_msg="${yellow_cor} warn: could not pull latest changes, probably already merged ${reset_cor}"
+    warn_msg="${yellow_cor} warn: could not pull latest changes. PR is probably already merged ${reset_cor}"
   fi
 
   if [[ -n "$_setup" ]]; then
@@ -5426,7 +5517,7 @@ function tags() {
 
   prune &>/dev/null
 
-  local n="${1-100}"
+  local n="${1:-100}"
   local tags=""
 
   if (( n == 1 )); then
@@ -5812,8 +5903,7 @@ function co() {
   # co pr
   if (( co_is_p || co_is_r )); then
     local pr=("${(@s:|:)$(select_pr_ "$1")}")
-    
-    if [[ -z "${pr[1]}" ]]; then return 1; fi
+    if [[ -z "$pr" ]]; then return 1; fi
     
     gum spin --title="detaching pull request: ${pr[3]}" -- \
       gh pr checkout --force --detach "${pr[1]}"
@@ -6618,27 +6708,32 @@ function pro() {
       if ! is_proj_folder_ &>/dev/null; then return 1; fi
       
       local pkg_name="$(get_from_pkg_json_ "name")"
+      if [[ -z "$pkg_name" ]]; then
+        pkg_name="$(basename "$PWD")"
+      fi
       local proj_cmd=$(sanitize_pkg_name_ "$pkg_name")
-
-      local remote_origin="$(get_remote_origin_)"
-      local proj_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
 
       local i=0 foundI=0 emptyI=0
       for i in {1..9}; do
-        if [[ $foundI -eq 0 ]] && [[ "$proj_repo" == "${PUMP_PROJECT_REPO[$i]}" || "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-          foundI=$i
+        # give option to edit the project because it could have been moved to a different folder
+        # that which_pro_pwd_ doesn't pick up
+        if (( foundI == 0 )); then
+          if [[ "$proj_cmd" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+            foundI=$i
+          fi
         fi
         if [[ $emptyI -eq 0 && -z "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
           emptyI=$i
         fi
       done
 
-      local action="add"; (( foundI )) && action="edit"
-
-      if confirm_from_ "would you like to $action this project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
-        if (( foundI )); then
+      # if foundI != 0, it's because a project with the same name already exists but the folder is different
+      if (( foundI )); then
+        if confirm_from_ "looks like the folder has changed for project: "$'\e[38;5;201m'"$proj_cmd"$'\e[0m'" ?"; then
           save_proj_ -fe $foundI "$pkg_name"
-        else
+        fi
+      else
+        if confirm_from_ "would you like to add project: "$'\e[38;5;201m'"$proj_cmd"$'\e[0m'" ?"; then
           save_proj_ -fa $emptyI "$pkg_name"
         fi
         return $?;
@@ -7014,7 +7109,7 @@ function __commit() {
 function help() {
   #tput reset
   if command -v gum &>/dev/null; then
-    gum style --border=rounded --margin=0 --padding="1 16" --border-foreground=212 --width=71 \
+    gum style --border=rounded --margin=0 --padding="1 16" --border-foreground 212 --width=71 \
       --align=center "welcome to $(gum style --foreground 212 "fab1o's pump my shell! v$PUMP_VERSION")" 2>/dev/tty
   else
     display_line_ "fab1o's pump my shell!" "${purple_cor}"
@@ -7284,7 +7379,7 @@ function validate_proj_cmd_strict_() {
           return 1;
         fi
       fi
-      print " project name is reserved, $reserved" 2>/dev/tty >&2
+      print " project name is reserved, $reserved" 2>/dev/tty
       return 1;
     fi
   fi
@@ -7315,7 +7410,7 @@ function validate_proj_cmd_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print " $error_msg" 2>/dev/tty >&2
+    print " $error_msg" 2>/dev/tty
     return 1;
   fi
 
