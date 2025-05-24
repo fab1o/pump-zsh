@@ -1910,7 +1910,7 @@ function get_node_version_() {
   if [[ -n "$i" ]]; then
     proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
   else
-    proj_folder="$(pwd)"
+    proj_folder="$PWD"
   fi
 
   if ! command -v nvm >/dev/null 2>&1; then
@@ -1974,9 +1974,7 @@ function get_node_version_() {
 function get_proj_index_() {
   local proj_arg="$1"
 
-  if [[ -z "$proj_arg" ]]; then
-    return 1;
-  fi
+  if [[ -z "$proj_arg" ]]; then return 1; fi
 
   local i=0
   for i in {1..9}; do
@@ -2069,7 +2067,7 @@ function which_pro_index_pwd_() {
   local i=0
   for i in {1..9}; do
     if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" && -n "${PUMP_PROJECT_FOLDER[$i]}" ]]; then
-      if [[ $(pwd) == $PUMP_PROJECT_FOLDER[$i]* ]]; then
+      if [[ $PWD == $PUMP_PROJECT_FOLDER[$i]* ]]; then
         echo "$i"
         return 0;
       fi
@@ -2082,12 +2080,12 @@ function which_pro_index_pwd_() {
 
 function which_pro_pwd_() {
   local i=0
-  local current_path=$(realpath "$(pwd)" 2>/dev/null)
+
   for i in {1..9}; do
     if [[ -n "${PUMP_PROJECT_SHORT_NAME[$i]}" && -n "${PUMP_PROJECT_FOLDER[$i]}" ]]; then
       local proj_path=""
       proj_path=$(realpath "${PUMP_PROJECT_FOLDER[$i]}" 2>/dev/null)
-      if (( $? == 0 )) && [[ -n "$proj_path" && $current_path == $proj_path* ]]; then
+      if (( $? == 0 )) && [[ -n "$proj_path" && $PWD == $proj_path* ]]; then
         echo "${PUMP_PROJECT_SHORT_NAME[$i]}"
         return 0;
       fi
@@ -2099,7 +2097,7 @@ function which_pro_pwd_() {
 }
 
 function is_proj_folder_() {
-  local folder="$1"
+  local folder="${1:-$PWD}"
 
   if ! get_proj_for_pkg_from_within_ "$folder" 1>/dev/null; then return 2; fi
 
@@ -2135,7 +2133,7 @@ function get_proj_for_pkg_from_within_() {
 }
 
 function is_git_repo_() {
-  local folder="$1"
+  local folder="${1:-$PWD}"
 
   if [[ -z "$folder" || ! -d "$folder" ]]; then
     print " not a git repository (or any of the parent directories): $folder" >&2 
@@ -2150,12 +2148,10 @@ function is_git_repo_() {
 }
 
 function get_default_folder_() {
-  local proj_folder="${1:-$(pwd)}"
+  local proj_folder="${1:-$PWD}"
   local git_folder=$(get_proj_for_git_ "$proj_folder")
 
-  if [[ -z "$git_folder" ]]; then
-    return 1;
-  fi
+  if [[ -z "$git_folder" ]]; then return 1; fi
 
   cd "$git_folder"
   local default_folder="$(git config --get init.defaultBranch)"
@@ -2253,7 +2249,7 @@ function get_proj_for_pkg_() {
 }
 
 function open_proj_for_git_() {
-  local folder="$1"
+  local folder="${1-$PWD}"
 
   if [[ -z "$1" ]]; then
     print " fatal: no argument provided" >&2
@@ -2271,7 +2267,7 @@ function open_proj_for_git_() {
 }
 
 function get_proj_for_git_() {
-  local folder="$1"
+  local folder="${1:$PWD}"
 
   if is_git_repo_ "$folder"; then
     echo "$folder"
@@ -2487,7 +2483,7 @@ function open_working_() {
   local folder="$node_folder[$head]"
   local branch="$node_branch[$head]"
 
-  local past_folder="$(pwd)"
+  local past_folder="$PWD"
   local past_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
   
   if [[ -n "$folder" ]]; then
@@ -3092,8 +3088,8 @@ function refix() {
     return 0;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   last_commit_msg=$(git --no-pager log -1 --pretty=format:'%s' | xargs -0)
   
@@ -3168,8 +3164,8 @@ function covc() {
     return 1;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if [[ -z "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]]; then
     print " project is not set, use ${yellow_cor}pro${reset_cor} to set project" >&2
@@ -3388,7 +3384,7 @@ function test() {
 
   trap 'print ""; return 130' INT
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   (eval "$CURRENT_PUMP_TEST" $@)
   local RET=$?
@@ -3424,7 +3420,7 @@ function cov() {
     return 0;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     covc $@
@@ -3433,7 +3429,7 @@ function cov() {
 
   trap 'print ""; return 130' INT
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   (eval "$CURRENT_PUMP_COV" $@)
   local RET=$?
@@ -3476,7 +3472,7 @@ function testw() {
     return 0;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   eval "$CURRENT_PUMP_TEST_WATCH" $@
 }
@@ -3491,7 +3487,7 @@ function e2e() {
     return 0;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2E" --project="$1" ${@:2}
@@ -3510,7 +3506,7 @@ function e2eui() {
     return 0;
   fi
 
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2EUI" --project="$1" ${@:2}
@@ -3530,7 +3526,7 @@ function add() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if [[ -n "$1" && $1 != -*  ]]; then
     git add "$1" ${@:2}
@@ -3626,7 +3622,7 @@ function pr() {
     return 1;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if gh pr view --web &>/dev/null; then
     return 0;
@@ -3761,7 +3757,7 @@ function run() {
     return 0;
   fi
 
-  local proj_arg=""
+  local proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
   local folder_arg=""
   local _env="dev"
 
@@ -3770,11 +3766,13 @@ function run() {
     _env="$3"
     folder_arg="$2"
   elif [[ -n "$2" ]]; then
-    local i=$(get_proj_index_ $1)
-    if [[ -n $i ]]; then
-      proj_arg="${1:-$CURRENT_PUMP_PROJECT_SHORT_NAME}"
+    local i=$(get_proj_index_ "$1")
+    if [[ -n "$i" ]]; then
+      proj_arg="$1"
       if [[ "$2" == "dev" || "$2" == "stage" || "$2" == "prod" ]]; then
-        local single_mode=$PUMP_PROJECT_SINGLE_MODE[$i]
+        if ! save_proj_mode_ $i "${PUMP_PROJECT_FOLDER[$i]}" "${PUMP_PROJECT_SINGLE_MODE[$i]}" >/dev/null; then return 1; fi
+
+        local single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
 
         if (( single_mode )); then
           _env="$2";
@@ -3789,7 +3787,7 @@ function run() {
       _env="$2"
     fi
   elif [[ -n "$1" ]]; then
-    if is_project_ $1; then
+    if is_project_ "$1"; then
       proj_arg="$1"
     elif [[ "$1" == "dev" || "$1" == "stage" || "$1" == "prod" ]]; then
       _env="$1"
@@ -3815,30 +3813,32 @@ function run() {
     _run="$CURRENT_PUMP_RUN_PROD"
   fi
 
-  if [[ -n "$proj_arg" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        found=$i
-
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
-        _run="${PUMP_RUN[$i]}"
-
-        if [[ "$_env" == "stage" ]]; then
-          _run="${PUMP_RUN_STAGE[$i]}"
-        elif [[ "$_env" == "prod" ]]; then
-          _run="${PUMP_RUN_PROD[$i]}"
-        fi
-        break;
-      fi
-    done
-  else
-    proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
+  if [[ -z "$proj_arg" ]]; then
+    print " no project is set" >&2
+    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
   fi
+
+  local i=0
+  for i in {1..9}; do
+    if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      found=$i
+
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
+        return 1;
+      fi
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
+
+      _run="${PUMP_RUN[$i]}"
+
+      if [[ "$_env" == "stage" ]]; then
+        _run="${PUMP_RUN_STAGE[$i]}"
+      elif [[ "$_env" == "prod" ]]; then
+        _run="${PUMP_RUN_PROD[$i]}"
+      fi
+      break;
+    fi
+  done
 
   if [[ -z "$_run" ]]; then
     print " missing PUMP_RUN_$found" >&2
@@ -3870,7 +3870,7 @@ function run() {
 
     folder_to_run="$folder_arg"
   else
-    if ! is_proj_folder_ "$(pwd)" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ &>/dev/null; then return 2; fi
 
     folder_to_run="."
   fi
@@ -3906,7 +3906,7 @@ function setup() {
     return 0;
   fi
 
-  local proj_arg=""
+  local proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
   local folder_arg=""
 
   if [[ -n "$2" ]]; then
@@ -3920,31 +3920,35 @@ function setup() {
     fi
   fi
 
+  if [[ -z "$proj_arg" ]]; then
+    print " no project is set" >&2
+    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
+  fi
+
   local proj_folder="";
   local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PACKAGE_MANAGER $([[ $CURRENT_PUMP_PACKAGE_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
   local found=0
 
-  if [[ -n "$proj_arg" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
-        found=$i
+  local i=0
+  for i in {1..9}; do
+    if [[ "$proj_arg" == "${PUMP_PROJECT_SHORT_NAME[$i]}" ]]; then
+      found=$i
 
-        if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
-
-        _setup="${PUMP_SETUP[$i]:-${PUMP_PACKAGE_MANAGER[$i]} $([[ ${PUMP_PACKAGE_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
-        break;
+      if ! check_proj_folder_ -s $i "${PUMP_PROJECT_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJECT_REPO[$i]}"; then
+        return 1;
       fi
-    done
+      proj_folder="${PUMP_PROJECT_FOLDER[$i]}"
 
-    if [[ -z "$proj_folder" ]]; then
-      print " not a valid project: $proj_arg" >&2
-      print " type ${yellow_cor}setup -h${reset_cor} to see usage" >&2
-      return 1;
+      _setup="${PUMP_SETUP[$i]:-${PUMP_PACKAGE_MANAGER[$i]} $([[ ${PUMP_PACKAGE_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
+      break;
     fi
+  done
+
+  if [[ -z "$proj_folder" ]]; then
+    print " not a valid project: $proj_arg" >&2
+    print " type ${yellow_cor}setup -h${reset_cor} to see usage" >&2
+    return 1;
   fi
 
   if [[ -z "$_setup" ]]; then
@@ -3977,7 +3981,7 @@ function setup() {
 
     folder_to_setup="$folder_arg"
   else
-    if ! is_proj_folder_ "$(pwd)" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ &>/dev/null; then return 2; fi
 
     folder_to_setup="."
   fi
@@ -3990,11 +3994,27 @@ function setup() {
 
   pushd "$folder_to_setup" &>/dev/null
 
-  print " setup on ${gray_cor}$(shorten_path_ "$(pwd)") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
+  print " setup on ${gray_cor}$(shorten_path_ "$PWD") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
     print " failed to run PUMP_SETUP_${found}" >&2
   fi
+}
+
+function get_revs_folder_() {
+  local proj_folder="$1"
+
+  local revs_folder="${proj_folder}/revs"
+  local rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
+
+  if [[ -z "$rev_options" ]]; then
+    revs_folder=".${proj_folder}-revs"
+    rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
+
+    if [[ -z "$rev_options" ]]; then return 1; fi
+  fi
+
+  echo "$revs_folder"
 }
 
 function revs() {
@@ -4027,11 +4047,18 @@ function revs() {
         break;
       fi
     done
+
     if (( valid_project == 0 )); then
       print " not a valid project: $1" >&2
       print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
       return 1;
     fi
+  fi
+
+  if [[ -z "$proj_arg" ]]; then
+    print " no project is set" >&2
+    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
   fi
 
   local proj_folder=""
@@ -4046,45 +4073,27 @@ function revs() {
     fi
   done
 
-  if [[ -z $proj_folder ]]; then
+  if [[ -z "$proj_folder" ]]; then
     print " missing project folder for: $proj_arg" >&2
     print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
   local _pwd="$(pwd)";
-  local revs_folder="$proj_folder/revs"
+  local revs_folder="$(get_revs_folder_ "$proj_folder")"
 
-  if [[ -d "$revs_folder" ]]; then
-    cd "$revs_folder"
-  else
-    revs_folder=".$proj_folder-revs"
-    if [[ -d "$revs_folder" ]]; then
-      cd "$revs_folder"
-    else
-      print " no revs for $proj_folder" >&2
-      print " type ${yellow_cor}rev${reset_cor} to open a review" >&2
-      return 1; 
-    fi
-  fi
-
-  local rev_choices=$(ls -d rev* | xargs -0 | sort -fu)
-
-  cd "$_pwd"
-
-  if [[ -z "$rev_choices" ]]; then
-    print " no revs for $proj_folder" >&2
+  if [[ -z "$revs_folder" ]]; then
+    print " no revs for $proj_arg" >&2
     print " type ${yellow_cor}rev${reset_cor} to open a review" >&2
-    return 1;
+    return 1; 
   fi
 
-  local choice=""
-  choice=$(echo "$rev_choices" | gum choose --limit=1 --header " choose review to open:")
-  if (( $? == 130 )); then return 130; fi
+  local rev_options="$(ls -A "$revs_folder/rev*" 2>/dev/null)"
 
-  if [[ -n "$choice" ]]; then
-    rev "$proj_arg" "${choice//rev./}"
-  fi
+  local rev_choice=$(echo "$rev_options" | xargs -0 | sort -fu | gum choose --limit=1 --header " choose review to open:")
+  if [[ -z "$rev_choice" ]]; then return 1; fi
+
+  rev "$proj_arg" "${rev_choice//rev./}"
 }
 
 function rev() {
@@ -4107,7 +4116,7 @@ function rev() {
     return 1;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local proj_arg="$CURRENT_PUMP_PROJECT_SHORT_NAME"
   local branch_arg=""
@@ -4121,6 +4130,12 @@ function rev() {
     else
       branch_arg="$1"
     fi
+  fi
+
+  if [[ -z "$proj_arg" ]]; then
+    print " no project is set" >&2
+    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
   fi
 
   local proj_repo=""
@@ -4149,7 +4164,10 @@ function rev() {
       _setup="${PUMP_SETUP[$i]}"
       _clone="${PUMP_CLONE[$i]}"
       code_editor="${PUMP_CODE_EDITOR[$i]}"
-      single_mode=$PUMP_PROJECT_SINGLE_MODE[$i]
+
+      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJECT_SINGLE_MODE[$i]}" >/dev/null; then return 1; fi
+
+      single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]}"
       break;
     fi
   done
@@ -4170,26 +4188,23 @@ function rev() {
     return 1;
   fi
 
-  local _pwd="$(pwd)";
   local branch="";
-
-  #if ! open_proj_for_git_ "$proj_folder"; then return 2; fi
 
   if (( rev_is_e )); then
     branch="$branch_arg"
+
+    if [[ -z "$branch" ]]; then
+      print " branch is required" >&2
+      return 1;
+    fi
   elif (( rev_is_b )); then
     fetch --quiet
     branch="$(select_branch_ 1 -r "$branch_arg")"
+    if [[ -z "$branch" ]]; then return 1; fi
   else
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
     branch="${pr[2]}"
-  fi
-
-  if [[ -z "$branch" ]]; then
-    print " branch is required" >&2
-    cd "$_pwd"
-
-    return 1;
+    if [[ -z "$branch" ]]; then return 1; fi
   fi
 
   local branch_folder="${branch//\\/-}";
@@ -4202,7 +4217,7 @@ function rev() {
     revs_folder="$proj_folder/revs"
   fi
 
-  local full_rev_folder="$revs_folder/rev.$branch_folder"
+  local full_rev_folder="${revs_folder}/rev.${branch_folder}"
 
   local is_open_editor=1
 
@@ -4534,7 +4549,7 @@ function abort() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   GIT_EDITOR=true git rebase --abort &>/dev/null
   GIT_EDITOR=true git merge --abort  &>/dev/null
@@ -4557,7 +4572,7 @@ function renb() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local current_name="$(git symbolic-ref --short HEAD 2>/dev/null)"
   local base_branch="$(git config --get "branch.${current_name}.gh-merge-base" 2>/dev/null)"
@@ -4585,7 +4600,7 @@ function chp() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
   
   git cherry-pick "$1" ${@:2}
 }
@@ -4599,7 +4614,7 @@ function chc() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   GIT_EDITOR=true git merge --continue &>/dev/null
 }
@@ -4613,7 +4628,7 @@ function mc() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git add .
 
@@ -4629,7 +4644,7 @@ function rc() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git add .
 
@@ -4645,7 +4660,7 @@ function cont() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git add .
   local RET=$?
@@ -4668,7 +4683,7 @@ function reset1() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git --no-pager log -1 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -4685,7 +4700,7 @@ function reset2() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git --no-pager log -2 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -4702,7 +4717,7 @@ function reset3() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git --no-pager log -3 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -4719,7 +4734,7 @@ function reset4() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git --no-pager log -4 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -4736,7 +4751,7 @@ function reset5() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git --no-pager log -5 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -4754,7 +4769,7 @@ function repush() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if (( repush_is_s )); then
     if ! recommit -s --quiet 1>/dev/null; then return 1; fi
@@ -4775,7 +4790,7 @@ function recommit() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -z "$git_status" ]]; then
@@ -4844,7 +4859,7 @@ function fetch() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local RET=0
 
@@ -4899,7 +4914,7 @@ function glog() {
   local RET=0
 
   if (( glog_is_c )); then
-    if ! is_git_repo_ "$(pwd)"; then return 2; fi
+    if ! is_git_repo_; then return 2; fi
     print ""
 
     local merge_commits=""
@@ -4914,7 +4929,7 @@ function glog() {
     RET=$?
   else
     local _pwd="$(pwd)";
-    if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+    if ! open_proj_for_git_; then return 2; fi
     
     print ""
     git --no-pager log main HEAD --oneline --graph --date=relative $@
@@ -4938,7 +4953,7 @@ function push() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   fetch --quiet
 
@@ -5006,7 +5021,7 @@ function pushf() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local RET=0
 
@@ -5059,7 +5074,7 @@ function dtag() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_; then return 2; fi
   
   prune
 
@@ -5106,7 +5121,7 @@ function pull() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local remote_origin="$(get_remote_origin_)"
 
@@ -5157,7 +5172,7 @@ function drelease() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_; then return 2; fi
 
   local tag="$1"
 
@@ -5217,8 +5232,8 @@ function release() {
     return 1;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
 
   local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
 
@@ -5363,8 +5378,8 @@ function tag() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
-  if ! is_proj_folder_ "$(pwd)" 1>/dev/null; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
+  if ! is_proj_folder_; then return 2; fi
   
   prune &>/dev/null
 
@@ -5407,7 +5422,7 @@ function tags() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_; then return 2; fi
 
   prune &>/dev/null
 
@@ -5446,7 +5461,7 @@ function restore() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git restore --quiet .
 }
@@ -5460,7 +5475,7 @@ function clean() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
   
   git clean -fd --quiet
 }
@@ -5474,7 +5489,7 @@ function discard() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git reset HEAD .
   clean
@@ -5490,7 +5505,7 @@ function reseta() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local my_branch="$(git branch --show-current)"
   local remote_origin="$(get_remote_origin_ "$my_branch")"
@@ -5528,7 +5543,7 @@ function glr() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_; then return 2; fi
 
   fetch --quiet
 
@@ -5554,7 +5569,7 @@ function gll() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_ "$(pwd)"; then return 2; fi
+  if ! open_proj_for_git_; then return 2; fi
 
   git branch --list "*$1*" --sort=authordate --format="%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=2)" | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
@@ -5661,6 +5676,12 @@ function gha() {
   local gha_interval=""
   local gha_workflow=""
   local found=0
+
+  if [[ -z "$proj_arg" ]]; then
+    print " no project is set" >&2
+    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
+  fi
 
   local i=0
   for i in {1..9}; do
@@ -5786,7 +5807,7 @@ function co() {
     return 1;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   # co pr
   if (( co_is_p || co_is_r )); then
@@ -5989,7 +6010,7 @@ function back() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git switch -
 
@@ -6009,7 +6030,7 @@ function dev() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if ! co -e dev &>/dev/null; then
     if ! co -e develop &>/dev/null; then
@@ -6029,7 +6050,7 @@ function main() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if ! co -e main &>/dev/null; then
     if ! co -e master &>/dev/null; then
@@ -6049,7 +6070,7 @@ function prod() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if ! co -e prod &>/dev/null; then
     if ! co -e production &>/dev/null; then
@@ -6069,7 +6090,7 @@ function stage() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if ! co -e stage &>/dev/null; then
     if ! co -e staging &>/dev/null; then
@@ -6091,7 +6112,7 @@ function rebase() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local rebase_branch=""
 
@@ -6180,7 +6201,7 @@ function merge() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
   
   local merge_branch=""
 
@@ -6266,7 +6287,7 @@ function prune() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local default_main_branch="$(git config --get init.defaultBranch)"
 
@@ -6331,7 +6352,7 @@ function delb() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   local branch_arg="$1"
   local deleted_branches=();
@@ -6386,7 +6407,7 @@ function st() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   git status -sb $@
 }
@@ -6551,7 +6572,7 @@ function pro() {
 
     local re_activate=0;
 
-    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]] && ! is_proj_folder_ "$(pwd)" &>/dev/null; then
+    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT_SHORT_NAME" ]] && ! is_proj_folder_ &>/dev/null; then
       re_activate=1
     fi
 
@@ -6594,7 +6615,7 @@ function pro() {
     proj_arg=$(which_pro_pwd_);
 
     if [[ -z "$proj_arg" ]]; then # didn't find project based on pwd
-      if ! is_proj_folder_ "$(pwd)" &>/dev/null; then return 1; fi
+      if ! is_proj_folder_ &>/dev/null; then return 1; fi
       
       local pkg_name="$(get_from_pkg_json_ "name")"
       local proj_cmd=$(sanitize_pkg_name_ "$pkg_name")
@@ -6699,6 +6720,9 @@ function proj_handler_() {
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
   local working="${PUMP_WORKING[$i]}"
+
+  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJECT_SINGLE_MODE[$i]}" >/dev/null; then return 1; fi
+  
   local single_mode="${PUMP_PROJECT_SINGLE_MODE[$i]:-1}"
 
   if (( proj_handler_is_h )); then
@@ -6808,7 +6832,7 @@ function stash() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if (( stash_is_v )); then
     git stash show -p stash@{${1:-0}}
@@ -6843,7 +6867,7 @@ function pop() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if (( pop_is_a )); then
     local stashes=()
@@ -6912,7 +6936,7 @@ function __commit() {
     return 0;
   fi
 
-  if ! is_git_repo_ "$(pwd)"; then return 2; fi
+  if ! is_git_repo_; then return 2; fi
 
   if (( commit_is_a || CURRENT_PUMP_COMMIT_ADD )); then
     git add .
