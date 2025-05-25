@@ -28,7 +28,7 @@
             "style": "folder"
           },
           "style": "plain",
-          "template": "<b>{{ .Env.CURRENT_PUMP_PROJECT_SHORT_NAME }}{{ if .Env.CURRENT_PUMP_PROJECT_SHORT_NAME }}⟣{{ end }}</b>",
+          "template": "<b>{{ .Env.CURRENT_PUMP_PROJ_SHORT_NAME }}{{ if .Env.CURRENT_PUMP_PROJ_SHORT_NAME }}⟣{{ end }}</b>",
           "type": "path"
         },
         {
