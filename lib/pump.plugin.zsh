@@ -149,7 +149,9 @@ function parse_flags_() {
             fi
           fi
         else
-          flags+=("-$ch")
+          if [[ "$ch" != "d" ]]; then
+            flags+=("-$ch")
+          fi
         fi
 
         if [[ "$ch" == "d" || "$is_debug" -eq 1 ]]; then
@@ -2148,70 +2150,70 @@ function print_current_proj_() {
   display_line_ "" "$dark_gray_cor"
 
   if (( i > 0 )); then
-    print "${solid_magenta_cor} PUMP_PROJ_SHORT_NAME_$i=${reset_cor}${PUMP_PROJ_SHORT_NAME[$i]}"
-    print "${solid_magenta_cor} PUMP_PROJ_FOLDER_$i=${reset_cor}${PUMP_PROJ_FOLDER[$i]}"
-    print "${solid_magenta_cor} PUMP_PROJ_REPO_$i=${reset_cor}${PUMP_PROJ_REPO[$i]}"
-    print "${solid_magenta_cor} PUMP_PROJ_SINGLE_MODE_$i=${reset_cor}${PUMP_PROJ_SINGLE_MODE[$i]}"
-    print "${solid_magenta_cor} PUMP_PKG_MANAGER_$i=${reset_cor}${PUMP_PKG_MANAGER[$i]}"
-    print "${solid_magenta_cor} PUMP_RUN_$i=${reset_cor}${PUMP_RUN[$i]}"
-    print "${solid_magenta_cor} PUMP_RUN_STAGE_$i=${reset_cor}${PUMP_RUN_STAGE[$i]}"
-    print "${solid_magenta_cor} PUMP_RUN_PROD_$i=${reset_cor}${PUMP_RUN_PROD[$i]}"
-    print "${solid_magenta_cor} PUMP_SETUP_$i=${reset_cor}${PUMP_SETUP[$i]}"
-    print "${solid_magenta_cor} PUMP_CLONE_$i=${reset_cor}${PUMP_CLONE[$i]}"
-    print "${solid_magenta_cor} PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}"
-    print "${solid_magenta_cor} PUMP_USE_$i=${reset_cor}${PUMP_USE[$i]}"
-    print "${solid_magenta_cor} PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}"
-    print "${solid_magenta_cor} PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}"
-    print "${solid_magenta_cor} PUMP_OPEN_COV_$i=${reset_cor}${PUMP_OPEN_COV_[$i]}"
-    print "${solid_magenta_cor} PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}"
-    print "${solid_magenta_cor} PUMP_RETRY_TEST_$i=${reset_cor}${PUMP_RETRY_TEST[$i]}"
-    print "${solid_magenta_cor} PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}"
-    print "${solid_magenta_cor} PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}"
-    print "${solid_magenta_cor} PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}"
-    print "${solid_magenta_cor} PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}"
-    print "${solid_magenta_cor} PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}"
-    print "${solid_magenta_cor} PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}"
-    print "${solid_magenta_cor} PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}"
-    print "${solid_magenta_cor} PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}"
-    print "${solid_magenta_cor} PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}"
-    print "${solid_magenta_cor} PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}"
-    print "${solid_magenta_cor} PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}"
-    print "${solid_magenta_cor} PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}"
-    print "${solid_magenta_cor} PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}"
+    print " [${solid_magenta_cor}PUMP_PROJ_SHORT_NAME_$i=${reset_cor}${PUMP_PROJ_SHORT_NAME[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_FOLDER_$i=${reset_cor}${PUMP_PROJ_FOLDER[${solid_magenta_cor}$i]}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_REPO_$i=${reset_cor}${PUMP_PROJ_REPO[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_SINGLE_MODE_$i=${reset_cor}${PUMP_PROJ_SINGLE_MODE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PKG_MANAGER_$i=${reset_cor}${PUMP_PKG_MANAGER[$i]}]"
+    print " [${solid_magenta_cor}PUMP_RUN_$i=${reset_cor}${PUMP_RUN[$i]}]"
+    print " [${solid_magenta_cor}PUMP_RUN_STAGE_$i=${reset_cor}${PUMP_RUN_STAGE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_RUN_PROD_$i=${reset_cor}${PUMP_RUN_PROD[$i]}]"
+    print " [${solid_magenta_cor}PUMP_SETUP_$i=${reset_cor}${PUMP_SETUP[$i]}]"
+    print " [${solid_magenta_cor}PUMP_CLONE_$i=${reset_cor}${PUMP_CLONE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}]"
+    print " [${solid_magenta_cor}PUMP_USE_$i=${reset_cor}${PUMP_USE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}]"
+    print " [${solid_magenta_cor}PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}]"
+    print " [${solid_magenta_cor}PUMP_OPEN_COV_$i=${reset_cor}${PUMP_OPEN_COV_[$i]}]"
+    print " [${solid_magenta_cor}PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}]"
+    print " [${solid_magenta_cor}PUMP_RETRY_TEST_$i=${reset_cor}${PUMP_RETRY_TEST[$i]}]"
+    print " [${solid_magenta_cor}PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}]"
+    print " [${solid_magenta_cor}PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}]"
+    print " [${solid_magenta_cor}PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}]"
+    print " [${solid_magenta_cor}PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}]"
+    print " [${solid_magenta_cor}PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}]"
+    print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
 
     return 0;
   fi
 
-  print "${pink_cor} CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME"
-  print "${pink_cor} CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER"
-  print "${pink_cor} CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO"
-  print "${pink_cor} CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE"
-  print "${pink_cor} CURRENT_PUMP_PKG_MANAGER=${reset_cor}$CURRENT_PUMP_PKG_MANAGER"
-  print "${pink_cor} CURRENT_PUMP_RUN=${reset_cor}$CURRENT_PUMP_RUN"
-  print "${pink_cor} CURRENT_PUMP_RUN_STAGE=${reset_cor}$CURRENT_PUMP_RUN_STAGE"
-  print "${pink_cor} CURRENT_PUMP_RUN_PROD=${reset_cor}$CURRENT_PUMP_RUN_PROD"
-  print "${pink_cor} CURRENT_PUMP_SETUP=${reset_cor}$CURRENT_PUMP_SETUP"
-  print "${pink_cor} CURRENT_PUMP_CLONE=${reset_cor}$CURRENT_PUMP_CLONE"
-  print "${pink_cor} CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO"
-  print "${pink_cor} CURRENT_PUMP_USE=${reset_cor}$CURRENT_PUMP_USE"
-  print "${pink_cor} CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR"
-  print "${pink_cor} CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV"
-  print "${pink_cor} CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV"
-  print "${pink_cor} CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST"
-  print "${pink_cor} CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST"
-  print "${pink_cor} CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH"
-  print "${pink_cor} CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E"
-  print "${pink_cor} CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI"
-  print "${pink_cor} CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE"
-  print "${pink_cor} CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE"
-  print "${pink_cor} CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND"
-  print "${pink_cor} CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST"
-  print "${pink_cor} CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD"
-  print "${pink_cor} CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX"
-  print "${pink_cor} CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL"
-  print "${pink_cor} CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
-  print "${pink_cor} CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README"
-  print "${pink_cor} CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME"
+  print " [${pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME]"
+  print " [${pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER]"
+  print " [${pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO]"
+  print " [${pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE]"
+  print " [${pink_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}$CURRENT_PUMP_PKG_MANAGER]"
+  print " [${pink_cor}CURRENT_PUMP_RUN=${reset_cor}$CURRENT_PUMP_RUN]"
+  print " [${pink_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}$CURRENT_PUMP_RUN_STAGE]"
+  print " [${pink_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}$CURRENT_PUMP_RUN_PROD]"
+  print " [${pink_cor}CURRENT_PUMP_SETUP=${reset_cor}$CURRENT_PUMP_SETUP]"
+  print " [${pink_cor}CURRENT_PUMP_CLONE=${reset_cor}$CURRENT_PUMP_CLONE]"
+  print " [${pink_cor}CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO]"
+  print " [${pink_cor}CURRENT_PUMP_USE=${reset_cor}$CURRENT_PUMP_USE]"
+  print " [${pink_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR]"
+  print " [${pink_cor}CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV]"
+  print " [${pink_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV]"
+  print " [${pink_cor}CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST]"
+  print " [${pink_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST]"
+  print " [${pink_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH]"
+  print " [${pink_cor}CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E]"
+  print " [${pink_cor}CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI]"
+  print " [${pink_cor}CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE]"
+  print " [${pink_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE]"
+  print " [${pink_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND]"
+  print " [${pink_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST]"
+  print " [${pink_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD]"
+  print " [${pink_cor}CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX]"
+  print " [${pink_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL]"
+  print " [${pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
+  print " [${pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
+  print " [${pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
 }
 
 function which_pro_index_pwd_() {
@@ -4573,12 +4575,11 @@ function clone() {
     return 1;
   fi
 
-  if (( single_mode )) && [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
-    print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
-    print "" >&2
-    print " to switch to multiple mode:" >&2
-    print " type ${yellow_cor}pro -e ${proj_arg}${reset_cor}" >&2
+  rm -rf "$proj_folder/.DS_Store"
 
+  if (( single_mode )) && [[ -n "$(ls "$proj_folder" 2>/dev/null)" ]]; then
+    print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
+    print " to switch to multiple mode: type ${yellow_cor}pro -e ${proj_arg}${reset_cor}" >&2
     return 1;
   fi
 
@@ -4603,7 +4604,7 @@ function clone() {
   
         folder_to_clone="${proj_folder}/${branch_folder}"
 
-        if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
+        if [[ -d "$folder_to_clone" && -n "$(ls "$folder_to_clone" 2>/dev/null)" ]]; then
           print " fatal: destination path '$folder_to_clone' already exists and is not an empty directory" >&2
           print " type ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
           return 1;
@@ -4651,7 +4652,7 @@ function clone() {
 
   # multiple mode
 
-  local past_folder="$(pwd)"
+  local past_folder="$PWD"
 
   pushd "$folder_to_clone" &>/dev/null
 
@@ -4686,7 +4687,8 @@ function clone() {
   fi
 
   if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
-    local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
+    local RET=0
+    local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1 &>/dev/null);
     if [[ -n "$readme_file" ]]; then
       if command -v glow &>/dev/null; then
         glow "$readme_file"
@@ -4696,7 +4698,7 @@ function clone() {
         RET=$?
       fi
     fi
-    
+
     if (( RET == 0 )) && [[ -z "$print_readme" ]]; then
       print ""
       if confirm_between_ "always display the readme file for future branches in "$'\e[34m'$proj_arg$'\e[0m'" when available?" "always" "never"; then
@@ -7027,7 +7029,7 @@ function proj_handler_() {
   if ! pushd "$resolved_folder" &>/dev/null; then return 1; fi
 
   if [[ -z "$(ls "$resolved_folder")" ]]; then
-    clone $proj_cmd
+    print " now try running: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&2
     return 0;
   fi
 
