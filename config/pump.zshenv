@@ -377,19 +377,6 @@ PUMP_GHA_WORKFLOW_8=
 PUMP_GHA_WORKFLOW_9=
 
 # optional
-# default: 1
-# set to 1 to display the readme file after cloning, 0 to not display
-PUMP_PRINT_README_1=
-PUMP_PRINT_README_2=
-PUMP_PRINT_README_3=
-PUMP_PRINT_README_4=
-PUMP_PRINT_README_5=
-PUMP_PRINT_README_6=
-PUMP_PRINT_README_7=
-PUMP_PRINT_README_8=
-PUMP_PRINT_README_9=
-
-# optional
 # package.json name
 PUMP_PKG_NAME_1=
 PUMP_PKG_NAME_2=
