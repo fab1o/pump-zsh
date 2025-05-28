@@ -1367,14 +1367,53 @@ function detect_pkg_name_online_() {
   
   if [[ -z "$repo" ]]; then return 1; fi
 
-  local urls=()
+  local owner_repo=""
+
   if [[ "$repo" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
-    local owner_repo="${match[1]}"
-    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/main")
-    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
+    owner_repo="${match[1]}"
   else
     return 1;
   fi
+
+  local manager=""
+
+  if command -v gh &>/dev/null; then
+    local url="repos/${owner_repo}/contents"
+    local package_json=$(gh api "${url}/package.json" --jq .download_url)
+
+    if command -v jq &>/dev/null; then
+      manager=$(curl -fs "$package_json" | jq -r --arg key "name" '.[$key]')
+      if [[ "$manager" == "null" ]]; then manager=""; fi
+    else
+      manager=$(curl -fs "$package_json" | grep -E '"'name'"\s*:\s*"' | head -1 | sed -E "s/.*\"name\": *\"([^\"]+)\".*/\1/")
+    fi
+
+    if [[ -n "$manager" ]]; then
+      manager="${manager%%@*}"
+      echo "$manager"
+      return 0;
+    fi
+
+    if gh api "${url}/package-lock.json" --silent &>/dev/null; then
+      manager="npm"
+    elif gh api "${url}/yarn.lock" --silent &>/dev/null; then
+      manager="yarn"
+    elif gh api "${url}/pnpm-lock.yaml" --silent &>/dev/null; then
+      manager="pnpm"
+    elif gh api "${url}/bun.lockb" --silent &>/dev/null; then
+      manager="bun"
+    fi
+  fi
+
+  if [[ -n "$manager" ]]; then
+    echo "$manager"
+    return 0;
+  fi
+
+  local urls=()
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/main")
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/dev")
 
   local pkg_name=""
 
@@ -1404,16 +1443,53 @@ function detect_pkg_manager_online_() {
   
   if [[ -z "$repo" ]]; then return 1; fi
 
-  local urls=()
+  local owner_repo=""
+
   if [[ "$repo" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
-    local owner_repo="${match[1]}"
-    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/main")
-    urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
+    owner_repo="${match[1]}"
   else
     return 1;
   fi
 
   local manager=""
+
+  if command -v gh &>/dev/null; then
+    local url="repos/${owner_repo}/contents"
+    local package_json=$(gh api "${url}/package.json" --jq .download_url)
+
+    if command -v jq &>/dev/null; then
+      manager=$(curl -fs "$package_json" | jq -r --arg key "packageManager" '.[$key]')
+      if [[ "$manager" == "null" ]]; then manager=""; fi
+    else
+      manager=$(curl -fs "$package_json" | grep -E '"'packageManager'"\s*:\s*"' | head -1 | sed -E "s/.*\"packageManager\": *\"([^\"]+)\".*/\1/")
+    fi
+
+    if [[ -n "$manager" ]]; then
+      manager="${manager%%@*}"
+      echo "$manager"
+      return 0;
+    fi
+
+    if gh api "${url}/package-lock.json" --silent &>/dev/null; then
+      manager="npm"
+    elif gh api "${url}/yarn.lock" --silent &>/dev/null; then
+      manager="yarn"
+    elif gh api "${url}/pnpm-lock.yaml" --silent &>/dev/null; then
+      manager="pnpm"
+    elif gh api "${url}/bun.lockb" --silent &>/dev/null; then
+      manager="bun"
+    fi
+  fi
+
+  if [[ -n "$manager" ]]; then
+    echo "$manager"
+    return 0;
+  fi
+
+  local urls=()
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/main")
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
+  urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/dev")
 
   if command -v jq &>/dev/null; then
     for url in "${urls[@]}"; do
@@ -1441,14 +1517,14 @@ function detect_pkg_manager_online_() {
 
   # 1. Lockfile-based detection (most reliable)
   for url in "${urls[@]}"; do
-    if curl -fs "${url}/bun.lockb" -o /dev/null; then
-      manager="bun"
-    elif curl -fs "${url}/pnpm-lock.yaml" -o /dev/null; then
-      manager="pnpm"
+    if curl -fs "${url}/package-lock.json" -o /dev/null; then
+      manager="npm"
     elif curl -fs "${url}/yarn.lock" -o /dev/null; then
       manager="yarn"
-    elif curl -fs "${url}/package-lock.json" -o /dev/null; then
-      manager="npm"
+    elif curl -fs "${url}/pnpm-lock.yaml" -o /dev/null; then
+      manager="pnpm"
+    elif curl -fs "${url}/bun.lockb" -o /dev/null; then
+      manager="bun"
     fi
   done
 
@@ -2076,7 +2152,7 @@ function get_node_version_() {
     proj_folder="$PWD"
   fi
 
-  if ! command -v nvm >/dev/null 2>&1; then return 1; fi
+  if ! command -v nvm &>/dev/null; then return 1; fi
 
   proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json" 2>/dev/null)
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -2087,7 +2163,7 @@ function get_node_version_() {
 
   local semver_range=""
 
-  if command -v jq >/dev/null 2>&1; then
+  if command -v jq &>/dev/null; then
     semver_range=$(jq -r '.engines.node // empty' "$package_json")
   else
     semver_range=$(grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' "$package_json" | sed -E 's/.*"node"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
@@ -2096,20 +2172,24 @@ function get_node_version_() {
   if [[ -z $semver_range ]]; then return 1; fi
 
   # Get list of installed versions from nvm
-  local installed_versions=($(nvm ls --no-colors | grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^v//'))
+  local installed_versions=($(nvm ls --no-colors | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[-> ]*//' | sed 's/^v//'))
 
   if (( ${#installed_versions[@]} == 0 )); then return 1; fi
 
   # Require 'semver' CLI tool to do semver comparisons
-  if ! command -v semver >/dev/null 2>&1; then
-    npm install -g semver &>/dev/null
+  if ! command -v semver &>/dev/null; then
+    npm install -g semver --yes &>/dev/null
+  fi
+
+  if ! command -v semver &>/dev/null; then
+    return 1
   fi
 
   local matching_versions=()
 
   # Find matching versions
   for version in "${installed_versions[@]}"; do
-    if semver -r "$semver_range" "$version" >/dev/null 2>&1; then
+    if semver -r "$semver_range" "$version" &>/dev/null; then
       matching_versions+=("$version")
     fi
   done
@@ -2289,9 +2369,9 @@ function get_default_folder_() {
   local default_folder="$(git config --get init.defaultBranch)"
 
   if is_git_repo_ "${proj_folder}/${default_folder}" &>/dev/null; then    
-    echo "${proj_folder}/${default_folder}"
+    echo "${default_folder}"
   else
-    echo "$git_folder"
+    echo "$(basename "$git_folder")"
   fi
 
   return 0;
@@ -2348,11 +2428,9 @@ function get_proj_for_pkg_() {
   if [[ -n "$file" && -n $(ls "$folder" | grep -i "^${(q)file}\$") ]]; then
     echo "$folder"
     return 0;
-  else
-    if [[ -f "$folder/package.json" || -f "$folder/pyproject.toml" ]]; then
-      echo "$folder"
-      return 0;
-    fi
+  elif [[ -f "${folder}/${file}" ]]; then
+    echo "$folder"
+    return 0;
   fi
 
   local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
@@ -2360,11 +2438,11 @@ function get_proj_for_pkg_() {
   # Loop through each folder name
   local dir=""
   for dir in "${folders[@]}"; do
-    if [[ -n "$file" && -d "${folder}/${dir}" && -n $(ls "${folder}/${dir}" | grep -i "^${(q)file}\$") ]]; then
+    if [[ -d "${folder}/${dir}" && -n $(ls "${folder}/${dir}" | grep -i "^${(q)file}\$") ]]; then
       echo "${folder}/${dir}"
       return 0;
     else
-      if [[ -d "${folder}/${dir}" && -f "$folder/${dir}/$file" || -f "${folder}/${dir}/package.json" || -f "${folder}/${dir}/pyproject.toml" ]]; then
+      if [[ -f "${folder}/${dir}/${file}" ]]; then
         echo "${folder}/${dir}"
         return 0;
       fi
@@ -2378,7 +2456,10 @@ function open_proj_for_git_() {
   local folder="${1:-$PWD}"
 
   local git_folder=$(get_proj_for_git_ "$folder")
-  if [[ -z "$git_folder" ]]; then return 1; fi
+  if [[ -z "$git_folder" ]]; then
+    print " not a git repository (or any of the parent directories): $folder" >&2 
+    return 1;
+  fi
 
   cd "$git_folder"
 }
@@ -2386,7 +2467,7 @@ function open_proj_for_git_() {
 function get_proj_for_git_() {
   local folder="${1:-$PWD}"
 
-  if is_git_repo_ "$folder"; then
+  if is_git_repo_ "$folder" &>/dev/null; then
     echo "$folder"
     return 0;
   fi
@@ -2396,7 +2477,7 @@ function get_proj_for_git_() {
   # Loop through each folder name
   local dir=""
   for dir in "${folders[@]}"; do
-    if is_git_repo_ "${folder}/${dir}"; then
+    if is_git_repo_ "${folder}/${dir}" &>/dev/null; then
       echo "${folder}/${dir}"
       return 0;
     fi
@@ -4597,7 +4678,7 @@ function clone() {
         branch_to_clone=$(input_branch_name_ "type the name of your feature branch");
       fi
       if [[ -n "$branch_to_clone" ]]; then
-        print " branch: $branch_to_clone"
+        print " preparing to clone branch: $branch_to_clone"
 
         local branch_folder="${branch_to_clone//\\/-}"
         branch_folder="${branch_folder//\//-}"
@@ -4642,9 +4723,10 @@ function clone() {
   fi
 
   if command -v gum &>/dev/null; then
-    local output=""
-    output=$(gum spin --title="cloning... $proj_repo on $branch_to_clone" -- git clone "$proj_repo" "$folder_to_clone" 2>&1)
-    if (( $? != 0 )); then print "$output" >&2; return 1; fi
+    if ! gum spin --title="cloning... $proj_repo on $branch_to_clone" -- git clone "$proj_repo" "$folder_to_clone"; then
+      print " failed to clone, repository uri is invalid or no access rights: $proj_repo" >&2
+      return 1;
+    fi
   else
     print " cloning... $proj_repo on $branch_to_clone"
     if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
@@ -6951,7 +7033,7 @@ function proj_handler_() {
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd <folder> ${reset_cor}: to set project to $proj_cmd and open the folder"
     
     (( single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to $proj_cmd"
-    (( single_mode )) && print "  ${yellow_cor}$proj_cmd <branch> ${reset_cor}: to set project to $proj_cmd and switch to branch"
+    (( single_mode )) && print "  ${yellow_cor}$proj_cmd <folder|branch> ${reset_cor}: to set project to $proj_cmd and cd into folder if exists or switch to branch"
     print "  --"
     print "  ${yellow_cor}$proj_cmd -e ${reset_cor}: to edit the project"
     return 0;
@@ -6978,39 +7060,34 @@ function proj_handler_() {
   local folder_arg=""
   local branch_arg=""
 
-  local use_default_folder=0
-
-  if [[ -n "$2" ]]; then
-    (( single_mode )) && branch_arg="$2"
-    folder_arg="$1"
-
-  elif [[ -n "$1" ]]; then
-    if [[ -d "$proj_folder/$1" ]] || (( ! single_mode )); then
-      folder_arg="$1"
+  if [[ -n "$1" ]]; then
+    if (( single_mode )); then
+      if [[ -d "${proj_folder}/$1" ]]; then
+        folder_arg="$1"
+      else
+        branch_arg="$1"
+      fi
     else
-      branch_arg="$1"
+      folder_arg="$1"
     fi
 
   elif (( proj_handler_is_m )); then
     if (( ! single_mode )); then
-      use_default_folder=1
       folder_arg="$(get_default_folder_ "$proj_folder")"
     fi
   fi
 
-  local resolved_folder=""
+  local resolved_folder="$proj_folder"
 
   # resolve folder_arg
   if (( single_mode )); then
-    resolved_folder="$proj_folder"
+    if [[ -n "$folder_arg" ]]; then
+      resolved_folder="${proj_folder}/${folder_arg}"
+    fi
   else
-    if [[ -n "$folder_arg" && -d "${proj_folder}/${folder_arg}" ]]; then
-      if (( ! use_default_folder )); then
-        resolved_folder="${proj_folder}/${folder_arg}"
-      fi
-    else
-      resolved_folder="$proj_folder"
-      
+    if [[ -n "$folder_arg" ]]; then
+      resolved_folder="${proj_folder}/${folder_arg}"
+    else  
       local dirs=($(get_folders_ "$proj_folder"))
       
       if (( ${#dirs[@]} )); then
@@ -7025,15 +7102,21 @@ function proj_handler_() {
 
   pro $proj_cmd
 
-  if [[ -z "$resolved_folder" ]]; then return 1; fi
-  if ! pushd "$resolved_folder" &>/dev/null; then return 1; fi
+  if ! pushd "$resolved_folder" &>/dev/null; then # ask to clone
+    if (( ! single_mode )); then
+      if confirm_from_ "would you like to clone $proj_cmd in folder: $(basename "$folder_arg")?"; then
+        clone "$proj_cmd" "$folder_arg"
+        return $?;
+      fi
+    fi
+    return 1;
+  fi
 
   if [[ -z "$(ls "$resolved_folder")" ]]; then
     print " now try running: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&2
     return 0;
   fi
 
-  if (( ! single_mode )); then return 0; fi
   if [[ -z "$branch_arg" ]]; then return 0; fi
 
   co "$branch_arg"
