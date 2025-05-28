@@ -4004,7 +4004,7 @@ function run() {
     return 0;
   fi
 
-  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local proj_arg=""
   local folder_arg=""
   local _env="dev"
 
@@ -4060,32 +4060,28 @@ function run() {
     _run="$CURRENT_PUMP_RUN_PROD"
   fi
 
-  if [[ -z "$proj_arg" ]]; then
-    print " no project is set" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
+  if [[ -n "$proj_arg" ]]; then
+    local i=0
+    for i in {1..9}; do
+      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        found=$i
+
+        if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
+          return 1;
+        fi
+        proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+        _run="${PUMP_RUN[$i]}"
+
+        if [[ "$_env" == "stage" ]]; then
+          _run="${PUMP_RUN_STAGE[$i]}"
+        elif [[ "$_env" == "prod" ]]; then
+          _run="${PUMP_RUN_PROD[$i]}"
+        fi
+        break;
+      fi
+    done
   fi
-
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=$i
-
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-      _run="${PUMP_RUN[$i]}"
-
-      if [[ "$_env" == "stage" ]]; then
-        _run="${PUMP_RUN_STAGE[$i]}"
-      elif [[ "$_env" == "prod" ]]; then
-        _run="${PUMP_RUN_PROD[$i]}"
-      fi
-      break;
-    fi
-  done
 
   if [[ -z "$_run" ]]; then
     print " missing PUMP_RUN_$found" >&2
@@ -4119,7 +4115,7 @@ function run() {
   else
     if ! is_proj_folder_ &>/dev/null; then return 2; fi
 
-    folder_to_run="."
+    folder_to_run="$PWD"
   fi
 
   # debugging
@@ -4153,7 +4149,7 @@ function setup() {
     return 0;
   fi
 
-  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local proj_arg=""
   local folder_arg=""
 
   if [[ -n "$2" ]]; then
@@ -4167,30 +4163,26 @@ function setup() {
     fi
   fi
 
-  if [[ -z "$proj_arg" ]]; then
-    print " no project is set" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
-  fi
-
-  local proj_folder="";
+  local proj_folder="$PWD";
   local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
   local found=0
 
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=$i
+  if [[ -n "$proj_arg" ]]; then
+    local i=0
+    for i in {1..9}; do
+      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        found=$i
 
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-        return 1;
+        if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
+          return 1;
+        fi
+        proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+        _setup="${PUMP_SETUP[$i]:-${PUMP_PKG_MANAGER[$i]} $([[ ${PUMP_PKG_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
+        break;
       fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-      _setup="${PUMP_SETUP[$i]:-${PUMP_PKG_MANAGER[$i]} $([[ ${PUMP_PKG_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
-      break;
-    fi
-  done
+    done
+  fi
 
   if [[ -z "$proj_folder" ]]; then
     print " not a valid project: $proj_arg" >&2
@@ -4199,7 +4191,7 @@ function setup() {
   fi
 
   if [[ -z "$_setup" ]]; then
-    print " missing PUMP_SETUP_$found" >&2
+    print " missing PUMP_SETUP" >&2
     print " edit your pump.zshenv config, refresh then try again" >&2
     return 1;
   fi
@@ -4241,7 +4233,7 @@ function setup() {
 
   pushd "$folder_to_setup" &>/dev/null
 
-  print " setup on ${gray_cor}$(shorten_path_ "$PWD") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
+  print " setup ${gray_cor}$(shorten_path_ "$PWD") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
     print " failed to run PUMP_SETUP_${found}" >&2
