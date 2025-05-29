@@ -1133,7 +1133,7 @@ function check_proj_folder_() {
 
   local error_msg=""
 
-  if [[ -z "$proj_folder" ]]; then
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
     error_msg="project folder is missing for ${solid_blue_cor}$pkg_name${reset_cor}"
   fi
 
@@ -1141,14 +1141,10 @@ function check_proj_folder_() {
     print "  $error_msg" 2>/dev/tty
 
     if (( check_proj_folder_is_s )); then
-      if save_proj_folder_ $i "$pkg_name" "$proj_repo"; then return 0; fi
+      if save_proj_folder_ -s $i "$pkg_name" "$proj_repo"; then return 0; fi
     fi
 
     return 1;
-  fi
-
-  if (( check_proj_folder_is_s )); then
-    mkdir -p "$proj_folder"
   fi
 
   return 0;
@@ -1622,10 +1618,6 @@ function save_proj_cmd_() {
   if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
     print "  ${pink_cor}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
-    
-    if (( save_proj_cmd_is_e || save_proj_cmd_is_a )); then
-      update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
-    fi
   fi
 }
 
@@ -1660,7 +1652,7 @@ function save_proj_mode_() {
 }
 
 function save_proj_folder_() {
-  eval "$(parse_flags_ "save_proj_folder_" "aerf" "$@")"
+  eval "$(parse_flags_ "save_proj_folder_" "aerfs" "$@")"
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
@@ -1698,12 +1690,12 @@ function save_proj_folder_() {
     confirm_between_ "would you like create a new folder or use an existing folder?" "create new folder" "use existing folder"
     RET=$?
     if (( RET == 130 )); then return 130; fi
-    header="select the existing folder"
   fi
 
   if [[ -z "$proj_folder" ]]; then
     if (( RET == 1 )); then
       folder_exists=1
+      header="select the existing folder"
     else
       if [[ -z "$pkg_name" ]]; then
         if ! save_proj_cmd_ $i "$pkg_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
@@ -1721,8 +1713,10 @@ function save_proj_folder_() {
     if (( folder_exists == 0 )); then
       proj_folder="${proj_folder}/${pkg_name}"
 
-      if [[ ! -d "$proj_folder" ]]; then
-        mkdir -p "$proj_folder"
+      if (( save_proj_folder_is_s )); then # only create folder is calling from check_proj_folder_
+        if [[ ! -d "$proj_folder" ]]; then
+          mkdir -p "$proj_folder"
+        fi
       fi
     fi
   fi
@@ -1851,6 +1845,8 @@ function save_proj_f_() {
     display_line_ "add new project" "${cor}"
   fi
 
+  TEMP_PUMP_PROJ_SHORT_NAME=""
+
   # for pro pwd, all the settings come from $PWD
 
   update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
@@ -1870,6 +1866,8 @@ function save_proj_f_() {
 
     # if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_cmd_ -fa $i "$proj_cmd"; then return 1; fi
+
+    update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
 
     display_line_ "" "${cor}"
     print "  ${cor}project saved!${reset_cor}" >&1
@@ -1955,6 +1953,8 @@ function save_proj_() {
     update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
   fi
   
+  update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
+
   display_line_ "" "${cor}"
   print "  ${cor}project saved!${reset_cor}" >&1
   print "" >&1
@@ -1963,8 +1963,14 @@ function save_proj_() {
 
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
+  if [[ ! -d "${PUMP_PROJ_FOLDER[$i]}" ]]; then
+    mkdir -p "${PUMP_PROJ_FOLDER[$i]}"
+  fi
+
   if (( single_mode )); then
+    rm -rf "${PUMP_PROJ_FOLDER[$i]}/.DS_Store"
     local folder_contents="$(ls -A "${PUMP_PROJ_FOLDER[$i]}")"
+
     if [[ -n "$folder_contents" ]]; then
       if print_tree_ascii_ "${PUMP_PROJ_FOLDER[$i]}" "$green_cor" 6; then
         create_backup_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}"
@@ -4691,7 +4697,7 @@ function clone() {
     return 1;
   fi
 
-  rm -rf "$proj_folder/.DS_Store"
+  rm -rf "${proj_folder}/.DS_Store"
 
   if (( single_mode )) && [[ -n "$(ls "$proj_folder" 2>/dev/null)" ]]; then
     print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
