@@ -7098,7 +7098,7 @@ function proj_handler_() {
   local i="$1"
   shift
 
-  eval "$(parse_flags_ "proj_handler_" "lme" "$@")"
+  eval "$(parse_flags_ "proj_handler_" "me" "$@")"
   (( proj_handler_is_d )) && set -x
 
   local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
@@ -7119,33 +7119,18 @@ function proj_handler_() {
 
   if (( proj_handler_is_h )); then
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to $proj_cmd and open a folder"
-    (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd -l${reset_cor}: to list all folders in $proj_cmd"
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd -m${reset_cor}: to set project to $proj_cmd and open the default folder"
+    print "  ${yellow_cor}$proj_cmd -e ${reset_cor}: to edit the project"
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd <folder> ${reset_cor}: to set project to $proj_cmd and open the folder"
-    
+
     (( single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to $proj_cmd"
     (( single_mode )) && print "  ${yellow_cor}$proj_cmd <folder|branch> ${reset_cor}: to set project to $proj_cmd and cd into folder if exists or switch to branch"
-    print "  --"
-    print "  ${yellow_cor}$proj_cmd -e ${reset_cor}: to edit the project"
     return 0;
   fi
   
   if (( proj_handler_is_e )); then
     pro -e "$proj_cmd"
     return $?
-  fi
-
-  if (( proj_handler_is_l )); then
-    local dirs=($(get_folders_ "$proj_folder"))
-    if (( ${#dirs[@]} )); then
-      local dir=""
-      for dir in "${dirs[@]}"; do
-        print "${pink_cor} $dir ${reset_cor}"
-      done
-    else
-      print " no folders"
-    fi
-    return 0;
   fi
 
   local folder_arg=""
