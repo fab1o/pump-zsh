@@ -160,6 +160,7 @@ PUMP_USE_9=
 # optional
 # default: empty
 # script to run after `pro` command
+# example: nvm use 18
 PUMP_PRO_1=
 PUMP_PRO_2=
 PUMP_PRO_3=
@@ -387,3 +388,17 @@ PUMP_PKG_NAME_6=
 PUMP_PKG_NAME_7=
 PUMP_PKG_NAME_8=
 PUMP_PKG_NAME_9=
+
+# optional
+# default: 0
+# 0 to look for node version and run "nvm use <version>" if found, 1 to skip
+# if skipped, you can manually set PUMP_PRO=nvm use 18 for example to improve on performance
+PUMP_SKIP_NVM_LOOKUP_1=
+PUMP_SKIP_NVM_LOOKUP_2=
+PUMP_SKIP_NVM_LOOKUP_3=
+PUMP_SKIP_NVM_LOOKUP_4=
+PUMP_SKIP_NVM_LOOKUP_5=
+PUMP_SKIP_NVM_LOOKUP_6=
+PUMP_SKIP_NVM_LOOKUP_7=
+PUMP_SKIP_NVM_LOOKUP_8=
+PUMP_SKIP_NVM_LOOKUP_9=

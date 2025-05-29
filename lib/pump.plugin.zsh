@@ -400,13 +400,13 @@ function confirm_between_() {
     fi
 
     if (( change_default )); then
-      gum confirm ""mode:$'\e[0m'" $1" \
+      gum confirm ""confirm:$'\e[0m'" $1" \
         --no-show-help \
         --default=false \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
     else
-      gum confirm ""mode:$'\e[0m'" $1" \
+      gum confirm ""confirm:$'\e[0m'" $1" \
         --no-show-help \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
@@ -428,12 +428,12 @@ function confirm_between_() {
     fi
   else
     while true; do
-      echo -n ""$'\e[38;5;99m'mode:$'\e[0m'" $1? "$'\e[38;5;218m'$option1$'\e[0m'" or "$'\e[38;5;218m'$option2$'\e[0m'" repositories? [${opt1:l}/${opt2:l}]: " 2>/dev/tty
-      stty -echo                  # Turn off input echo
-      read -k 1 mode              # Read one character
-      stty echo                   # Turn echo back on
+      echo -n ""$'\e[38;5;99m'confirm:$'\e[0m'" $1? "$'\e[38;5;218m'$option1$'\e[0m'" or "$'\e[38;5;218m'$option2$'\e[0m'" repositories? [${opt1:l}/${opt2:l}]: " 2>/dev/tty
+      stty -echo       # turn off input echo
+      read -k 1 mode   # read one character
+      stty echo        # turn echo back on
       case "$mode" in
-        [sSmM]) break ;;          # Accept only s or m (case-insensitive)
+        [sSmM]) break ;; # accept only s or m (case-insensitive)
         *) echo "" ;;
       esac
     done
@@ -1196,8 +1196,8 @@ function choose_mode_() {
   local proj_folder="$(basename "$1")"
   local mode="$2"
 
-  local multiple_title=$(gum style --align=center --margin="0" --align=left --padding="0 7" --border=none --width=40 --foreground 212 "example of multiple mode")
-  local single_title=$(gum style --align=center --margin="0" --align=left --padding="0 8" --border=none --width=40 --foreground 99 "example of single mode")
+  local multiple_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=40 --foreground 212 "example of multiple mode")
+  local single_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=40 --foreground 99 "example of single mode")
 
   local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
 
@@ -1233,8 +1233,8 @@ function choose_mode_() {
 
   # '
 
-  multiple=$(gum style --margin="0" --align=left --padding="0 0 0 0" --border=normal --width=40 --border-foreground 212 "$multiple")
-  single=$(gum style --margin="0" --align=left --padding="0 0 0 0" --border=normal --width=40 --border-foreground 99 "$single")
+  multiple=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=40 --border-foreground 212 "$multiple")
+  single=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=40 --border-foreground 99 "$single")
 
   local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
   
@@ -2099,6 +2099,7 @@ function remove_prj_() {
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" 1>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" 1>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" 1>/dev/null
+  update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" 1>/dev/null
 }
 
 function save_current_proj_() {
@@ -2134,6 +2135,7 @@ function save_current_proj_() {
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
+  CURRENT_PUMP_SKIP_NVM_LOOKUP="${PUMP_SKIP_NVM_LOOKUP[$i]}"
 }
 
 # function clear_curr_prj_() {
@@ -2145,6 +2147,13 @@ function save_current_proj_() {
 function get_node_version_() {
   local i="$1"
   local proj_folder=""
+  local get_major="${2:-0}"
+
+  if (( PUMP_SKIP_NVM_LOOKUP[$i] )); then
+    # Skip NVM lookup, return empty
+    echo ""
+    return 0;
+  fi
 
   if [[ -n "$i" ]]; then
     proj_folder="${PUMP_PROJ_FOLDER[$i]}"
@@ -2152,14 +2161,14 @@ function get_node_version_() {
     proj_folder="$PWD"
   fi
 
-  if ! command -v nvm &>/dev/null; then return 1; fi
-
+  if [[ -z "$proj_folder" ]]; then return 1; fi
   proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json" 2>/dev/null)
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
   local package_json="${proj_folder}/package.json"
-
   if [[ ! -f $package_json ]]; then return 1; fi
+
+  if ! command -v nvm &>/dev/null; then return 1; fi
 
   local semver_range=""
 
@@ -2172,7 +2181,7 @@ function get_node_version_() {
   if [[ -z $semver_range ]]; then return 1; fi
 
   # Get list of installed versions from nvm
-  local installed_versions=($(nvm ls --no-colors | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[-> ]*//' | sed 's/^v//'))
+  local installed_versions=($(nvm ls --no-colors | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[-> ]*//' | sed 's/^v//' | sed 's/ *\*$//'))
 
   if (( ${#installed_versions[@]} == 0 )); then return 1; fi
 
@@ -2181,9 +2190,7 @@ function get_node_version_() {
     npm install -g semver --yes &>/dev/null
   fi
 
-  if ! command -v semver &>/dev/null; then
-    return 1
-  fi
+  if ! command -v semver &>/dev/null; then return 1; fi
 
   local matching_versions=()
 
@@ -2198,6 +2205,14 @@ function get_node_version_() {
 
   # Sort versions and pick the latest
   local best_version=$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 1)
+
+  if (( get_major )) && [[ -n "$best_version" ]]; then
+    local major_version="$(semver -v "$best_version" | cut -d. -f1 2>/dev/null)"
+    if [[ -n "$major_version" ]]; then
+      echo "$major_version"
+      return 0;
+    fi
+  fi
 
   echo "$best_version"
 }
@@ -2260,6 +2275,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
+    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_SKIP_NVM_LOOKUP[$i]}]"
 
     return 0;
   fi
@@ -2294,6 +2310,7 @@ function print_current_proj_() {
   print " [${pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
   print " [${pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
+  print " [${pink_cor}CURRENT_PUMP_SKIP_NVM_LOOKUP=${reset_cor}$CURRENT_PUMP_SKIP_NVM_LOOKUP]"
 }
 
 function which_pro_index_pwd_() {
@@ -2377,6 +2394,30 @@ function get_default_folder_() {
   return 0;
 }
 
+function shorten_path_until_() {
+  local full_path="$1"
+  local base_path="$2"
+
+  # Normalize: remove trailing slashes
+  full_path="${full_path%/}"
+  base_path="${base_path%/}"
+
+  # Check if base_path is a prefix of full_path
+  if [[ "$full_path" == "$base_path" ]]; then
+    echo "..."
+    return 0
+  fi
+  
+  if [[ "$full_path" == "$base_path/"* ]]; then
+    local shortened="${full_path#$base_path/}"
+    echo ".../$shortened"
+    return 0
+  fi
+
+  # base_path not in full_path — fallback to full path
+  echo "$full_path"
+}
+
 function shorten_path_() {
   local folder="$1"
   local count="${2:-2}"
@@ -2399,10 +2440,8 @@ function shorten_path_() {
 
   # Prepend ".../" if not returning the full path
   if (( count < len )); then
-    if [[ -z "$3" ]]; then
-      echo ".../$output"
-      return 0;
-    fi
+    echo ".../$output"
+    return 0;
   fi
 
   echo "$output"
@@ -2860,6 +2899,7 @@ function load_config_entry_() {
     PUMP_PUSH_ON_REFIX
     PUMP_PRINT_README
     PUMP_PKG_NAME
+    PUMP_SKIP_NVM_LOOKUP
   )
 
   local key=""
@@ -3005,8 +3045,11 @@ function load_config_entry_() {
       PUMP_PKG_NAME)
         PUMP_PKG_NAME[$i]="$value"
         ;;
+      PUMP_SKIP_NVM_LOOKUP)
+        PUMP_SKIP_NVM_LOOKUP[$i]="$value"
+        ;;
     esac
-    # print "$i - key: $key, value: $value"
+    # print "$i - key: [$key], value: [$value]"
   done
 }
 
@@ -4127,7 +4170,7 @@ function run() {
 
   pushd "$folder_to_run" &>/dev/null
 
-  print " run $_env on ${gray_cor}$(shorten_path_ "$folder_to_run") ${reset_cor}:${pink_cor} $_run ${reset_cor}"
+  print " run $_env on ${gray_cor}$(shorten_path_until_ "$folder_to_run" $HOME) ${reset_cor}:${pink_cor} $_run ${reset_cor}"
   
   if ! eval "$_run"; then
     print " failed to run PUMP_RUN_${found}" >&2
@@ -4233,7 +4276,7 @@ function setup() {
 
   pushd "$folder_to_setup" &>/dev/null
 
-  print " setup ${gray_cor}$(shorten_path_ "$PWD") ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
+  print " setup ${gray_cor}$(shorten_path_until_ "$PWD" $HOME) ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
     print " failed to run PUMP_SETUP_${found}" >&2
@@ -5073,12 +5116,8 @@ function recommit() {
         if (( RET == 130 )); then return 130; fi
         if (( RET == 0 )); then
           if ! git reset --quiet --soft HEAD~1 1>/dev/null; then return 1; fi
-          git add .
 
-          confirm_between_ "save this preference and don't ask again?" "save" "ask again"
-          RET=$?
-          if (( RET == 130 )); then return 130; fi
-          if (( RET == 0 )); then
+          if git add . && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
             local i=0
             for i in {1..9}; do
               if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -6700,23 +6739,20 @@ function get_pkg_name_() {
 }
 
 function pro() {
-  # f is to suggest adding a project for $(pwd)
-  eval "$(parse_flags_ "pro_" "aerucfisnl" "$@")"
+  eval "$(parse_flags_ "pro_" "aerucfil" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
     print "  ${yellow_cor}pro <name>${reset_cor} : to set a project"
-    print "  ${yellow_cor}pro -a ${solid_yellow_cor}[<name>]${reset_cor} : to add a new project"
+    print "  ${yellow_cor}pro -a ${solid_yellow_cor}<name>${reset_cor} : to add new project"
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -n <version>${reset_cor} : to set node version for current project"
-    print "  ${yellow_cor}pro -n <version> ${solid_yellow_cor}<name>${reset_cor} : to set node version for a project"
+    print "  ${yellow_cor}pro -c${reset_cor} : to show current project's settings"
+    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project's settings"
+    print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to reset project's \"don't ask again\" settings"
+    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display the project's readme if available"
     print "  --"
-    print "  ${yellow_cor}pro -c${reset_cor} : to show current project config"
-    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project config"
-    # print "  ${yellow_cor}pro -u <name>${reset_cor} : to unset project"
-    print "  ${yellow_cor}pro -i <name>${reset_cor} : to display the project's readme"
     print "  ${yellow_cor}pro -l${reset_cor} : to list all projects"
     
     if [[ -n "${PUMP_PROJ_SHORT_NAME[*]}" ]]; then
@@ -6730,25 +6766,39 @@ function pro() {
         fi
       done
       print "${reset_cor}"
+      print ""
     fi
     return 0;
   fi
 
   if (( pro_is_l )); then
+
+    if ! command -v gum &>/dev/null; then
+      print " pro -l requires gum" >&2
+      print " install gum:${blue_cor} https://github.com/charmbracelet/gum ${reset_cor}" >&2
+      return 1;
+    fi
+
     # list projects
     local i=0
+    local projects=()
     for i in {1..9}; do
       if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        local node_version="$(get_node_version_ $i 2>/dev/null)"
-        local on_node=$([[ -n "$node_version" ]] && echo " @ ${solid_yellow_cor}${PUMP_USE[$i]} v${node_version}${reset_cor}" || echo "")
-        local mode=$([[ ${PUMP_PROJ_SINGLE_MODE[$i]} -eq 1 ]] && echo "${purple_cor}single mode" || echo "${bright_pink_cor}multiple mode")
-        print -n " ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}"
-        print -n "$on_node"
-        print -n " ${mode}${reset_cor}"
-        print -n " ${dark_gray_cor}-> ${gray_cor}${PUMP_PROJ_FOLDER[$i]} ${reset_cor}"
-        print ""
+        local mode=$([[ ${PUMP_PROJ_SINGLE_MODE[$i]} -eq 1 ]] && echo "${purple_cor}single${reset_cor}" || echo "${bright_pink_cor}multiple${reset_cor}")
+
+        local pro_style=$([[ -n "${PUMP_PRO[$i]}" ]] && echo "${solid_yellow_cor}${PUMP_PRO[$i]}${reset_cor}" || echo "")
+        local mode_style=$(gum style --align=center --margin="0" --padding="0" --border=none --width=10 "${mode}")
+        local pkg_style=$(gum style --align=left --margin="0" --padding="0" --border=none --width=6 --foreground 5 "${PUMP_PKG_MANAGER[$i]}")
+        local folder_style=$(gum style --align=left --margin="0" --padding="0" --border=none --width=50 --foreground 7 "$(shorten_path_until_ ${PUMP_PROJ_FOLDER[$i]} $HOME)")
+        local name_style=$(gum style --align=left --margin="0 0 0 2" --padding="0" --border=none --width=20 --foreground 4 "${PUMP_PROJ_SHORT_NAME[$i]}  ${pro_style}")   
+        
+        local settings=$(gum join --align=center --horizontal "$mode_style" "$pkg_style" "$folder_style" "$name_style")
+
+        projects+=("$settings")
       fi
     done
+
+    gum join --align=center --vertical "${projects[@]}"
 
     return 0;
   fi
@@ -6758,9 +6808,7 @@ function pro() {
   if (( pro_is_i )); then
     # display readme file of project
     if [[ -z "$proj_arg" ]]; then
-      print " provide a project name to display readme" >&2
-      print " type ${yellow_cor}pro -i <name>${reset_cor}" >&2
-      return 1;
+      proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
     fi
 
     local _pwd="$(pwd)"
@@ -6783,6 +6831,34 @@ function pro() {
           fi
         fi
         cd "$_pwd"
+        return 0;
+      fi
+    done
+
+    print " project not found: $proj_arg" >&2
+    return 1;
+  fi
+
+  if (( pro_is_u )); then
+    # reset project's flags
+    if [[ -z "$proj_arg" ]]; then
+      proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
+    fi
+
+    local i=0
+    for i in {1..9}; do
+      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        update_setting_ $i "PUMP_RETRY_TEST" ""
+        update_setting_ $i "PUMP_PR_APPEND" ""
+        update_setting_ $i "PUMP_PR_RUN_TEST" ""
+        update_setting_ $i "PUMP_COMMIT_ADD" ""
+        update_setting_ $i "PUMP_PUSH_ON_REFIX" ""
+        update_setting_ $i "PUMP_PRINT_README" ""
+        update_setting_ $i "PUMP_GHA_WORKFLOW" ""
+        update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" ""
+
+        print " project settings reset successful: $proj_arg"
+
         return 0;
       fi
     done
@@ -6976,10 +7052,12 @@ function pro() {
     
     export CURRENT_PUMP_PROJ_SHORT_NAME="$CURRENT_PUMP_PROJ_SHORT_NAME"
 
-    local node_version="$(get_node_version_ $found 2>/dev/null)"
-
+    local node_version="$(get_node_version_ $found 1 2>/dev/null)"
+    
+    local RET=1
     if [[ -n "$node_version" ]]; then
       nvm use "$node_version"
+      RET=$?
     fi
 
     if [[ -n "$CURRENT_PUMP_PRO" ]]; then
@@ -6988,8 +7066,23 @@ function pro() {
       fi
     fi
 
+    if (( RET == 0 )) && [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
+      confirm_between_ "save \"nvm use $node_version\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
+      RET=$?
+      if (( RET == 130 )); then return 0; fi
+      if (( RET == 0 )); then
+        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1
+        update_setting_ $found "PUMP_PRO" "nvm use $node_version"
+      else
+        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0
+      fi
+    fi
+
     unset_aliases_
     set_aliases_ $found
+    RET=$?
+
+    return $RET;
   fi
 }
 
@@ -7236,9 +7329,7 @@ function __commit() {
     git add .
   elif [[ -z "$CURRENT_PUMP_COMMIT_ADD" ]]; then
     if confirm_from_ "commit all changes?"; then
-      git add .
-
-      if (( $? == 0 )) && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
+      if git add . && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -7347,7 +7438,7 @@ function help() {
     if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
       local short="${PUMP_PROJ_SHORT_NAME[$i]}"
       local folder="${PUMP_PROJ_FOLDER[$i]}"
-      local shortened_path=$(shorten_path_ "$folder" 1)
+      local shortened_path=$(shorten_path_until_ "$folder" $HOME)
       local tab=$([[ ${#short} -lt 5 ]] && echo -e "\t\t" || echo -e "\t")
       
       print " ${solid_blue_cor} $short ${reset_cor}${tab} = set project and cd $shortened_path"
@@ -7645,6 +7736,7 @@ typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
+typeset -gA PUMP_SKIP_NVM_LOOKUP
 
 # ========================================================================
 typeset -g CURRENT_PUMP_PROJ_SHORT_NAME=""
@@ -7677,6 +7769,7 @@ typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
+typeset -g CURRENT_PUMP_SKIP_NVM_LOOKUP=""
 
 typeset -g MULTIPLE_MODE=0
 typeset -g SINGLE_MODE=1
