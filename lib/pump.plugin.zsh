@@ -3201,23 +3201,24 @@ function refresh() {
   #(( refresh_is_d )) && set -x # do not turn on for refresh
 
   if (( refresh_is_h )); then
-    print "  ${yellow_cor}refresh${reset_cor} : to source \$HOME/.zshrc"
+    print "  ${yellow_cor}refresh${reset_cor} : runs 'exec zsh'"
     return 0;
   fi
 
-  zsh
+  exec zsh
 }
 
 function upgrade() {
   if command -v omz &>/dev/null; then
-    omz update
+    if omz update; then
+      if command -v oh-my-posh &>/dev/null; then
+        if oh-my-posh upgrade; then
+          print ""
+          update_ -f
+        fi
+      fi
+    fi
   fi
-
-  if command -v oh-my-posh &>/dev/null; then
-    oh-my-posh upgrade
-  fi
-
-  update_ -f
 }
 
 function del() {
