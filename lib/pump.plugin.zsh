@@ -1762,11 +1762,13 @@ function save_proj_repo_() {
     fi
   fi
 
-  local _pwd="$(pwd)"
+  if [[ -z "$proj_repo" && -n "$proj_folder" ]]; then
+    local _pwd="$(pwd)"
 
-  if [[ -z "$proj_repo" ]] && open_proj_for_git_ "$proj_folder" &>/dev/null; then
-    proj_repo="$(get_repo_)"
-    cd "$_pwd"
+    if open_proj_for_git_ "$proj_folder" &>/dev/null; then
+      proj_repo="$(get_repo_)"
+      cd "$_pwd"
+    fi
   fi
 
   if (( ! save_proj_repo_is_f )); then
