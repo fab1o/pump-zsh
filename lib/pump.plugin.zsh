@@ -1214,7 +1214,6 @@ function choose_mode_() {
 
 
   '
-
   # local multiple=$'
   # '/"$(basename $(dirname "$1"))"'/
   #  └── '"${proj_folder}"'/
@@ -1257,7 +1256,7 @@ function choose_mode_() {
   local RET=$?
 
   local i=0
-  for i in {1..9}; do
+  for i in {1..16}; do
     clear_last_line_
   done
 
@@ -1364,8 +1363,9 @@ function create_backup_proj_folder_() {
   mkdir -p "$proj_folder" &>/dev/null
 }
 
-function detect_pkg_name_online_() {
-  local repo="$1"
+function get_pkg_field_online_() {
+  local field="$1"
+  local repo="$2"
   
   if [[ -z "$repo" ]]; then return 1; fi
 
@@ -1377,38 +1377,24 @@ function detect_pkg_name_online_() {
     return 1;
   fi
 
-  local manager=""
+  local pkg_name=""
 
   if command -v gh &>/dev/null; then
     local url="repos/${owner_repo}/contents"
     local package_json=$(gh api "${url}/package.json" --jq .download_url 2>/dev/null)
 
-    if command -v jq &>/dev/null; then
-      manager=$(curl -fs "$package_json" | jq -r '.name // empty')
-    else
-      manager=$(curl -fs "$package_json" | grep -E '"'name'"\s*:\s*"' | head -1 | sed -E "s/.*\"name\": *\"([^\"]+)\".*/\1/")
-    fi
+    if [[ -n "$package_json" ]]; then
+      if command -v jq &>/dev/null; then
+        pkg_name=$(curl -fs "$package_json" | jq -r --arg key "$field" '.[$key] // empty')
+      else
+        pkg_name=$(curl -fs "$package_json" | grep -E '"'$field'"\s*:\s*"' | head -1 | sed -E "s/.*\"$field\": *\"([^\"]+)\".*/\1/")
+      fi
 
-    if [[ -n "$manager" ]]; then
-      manager="${manager%%@*}"
-      echo "$manager"
-      return 0;
+      if [[ -n "$pkg_name" ]]; then
+        echo "$pkg_name"
+        return 0;
+      fi
     fi
-
-    if gh api "${url}/package-lock.json" --silent &>/dev/null; then
-      manager="npm"
-    elif gh api "${url}/yarn.lock" --silent &>/dev/null; then
-      manager="yarn"
-    elif gh api "${url}/pnpm-lock.yaml" --silent &>/dev/null; then
-      manager="pnpm"
-    elif gh api "${url}/bun.lockb" --silent &>/dev/null; then
-      manager="bun"
-    fi
-  fi
-
-  if [[ -n "$manager" ]]; then
-    echo "$manager"
-    return 0;
   fi
 
   local urls=()
@@ -1416,16 +1402,14 @@ function detect_pkg_name_online_() {
   urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/master")
   urls+=("https://raw.githubusercontent.com/${owner_repo}/refs/heads/dev")
 
-  local pkg_name=""
-
   if command -v jq &>/dev/null; then
     for url in "${urls[@]}"; do
-      pkg_name=$(curl -fs "${url}/package.json" | jq -r '.name // empty')
+      pkg_name=$(curl -fs "${url}/package.json" | jq -r --arg key "$field" '.[$key] // empty')
       if [[ -n "$pkg_name" ]]; then break; fi
     done
   else
     for url in "${urls[@]}"; do
-      pkg_name=$(curl -fs "${url}/package.json" | grep -E '"'name'"\s*:\s*"' | head -1 | sed -E "s/.*\"name\": *\"([^\"]+)\".*/\1/")
+      pkg_name=$(curl -fs "${url}/package.json" | grep -E '"'$field'"\s*:\s*"' | head -1 | sed -E "s/.*\"$field\": *\"([^\"]+)\".*/\1/")
       if [[ -n "$pkg_name" ]]; then break; fi
     done
   fi
@@ -1457,26 +1441,28 @@ function detect_pkg_manager_online_() {
     local url="repos/${owner_repo}/contents"
     local package_json=$(gh api "${url}/package.json" --jq .download_url 2>/dev/null)
 
-    if command -v jq &>/dev/null; then
-      manager=$(curl -fs "$package_json" | jq -r '.packageManager // empty')
-    else
-      manager=$(curl -fs "$package_json" | grep -E '"'packageManager'"\s*:\s*"' | head -1 | sed -E "s/.*\"packageManager\": *\"([^\"]+)\".*/\1/")
-    fi
+    if [[ -n "$package_json" ]]; then
+      if command -v jq &>/dev/null; then
+        manager=$(curl -fs "$package_json" | jq -r '.packageManager // empty')
+      else
+        manager=$(curl -fs "$package_json" | grep -E '"'packageManager'"\s*:\s*"' | head -1 | sed -E "s/.*\"packageManager\": *\"([^\"]+)\".*/\1/")
+      fi
 
-    if [[ -n "$manager" ]]; then
-      manager="${manager%%@*}"
-      echo "$manager"
-      return 0;
-    fi
+      if [[ -n "$manager" ]]; then
+        manager="${manager%%@*}"
+        echo "$manager"
+        return 0;
+      fi
 
-    if gh api "${url}/package-lock.json" --silent &>/dev/null; then
-      manager="npm"
-    elif gh api "${url}/yarn.lock" --silent &>/dev/null; then
-      manager="yarn"
-    elif gh api "${url}/pnpm-lock.yaml" --silent &>/dev/null; then
-      manager="pnpm"
-    elif gh api "${url}/bun.lockb" --silent &>/dev/null; then
-      manager="bun"
+      if gh api "${url}/package-lock.json" --silent &>/dev/null; then
+        manager="npm"
+      elif gh api "${url}/yarn.lock" --silent &>/dev/null; then
+        manager="yarn"
+      elif gh api "${url}/pnpm-lock.yaml" --silent &>/dev/null; then
+        manager="pnpm"
+      elif gh api "${url}/bun.lockb" --silent &>/dev/null; then
+        manager="bun"
+      fi
     fi
   fi
 
@@ -1539,10 +1525,10 @@ function detect_pkg_manager_online_() {
   #   fi
   # done
 
-  if [[ -n "$manager" ]]; then
-    echo "$manager"
-    return 0;
-  fi
+  # if [[ -n "$manager" ]]; then
+  #   echo "$manager"
+  #   return 0;
+  # fi
 
   return 1;
 }
@@ -1587,10 +1573,10 @@ function detect_pkg_manager_() {
   #   manager="poe"
   # fi
 
-  if [[ -n "$manager" ]]; then
-    echo "$manager"
-    return 0;
-  fi
+  # if [[ -n "$manager" ]]; then
+  #   echo "$manager"
+  #   return 0;
+  # fi
 
   return 1;
 }
@@ -1799,11 +1785,15 @@ function save_pkg_manager_() {
   local proj_folder="$2"
   local proj_repo="$3"
 
+  print " detecting package manager..." >&1
+
   local pkg_manager="$(detect_pkg_manager_ "$proj_folder")"
 
   if [[ -z "$pkg_manager" ]]; then
     pkg_manager=$(detect_pkg_manager_online_ "$proj_repo")
   fi
+
+  clear_last_line_
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
     confirm_from_ "confirm package manager: "$'\e[38;5;212m'${pkg_manager}$'\e[0m'" "
@@ -2107,6 +2097,7 @@ function remove_prj_() {
   update_setting_ $i "PUMP_PRINT_README" "" 1>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" 1>/dev/null
   update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" 1>/dev/null
+  update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 1>/dev/null
 }
 
 function save_current_proj_() {
@@ -2143,6 +2134,7 @@ function save_current_proj_() {
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
   CURRENT_PUMP_SKIP_NVM_LOOKUP="${PUMP_SKIP_NVM_LOOKUP[$i]}"
+  CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
 }
 
 # function clear_curr_prj_() {
@@ -2275,6 +2267,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_SKIP_NVM_LOOKUP[$i]}]"
+    print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
 
     return 0;
   fi
@@ -2310,6 +2303,7 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
   print " [${solid_pink_cor}CURRENT_PUMP_SKIP_NVM_LOOKUP=${reset_cor}$CURRENT_PUMP_SKIP_NVM_LOOKUP]"
+  print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
 }
 
 function which_pro_index_pwd_() {
@@ -2899,6 +2893,7 @@ function load_config_entry_() {
     PUMP_PRINT_README
     PUMP_PKG_NAME
     PUMP_SKIP_NVM_LOOKUP
+    PUMP_DEFAULT_BRANCH
   )
 
   local key=""
@@ -3046,6 +3041,9 @@ function load_config_entry_() {
         ;;
       PUMP_SKIP_NVM_LOOKUP)
         PUMP_SKIP_NVM_LOOKUP[$i]="$value"
+        ;;
+      PUMP_DEFAULT_BRANCH)
+        PUMP_DEFAULT_BRANCH[$i]="$value"
         ;;
     esac
     # print "$i - key: [$key], value: [$value]"
@@ -4647,6 +4645,7 @@ function clone() {
   local proj_folder=""
   local _clone=""
   local print_readme=""
+  local pump_default_branch=""
   local single_mode=""
   
   local found=0
@@ -4668,9 +4667,10 @@ function clone() {
 
       if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" >/dev/null; then return 1; fi
 
-      single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
       _clone="${PUMP_CLONE[$i]}"
       print_readme="${PUMP_PRINT_README[$i]}"
+      pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
+      single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
       break;
     fi
   done
@@ -4731,7 +4731,7 @@ function clone() {
     fi
   fi
 
-  local default_branch="$default_branch_arg"
+  local default_branch="${default_branch_arg:-$pump_default_branch}"
 
   if [[ -z "$default_branch" ]]; then
     default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg")
@@ -4744,6 +4744,10 @@ function clone() {
       else
         return 1;
       fi   
+    fi
+
+    if confirm_from_ "save default branch '"$'\e[32m'$default_branch$'\e[0m'"' and don't ask again?"; then
+      update_setting_ $found "PUMP_DEFAULT_BRANCH" $default_branch
     fi
   fi
 
@@ -6732,7 +6736,7 @@ function get_pkg_name_() {
     local pkg_name="$(get_from_pkg_json_ "name" "$folder")"
   
     if [[ -z "$pkg_name" && -n "$proj_repo" ]]; then
-      pkg_name="$(detect_pkg_name_online_ "$proj_repo")"
+      pkg_name="$(get_pkg_field_online_ "name" "$proj_repo")"
     fi
   fi
   
@@ -6856,6 +6860,7 @@ function pro() {
         update_setting_ $i "PUMP_PRINT_README" ""
         update_setting_ $i "PUMP_GHA_WORKFLOW" ""
         update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" ""
+        update_setting_ $i "PUMP_DEFAULT_BRANCH" ""
 
         print " project settings reset successful: $proj_arg"
 
@@ -7245,16 +7250,16 @@ function pop() {
     local stashes=()
     local stash
 
-    # Collect stash refs in an array
+    # collect stash refs in an array
     while IFS= read -r line; do
       stash="${line%%:*}"  # strip everything after the first colon
       stashes+=("$stash")
     done < <(git stash list)
 
-    # Pop in reverse order (so indices don’t shift)
+    # pop in reverse order (so indices don’t shift)
     for (( i=${#stashes[@]}-1; i>=0; i-- )); do
-      echo "Popping ${stashes[i]}..."
-      git stash pop --index "${stashes[i]}" || break;
+      echo "Popping ${stashes[$i]}..."
+      git stash pop --index "${stashes[$i]}" || break;
     done
   else
     git stash pop --index
@@ -7722,6 +7727,7 @@ typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
 typeset -gA PUMP_SKIP_NVM_LOOKUP
+typeset -gA PUMP_DEFAULT_BRANCH
 
 # ========================================================================
 typeset -g CURRENT_PUMP_PROJ_SHORT_NAME=""
@@ -7755,6 +7761,7 @@ typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
 typeset -g CURRENT_PUMP_SKIP_NVM_LOOKUP=""
+typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
 
 typeset -g MULTIPLE_MODE=0
 typeset -g SINGLE_MODE=1
