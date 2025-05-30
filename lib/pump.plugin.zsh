@@ -31,8 +31,9 @@ typeset -g blue_cor="\e[94m"
 typeset -g solid_cyan_cor="\e[36m"
 typeset -g cyan_cor="\e[96m"
 
-typeset -g bright_pink_cor="\e[38;5;212m"
-typeset -g pink_cor="\e[0;95m"
+typeset -g solid_pink_cor="\e[0;95m"
+typeset -g pink_cor="\e[38;5;212m"
+
 typeset -g purple_cor="\e[38;5;99m"
 
 typeset -g reset_cor="\e[0m"
@@ -1035,8 +1036,13 @@ function delete_pump_workings_() {
 function sanitize_pkg_name_() {
   local pkg_name="$1"
 
+  if [[ -z "$pkg_name" ]]; then
+    echo ""
+    return 0;
+  fi
+
   # Convert to lowercase
-  sanitized="${pkg_name:l}"
+  local sanitized="${pkg_name:l}"
 
   # Remove all characters before the first slash
   sanitized="${sanitized#*/}"
@@ -1192,8 +1198,8 @@ function choose_mode_() {
   local proj_folder="$(basename "$1")"
   local mode="$2"
 
-  local multiple_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=40 --foreground 212 "example of multiple mode")
-  local single_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=40 --foreground 99 "example of single mode")
+  local multiple_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=25 --foreground 212 "multiple mode")
+  local single_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=25 --foreground 99 "single mode")
 
   local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
 
@@ -1229,8 +1235,8 @@ function choose_mode_() {
 
   # '
 
-  multiple=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=40 --border-foreground 212 "$multiple")
-  single=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=40 --border-foreground 99 "$single")
+  multiple=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=25 --border-foreground 212 "$multiple")
+  single=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=25 --border-foreground 99 "$single")
 
   local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
   
@@ -1239,15 +1245,15 @@ function choose_mode_() {
 
   local default="$((( mode )) && echo "single" || echo "multiple")"
 
-  confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode? "$'\n'" \
-    "$'\e[0m'"  • "$'\e[38;5;212m'multiple$'\e[0m'" mode: "$'\n\e[0m'" \
-    "$'\e[0m'"   manages separate folders for branches"$'\n\e[0m'" \
-    "$'\e[0m'"   designed for professionals with sizable teams and extensive branching workflows"$'\n\e[0m'" \
-    "$'\e[0m'"  • "$'\e[38;5;99m'single$'\e[0m'" mode: "$'\n\e[0m'" \
-    "$'\e[0m'"   manages all branches within a single folder"$'\n\e[0m'" \
-    "$'\e[0m'"   ideal for personal projects or small teams with a limited number of branches" \
-    "multiple" "single" "$default"
-  
+  print " • ${pink_cor}multiple mode${reset_cor}:" 1>/dev/tty
+  print "   manages branches in separate folders" 1>/dev/tty
+  print "   designed for professionals with extensive branching workflows" 1>/dev/tty
+  print " • ${purple_cor}single mode${reset_cor}:" 1>/dev/tty
+  print "   manages branches within a single folder" 1>/dev/tty
+  print "   ideal for small projects with a limited number of branches" 1>/dev/tty
+  print "" 1>/dev/tty
+
+  confirm_between_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode?" "multiple" "single" "$default"
   local RET=$?
 
   local i=0
@@ -1616,7 +1622,7 @@ function save_proj_cmd_() {
 
   if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
-    print "  ${pink_cor}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
+    print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
   fi
 }
 
@@ -1644,9 +1650,9 @@ function save_proj_mode_() {
   update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode"
 
   if (( single_mode )); then
-    print "  ${pink_cor}project mode:${reset_cor} single" >&1
+    print "  ${SAVE_PROJ_COR}project mode:${reset_cor} single" >&1
   else
-    print "  ${pink_cor}project mode:${reset_cor} multiple" >&1
+    print "  ${SAVE_PROJ_COR}project mode:${reset_cor} multiple" >&1
   fi
 }
 
@@ -1677,7 +1683,7 @@ function save_proj_folder_() {
       RET=$?
       if (( RET == 130 )); then return 130; fi
       if (( RET == 0 )); then
-        print "  ${pink_cor}project folder:${reset_cor} ${PUMP_PROJ_FOLDER[$i]}" >&1
+        print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${PUMP_PROJ_FOLDER[$i]}" >&1
         return 0;
       fi
     fi
@@ -1721,7 +1727,7 @@ function save_proj_folder_() {
 
   update_setting_ $i "PUMP_PROJ_FOLDER" "$proj_folder"
   
-  print "  ${pink_cor}project folder:${reset_cor} ${proj_folder}" >&1
+  print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${proj_folder}" >&1
 }
 
 function save_proj_repo_() {
@@ -1741,7 +1747,7 @@ function save_proj_repo_() {
       RET=$?
       if (( RET == 130 )); then return 130; fi
       if (( RET == 0 )); then
-        print "  ${pink_cor}project repository:${reset_cor} ${proj_repo}" >&1
+        print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
         return 0;
       fi
     elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
@@ -1780,7 +1786,7 @@ function save_proj_repo_() {
       # don't pass $proj_folder to check_proj_repo_ so it doesn't ask again if we want to use the same repo
       if ! check_proj_repo_ -s $i "$proj_repo";  then return 1; fi
 
-      print "  ${pink_cor}project repository:${reset_cor} ${proj_repo}" >&1
+      print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
     fi
   fi
 
@@ -1819,7 +1825,7 @@ function save_pkg_manager_() {
 
   update_setting_ $i "PUMP_PKG_MANAGER" "$pkg_manager"
   
-  print "  ${pink_cor}package manager:${reset_cor} ${pkg_manager}" >&1
+  print "  ${SAVE_PROJ_COR}package manager:${reset_cor} ${pkg_manager}" >&1
 }
 
 function save_proj_f_() {
@@ -1835,15 +1841,15 @@ function save_proj_f_() {
     return 1;
   fi
 
-  local cor=""
   local proj_repo="$(get_repo_)"
 
-  if (( save_proj_f_is_a )); then
-    cor="${bright_green_cor}"
-    display_line_ "add new project" "${cor}"
-  fi
-
   TEMP_PUMP_PROJ_SHORT_NAME=""
+  SAVE_PROJ_COR="${bright_yellow_cor}"
+
+  if (( save_proj_f_is_a )); then
+    SAVE_PROJ_COR="${bright_green_cor}"
+    display_line_ "add new project" "${SAVE_PROJ_COR}"
+  fi
 
   # for pro pwd, all the settings come from $PWD
 
@@ -1889,19 +1895,18 @@ function save_proj_() {
     return 1;
   fi
 
+  TEMP_PUMP_PROJ_SHORT_NAME=""
+
   # display header
-  local cor=""
   if (( save_proj_is_e )); then
-    cor="${bright_yellow_cor}"
-    display_line_ "edit project: ${proj_name}" "${cor}"
+    SAVE_PROJ_COR="${bright_yellow_cor}"
+    display_line_ "edit project: ${proj_name}" "${SAVE_PROJ_COR}"
   else
-    cor="${bright_green_cor}"
-    display_line_ "add new project" "${cor}"
+    SAVE_PROJ_COR="${bright_green_cor}"
+    display_line_ "add new project" "${SAVE_PROJ_COR}"
   fi
 
   local old_single_mode=""
-
-  TEMP_PUMP_PROJ_SHORT_NAME=""
 
   if (( save_proj_is_e )); then
     # editing a project
@@ -2276,37 +2281,37 @@ function print_current_proj_() {
     return 0;
   fi
 
-  print " [${pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME]"
-  print " [${pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER]"
-  print " [${pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO]"
-  print " [${pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE]"
-  print " [${pink_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}$CURRENT_PUMP_PKG_MANAGER]"
-  print " [${pink_cor}CURRENT_PUMP_RUN=${reset_cor}$CURRENT_PUMP_RUN]"
-  print " [${pink_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}$CURRENT_PUMP_RUN_STAGE]"
-  print " [${pink_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}$CURRENT_PUMP_RUN_PROD]"
-  print " [${pink_cor}CURRENT_PUMP_SETUP=${reset_cor}$CURRENT_PUMP_SETUP]"
-  print " [${pink_cor}CURRENT_PUMP_CLONE=${reset_cor}$CURRENT_PUMP_CLONE]"
-  print " [${pink_cor}CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO]"
-  print " [${pink_cor}CURRENT_PUMP_USE=${reset_cor}$CURRENT_PUMP_USE]"
-  print " [${pink_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR]"
-  print " [${pink_cor}CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV]"
-  print " [${pink_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV]"
-  print " [${pink_cor}CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST]"
-  print " [${pink_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST]"
-  print " [${pink_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH]"
-  print " [${pink_cor}CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E]"
-  print " [${pink_cor}CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI]"
-  print " [${pink_cor}CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE]"
-  print " [${pink_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE]"
-  print " [${pink_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND]"
-  print " [${pink_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST]"
-  print " [${pink_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD]"
-  print " [${pink_cor}CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX]"
-  print " [${pink_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL]"
-  print " [${pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
-  print " [${pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
-  print " [${pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
-  print " [${pink_cor}CURRENT_PUMP_SKIP_NVM_LOOKUP=${reset_cor}$CURRENT_PUMP_SKIP_NVM_LOOKUP]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}$CURRENT_PUMP_PKG_MANAGER]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN=${reset_cor}$CURRENT_PUMP_RUN]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}$CURRENT_PUMP_RUN_STAGE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}$CURRENT_PUMP_RUN_PROD]"
+  print " [${solid_pink_cor}CURRENT_PUMP_SETUP=${reset_cor}$CURRENT_PUMP_SETUP]"
+  print " [${solid_pink_cor}CURRENT_PUMP_CLONE=${reset_cor}$CURRENT_PUMP_CLONE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO]"
+  print " [${solid_pink_cor}CURRENT_PUMP_USE=${reset_cor}$CURRENT_PUMP_USE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR]"
+  print " [${solid_pink_cor}CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV]"
+  print " [${solid_pink_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV]"
+  print " [${solid_pink_cor}CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST]"
+  print " [${solid_pink_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH]"
+  print " [${solid_pink_cor}CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E]"
+  print " [${solid_pink_cor}CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST]"
+  print " [${solid_pink_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX]"
+  print " [${solid_pink_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL]"
+  print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
+  print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
+  print " [${solid_pink_cor}CURRENT_PUMP_SKIP_NVM_LOOKUP=${reset_cor}$CURRENT_PUMP_SKIP_NVM_LOOKUP]"
 }
 
 function which_pro_index_pwd_() {
@@ -2360,19 +2365,15 @@ function is_proj_folder_() {
     return 1;
   fi
 
-  local files=("package.json" ".git" "README" "index.js" "index.ts")
+  local files=("package.json" ".git" "README.md" "index.js" "index.ts")
 
   for file in "${files[@]}"; do
-    # if [[ -n "$file" && -n $(ls "$folder" | grep -i "^${(q)file}\$") ]]; then
-    #   return 0;
-    # fi
-
     if [[ -e "${folder}/${file}" ]]; then
       return 0;
     fi
 
     local pattern=$(printf "%q" "$file")
-    local found_file=$(find "$folder" -maxdepth 1 -iname "${pattern}*" -print -quit 2>/dev/null)
+    local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 1 -iname "${pattern}*" -print -quit 2>/dev/null)
     
     if [[ -n "$found_file" ]]; then
       return 0;
@@ -2471,62 +2472,20 @@ function get_proj_for_pkg_() {
 
   if [[ ! -d "$folder" ]]; then return 1; fi
 
-  if [[ -f "${folder}/${file}" ]]; then
+  if [[ -e "${folder}/${file}" ]]; then
     echo "$folder"
     return 0;
   fi
 
   local pattern=$(printf "%q" "$file")
-  local found_file=$(find "$folder" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+  local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 2 -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+
+  if [[ -z "$found_file" ]]; then
+    found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+  fi
   
   if [[ -n "$found_file" ]]; then
     echo "$(dirname "$found_file")"
-    return 0;
-  fi
-
-  return 1;
-}
-
-# function get_proj_for_pkg_multiple_mode_() {
-#   local folder="${1:-$PWD}"
-#   local file="${2:-"package.json"}"
-
-#   if [[ ! -d "$folder" ]]; then return 1; fi
-
-#   local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
-
-#   local dir=""
-#   for dir in "${dirs[@]}"; do
-#     if [[ ! -d "${folder}/${dir}" ]]; then continue; fi
-
-#     if [[ -f "${folder}/${dir}/${file}" ]]; then
-#       echo "${folder}/${dir}"
-#       return 0;
-#     fi
-
-#     local pattern=$(printf "%q" "$file")
-#     local found_file=$(find "${folder}/${dir}" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
-    
-#     if [[ -n "$found_file" ]]; then
-#       echo "${folder}/${dir}"
-#       return 0;
-#     fi
-#   done
-
-#   return 1;
-# }
-
-function get_proj_for_pkg_multiple_mode_() {
-  local folder="${1:-$PWD}"
-  local file="${2:-"package.json"}"
-
-  if [[ ! -d "$folder" ]]; then return 1; fi
-
-  local pattern=$(printf "%q" "$file")
-  local found_file=$(find "$folder" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
-  
-  if [[ -n "$found_file" ]]; then
-    echo "${folder}/${dir}"
     return 0;
   fi
 
@@ -2553,25 +2512,18 @@ function get_proj_for_git_() {
     return 0;
   fi
 
-  local found_git=$(find "$folder" -type d -iname ".git" -print -quit 2>/dev/null)
+  local found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -maxdepth 2 -type d -name ".git" -print -quit 2>/dev/null)
   
+  if [[ -z "$found_git" ]]; then
+    found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -type d -name ".git" -print -quit 2>/dev/null)
+  fi
+
   if [[ -n "$found_git" ]]; then
     if is_git_repo_ "$(dirname "$found_git")" &>/dev/null; then
       echo "$(dirname "$found_git")"
       return 0;
     fi
   fi
-
-  local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
-
-  # Loop through each folder name
-  local dir=""
-  for dir in "${folders[@]}"; do
-    if is_git_repo_ "${folder}/${dir}" &>/dev/null; then
-      echo "${folder}/${dir}"
-      return 0;
-    fi
-  done
 
   return 1;
 }
@@ -2632,8 +2584,8 @@ function get_remote_branch_() {
 }
 
 function get_repo_() {
-  local branch="$1"
-  local proj_folder="${2-$PWD}"
+  local proj_folder="${1-$PWD}"
+  local branch="$2"
 
   local remote_origin="$(get_remote_origin_ "$branch" "$proj_folder")"
   local remote_repo="$(git remote get-url "$remote_origin" 2>/dev/null)"
@@ -2913,10 +2865,11 @@ function get_from_pkg_json_() {
     else
       value=$(grep -E '"'$key_name'"\s*:\s*"' "$file" | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
     fi
+    echo "$value"
+    return 0;
   fi
 
-  echo "$value"
-  return 0;
+  return 1;
 }
 
 function load_config_entry_() {
@@ -4222,7 +4175,7 @@ function run() {
 
   pushd "$folder_to_run" &>/dev/null
 
-  print " run $_env on ${gray_cor}$(shorten_path_until_ "$folder_to_run" $HOME) ${reset_cor}:${pink_cor} $_run ${reset_cor}"
+  print " run $_env on ${gray_cor}$(shorten_path_until_ "$folder_to_run" $HOME) ${reset_cor}:${solid_pink_cor} $_run ${reset_cor}"
   
   if ! eval "$_run"; then
     print " failed to run PUMP_RUN_${found}" >&2
@@ -4328,7 +4281,7 @@ function setup() {
 
   pushd "$folder_to_setup" &>/dev/null
 
-  print " setup ${gray_cor}$(shorten_path_until_ "$PWD" $HOME) ${reset_cor}:${pink_cor} $_setup ${reset_cor}"
+  print " setup ${gray_cor}$(shorten_path_until_ "$PWD" $HOME) ${reset_cor}:${solid_pink_cor} $_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
     print " failed to run PUMP_SETUP_${found}" >&2
@@ -4610,7 +4563,7 @@ function rev() {
   fi
 
   if [[ -n "$_setup" ]]; then
-    print "${pink_cor} $_setup ${reset_cor}"
+    print "${solid_pink_cor} $_setup ${reset_cor}"
     if eval "$_setup"; then
       if (( is_open_editor )); then
         eval $code_editor .
@@ -4844,12 +4797,12 @@ function clone() {
   fi
 
   if [[ "$default_branch" != "$branch_to_clone" ]]; then
-    print " ${pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
+    print " ${solid_pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
     git config init.defaultBranch "$default_branch"
   fi
 
   if [[ -n "$_clone" ]]; then
-    print " ${pink_cor}$_clone ${reset_cor}"
+    print " ${solid_pink_cor}$_clone ${reset_cor}"
     if ! eval "$_clone"; then
       print " failed to run PUMP_CLONE_${found}" >&2
     fi
@@ -4857,7 +4810,7 @@ function clone() {
 
   if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
     local RET=0
-    local readme_file=$(find . -type f -iname "README*" -print -quit 2>/dev/null);
+    local readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null);
     if [[ -n "$readme_file" ]]; then
       if command -v glow &>/dev/null; then
         glow "$readme_file"
@@ -5230,9 +5183,10 @@ function fetch() {
   fi
 
   if [[ -n "$1" && $1 != -* ]]; then
-    local remote_origin="$(get_remote_origin_ "$1")"
+    local fetch_branch="$1"
+    local remote_origin="$(get_remote_origin_ "$fetch_branch")"
 
-    git fetch "$remote_origin" "$1" --prune ${@:2}
+    git fetch "$remote_origin" "$fetch_branch" --prune ${@:2}
     RET=$?
   else
     git fetch --all --prune $@
@@ -6494,7 +6448,7 @@ function rebase() {
       fi
 
       print ""
-      print -n " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch}${reset_cor}"
+      print -n " ${solid_pink_cor}rebasing branch ${pink_cor}$branch${solid_pink_cor} of ${rebase_branch}${reset_cor}"
       if (( rebase_is_p )); then
         print " then pushing"
         if ! rebase -p "$rebase_branch" ${@:2}; then
@@ -6582,7 +6536,7 @@ function merge() {
       fi
 
       print ""
-      print -n " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch}${reset_cor}"
+      print -n " ${solid_pink_cor}merging branch ${pink_cor}$branch${solid_pink_cor} from ${rebase_branch}${reset_cor}"
       if (( merge_is_p )); then
         print " then pushing"
         if ! merge -p "$merge_branch" ${@:2}; then
@@ -6772,13 +6726,19 @@ function get_pkg_name_() {
   local proj_repo="$2"
 
   if [[ -z "$proj_repo" ]]; then
-    proj_repo="$(get_repo_ "" "$proj_folder")"
+    local folder=$(get_proj_for_git_ "$proj_folder")
+    if [[ -n "$folder" ]]; then
+      proj_repo="$(get_repo_ "$folder")"
+    fi
   fi
 
-  local pkg_name="$(get_from_pkg_json_ "name" "$proj_folder")"
+  local folder=$(get_proj_for_pkg_ "$proj_folder")
+  if [[ -n "$folder" ]]; then
+    local pkg_name="$(get_from_pkg_json_ "name" "$folder")"
   
-  if [[ -z "$pkg_name" && -n "$proj_repo" ]]; then
-    pkg_name="$(detect_pkg_name_online_ "$proj_repo")"
+    if [[ -z "$pkg_name" && -n "$proj_repo" ]]; then
+      pkg_name="$(detect_pkg_name_online_ "$proj_repo")"
+    fi
   fi
   
   if [[ -z "$pkg_name" ]]; then
@@ -6834,7 +6794,7 @@ function pro() {
     local projects=()
     for i in {1..9}; do
       if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        local mode=$([[ ${PUMP_PROJ_SINGLE_MODE[$i]} -eq 1 ]] && echo "${purple_cor}single${reset_cor}" || echo "${bright_pink_cor}multiple${reset_cor}")
+        local mode=$([[ ${PUMP_PROJ_SINGLE_MODE[$i]} -eq 1 ]] && echo "${purple_cor}single${reset_cor}" || echo "${pink_cor}multiple${reset_cor}")
 
         local pro_style=$([[ -n "${PUMP_PRO[$i]}" ]] && echo "${solid_yellow_cor}${PUMP_PRO[$i]}${reset_cor}" || echo "")
         local mode_style=$(gum style --align=center --margin="0" --padding="0" --border=none --width=10 "${mode}")
@@ -6867,7 +6827,7 @@ function pro() {
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
         # find readme file
-        local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" -type f -iname "README*" -print -quit 2>/dev/null);
+        local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null);
         if [[ -n "$readme_file" ]]; then
           if command -v glow &>/dev/null; then
             glow "$readme_file"
@@ -7664,14 +7624,14 @@ function help() {
   print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
   print " ${solid_yellow_cor} upgrade ${reset_cor}\t = upgrade pump + zsh + omp"
   print ""
-  display_line_ "multi-step task" "${pink_cor}"
+  display_line_ "multi-step task" "${solid_pink_cor}"
   print ""
-  print " ${pink_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
-  print " ${pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-commit/push"
-  print " ${pink_cor} recommit ${reset_cor}\t = reset last commit then re-commit changes to index"
-  print " ${pink_cor} release ${reset_cor}\t = bump version and create a release in github"
-  print " ${pink_cor} repush ${reset_cor}\t = reset last commit then re-push changes to index"
-  print " ${pink_cor} rev ${reset_cor}\t\t = open a pull request for review on $CURRENT_PUMP_CODE_EDITOR"
+  print " ${solid_pink_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
+  print " ${solid_pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-commit/push"
+  print " ${solid_pink_cor} recommit ${reset_cor}\t = reset last commit then re-commit changes to index"
+  print " ${solid_pink_cor} release ${reset_cor}\t = bump version and create a release in github"
+  print " ${solid_pink_cor} repush ${reset_cor}\t = reset last commit then re-push changes to index"
+  print " ${solid_pink_cor} rev ${reset_cor}\t\t = open a pull request for review on $CURRENT_PUMP_CODE_EDITOR"
   print ""
   print "  to learn more, visit:${blue_cor} https://github.com/fab1o/pump-zsh/wiki ${reset_cor}"
 }
@@ -7808,6 +7768,7 @@ typeset -g PUMP_PAST_FOLDER=""
 typeset -g PUMP_PAST_BRANCH=""
 
 typeset -g TEMP_PUMP_PROJ_SHORT_NAME=""
+typeset -g SAVE_PROJ_COR=""
 
 export CURRENT_PUMP_PROJ_SHORT_NAME=""
 # ========================================================================
