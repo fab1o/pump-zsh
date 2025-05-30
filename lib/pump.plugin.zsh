@@ -6420,7 +6420,7 @@ function rebase() {
     print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branches on top of the HEAD commit of $(git config --get init.defaultBranch)"
     print "  ${yellow_cor}rebase ${solid_yellow_cor}<branch>${reset_cor} : to apply the commits from given branch on top of the HEAD commit of a branch"
     print "  ${yellow_cor}rebase -a${reset_cor} : to rebase multiple branches"
-    print "  ${yellow_cor}rebase -p${reset_cor} : push after rebase succeeds with no conflicts"
+    print "  ${yellow_cor}rebase -p${reset_cor} : to push after rebase succeeds with no conflicts"
     return 0;
   fi
 
@@ -6448,16 +6448,15 @@ function rebase() {
         break;
       fi
 
+      print ""
+      print -n " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch}${reset_cor}"
       if (( rebase_is_p )); then
-        print ""
-        print " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch} then pushing${reset_cor}"
+        print " then pushing"
         if ! rebase -p "$rebase_branch" ${@:2}; then
           RET=1
           break;
         fi
       else
-        print ""
-        print " ${pink_cor}rebasing branch ${bright_pink_cor}$branch${pink_cor} of ${rebase_branch}${reset_cor}"
         if ! rebase "$rebase_branch" ${@:2}; then
           RET=1
           break;
@@ -6494,7 +6493,7 @@ function rebase() {
   fi
 
   if (( RET == 0 && rebase_is_p )); then
-    pushf
+    pushf # push force with lease
     RET=$?
   fi
 
@@ -6509,7 +6508,7 @@ function merge() {
     print "  ${yellow_cor}merge${reset_cor} : to create a new merge commit from $(git config --get init.defaultBranch)"
     print "  ${yellow_cor}merge ${solid_yellow_cor}<branch>${reset_cor} : to create a new merge commit from a branch"
     print "  ${yellow_cor}merge -a${reset_cor} : to merge multiple branches"
-    print "  ${yellow_cor}merge -p${reset_cor} : push after merge succeeds with no conflicts"
+    print "  ${yellow_cor}merge -p${reset_cor} : to push after merge succeeds with no conflicts"
     return 0;
   fi
 
@@ -6537,16 +6536,15 @@ function merge() {
         break;
       fi
 
+      print ""
+      print -n " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch}${reset_cor}"
       if (( merge_is_p )); then
-        print ""
-        print " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch} then pushing${reset_cor}"
+        print " then pushing"
         if ! merge -p "$merge_branch" ${@:2}; then
           RET=1
           break;
         fi
       else
-        print ""
-        print " ${pink_cor}merging branch ${bright_pink_cor}$branch${pink_cor} from ${rebase_branch}${reset_cor}"
         if ! merge "$merge_branch" ${@:2}; then
           RET=1
           break;
