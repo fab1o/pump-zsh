@@ -1850,9 +1850,10 @@ function save_proj_f_() {
 
     # don't edit package manager, not necessary, very rare edge case
     # if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}" 1>/dev/null; then return 1; fi
-
     # update_proj_cmd_ $i "$proj_cmd"
   else
+    remove_prj_ $i
+
     if ! save_proj_repo_ -f $i "$PWD" "$proj_cmd" "$proj_repo"; then return 1; fi
     if ! save_proj_folder_ -f $i "$proj_cmd" "$proj_repo" "$PWD"; then return 1; fi
 
@@ -1905,12 +1906,9 @@ function save_proj_() {
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
   else
-    # adding a new project
-    PUMP_PROJ_REPO[$i]=""
-    PUMP_PROJ_FOLDER[$i]=""
-    PUMP_PKG_MANAGER[$i]=""
-    PUMP_PROJ_SINGLE_MODE[$i]=""
+    remove_prj_ $i
 
+    # adding a new project
     while [[ -z "${PUMP_PROJ_FOLDER[$i]}" ]]; do
       proj_cmd="${TEMP_PUMP_PROJ_SHORT_NAME:-$proj_cmd}"
 
@@ -2061,7 +2059,7 @@ function set_aliases_() {
 }
 
 function remove_prj_() {
-  i="$1"
+  local i="$1"
 
   unset_aliases_
   unset -f "${PUMP_PROJ_SHORT_NAME[$i]}" &>/dev/null
