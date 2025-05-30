@@ -264,7 +264,7 @@ function ll_add_node_() {
   local branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
 
   if [[ -z "$project" ]]; then
-    project=$(which_pro_pwd_)
+    project=$(find_pro_pwd_)
   fi
 
   node_project[$id]="$i"
@@ -602,7 +602,7 @@ function get_folders_() {
     [[ $name != "revs" ]] && filtered+=$name
   done
 
-  local priorities=(main stage dev develop staging master production)
+  local priorities=(dev develop release main master production stage staging)
   local ordered=()
 
   for name in "${priorities[@]}"; do
@@ -1164,7 +1164,7 @@ function check_proj_pkg_manager_() {
   if [[ -z "$pkg_manager" ]]; then
     error_msg="package manager is missing"
   else
-    local valid_pkg_managers=("npm" "yarn" "pnpm" "bun" "poe")
+    local valid_pkg_managers=("npm" "yarn" "pnpm" "bun") #"poe"
 
     if ! [[ " ${valid_pkg_managers[@]} " =~ " $pkg_manager " ]]; then
       error_msg="package manager is invalid: $pkg_manager"
@@ -1529,13 +1529,13 @@ function detect_pkg_manager_online_() {
     return 0;
   fi
 
-  local pyproject="pyproject.toml"
+  # local pyproject="pyproject.toml"
 
-  for url in "${urls[@]}"; do
-    if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]'; then
-      manager="poe"
-    fi
-  done
+  # for url in "${urls[@]}"; do
+  #   if curl -fs "${url}/${pyproject}" | grep -qE '^\s*\[tool\.poe\.tasks\]'; then
+  #     manager="poe"
+  #   fi
+  # done
 
   if [[ -n "$manager" ]]; then
     echo "$manager"
@@ -1550,12 +1550,11 @@ function detect_pkg_manager_() {
 
   local manager=""
 
-  folder=$(get_proj_for_pkg_from_within_ "$folder" 2>/dev/null)
-  
-  if [[ -z "$folder" ]]; then return 1; fi
+  local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  if [[ -f "${folder}/package.json" ]]; then
-    local line="$(get_from_pkg_json_ "packageManager" "$folder")"
+  if [[ -f "${proj_folder}/package.json" ]]; then
+    local line="$(get_from_pkg_json_ "packageManager" "$proj_folder")"
     
     if [[ $line =~ ([^\"]+) ]]; then
       manager="${match[1]%%@*}"
@@ -1565,13 +1564,13 @@ function detect_pkg_manager_() {
   fi
 
   # 1. Lockfile-based detection (most reliable)
-  if [[ -f "${folder}/bun.lockb" ]]; then
+  if [[ -f "${proj_folder}/bun.lockb" ]]; then
     manager="bun"
-  elif [[ -f "${folder}/pnpm-lock.yaml" ]]; then
+  elif [[ -f "${proj_folder}/pnpm-lock.yaml" ]]; then
     manager="pnpm"
-  elif [[ -f "${folder}/yarn.lock" ]]; then
+  elif [[ -f "${proj_folder}/yarn.lock" ]]; then
     manager="yarn"
-  elif [[ -f "${folder}/package-lock.json" ]]; then
+  elif [[ -f "${proj_folder}/package-lock.json" ]]; then
     manager="npm"
   fi
 
@@ -1580,11 +1579,11 @@ function detect_pkg_manager_() {
     return 0;
   fi
 
-  local pyproject="${folder}/pyproject.toml"
+  # local pyproject_file="${proj_folder}/pyproject.toml"
 
-  if [[ -f "$pyproject" ]] && grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject"; then
-    manager="poe"
-  fi
+  # if [[ -f "$pyproject_file" ]] && grep -qE '^\s*\[tool\.poe\.tasks\]' "$pyproject_file"; then
+  #   manager="poe"
+  # fi
 
   if [[ -n "$manager" ]]; then
     echo "$manager"
@@ -1656,7 +1655,7 @@ function save_proj_folder_() {
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
-  local pkg_name="$2"
+  local folder_name="$2"
   local proj_repo="$3"
   local proj_folder="$4"
 
@@ -1664,10 +1663,9 @@ function save_proj_folder_() {
     return 0;
   fi
 
-  # ?????
   if [[ -n "$proj_repo" ]]; then
-    pkg_name="$(get_repo_name_ "$proj_repo" 1 2>/dev/tty)"
-    pkg_name=$(sanitize_pkg_name_ "$pkg_name" 2>/dev/tty)
+    local repo_name="$(get_repo_name_ "$proj_repo" 1 2>/dev/tty)"
+    folder_name=$(sanitize_pkg_name_ "$repo_name" 2>/dev/tty)
   fi
 
   local RET=0
@@ -1697,21 +1695,21 @@ function save_proj_folder_() {
       folder_exists=1
       header="select the existing folder"
     else
-      if [[ -z "$pkg_name" ]]; then
-        if ! save_proj_cmd_ $i "$pkg_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
-        pkg_name="$TEMP_PUMP_PROJ_SHORT_NAME"
+      if [[ -z "$folder_name" ]]; then
+        if ! save_proj_cmd_ $i "$folder_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+        folder_name="$TEMP_PUMP_PROJ_SHORT_NAME"
       fi
 
       header="choose the parent directory where the new project folder will be created"
     fi
 
-    proj_folder=$(choose_proj_folder_ $i "$header" "$pkg_name" "$folder_exists")
+    proj_folder=$(choose_proj_folder_ $i "$header" "$folder_name" "$folder_exists")
     if [[ -z "$proj_folder" ]]; then return 1; fi
 
-    if ! check_proj_folder_ $i "$proj_folder" "$pkg_name" "$proj_repo"; then return 1; fi
+    if ! check_proj_folder_ $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
   
     if (( folder_exists == 0 )); then
-      proj_folder="${proj_folder}/${pkg_name}"
+      proj_folder="${proj_folder}/${folder_name}"
 
       if (( save_proj_folder_is_s )); then # only create folder is calling from check_proj_folder_
         if [[ ! -d "$proj_folder" ]]; then
@@ -1813,7 +1811,7 @@ function save_pkg_manager_() {
   fi
 
   if [[ -z "$pkg_manager" ]]; then
-    pkg_manager=($(choose_one_ 0 "choose package manager" 10 "npm" "yarn" "pnpm" "bun" "poe"))
+    pkg_manager=($(choose_one_ 0 "choose package manager" 10 "npm" "yarn" "pnpm" "bun")) # "poe"
     if [[ -z "$pkg_manager" ]]; then return 1; fi
 
     if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
@@ -2151,24 +2149,15 @@ function save_current_proj_() {
 # }
 
 function get_node_version_() {
-  local i="$1"
-  local proj_folder=""
-  local get_major="${2:-0}"
+  local folder="$1"
+  local skip_lookup="${2:-0}"
 
-  if (( PUMP_SKIP_NVM_LOOKUP[$i] )); then
-    # Skip NVM lookup, return empty
-    echo ""
+  if (( skip_lookup )); then
+    # skip NVM lookup, return empty
     return 0;
   fi
 
-  if [[ -n "$i" ]]; then
-    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-  else
-    proj_folder="$PWD"
-  fi
-
-  if [[ -z "$proj_folder" ]]; then return 1; fi
-  proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json" 2>/dev/null)
+  local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
   local package_json="${proj_folder}/package.json"
@@ -2186,12 +2175,12 @@ function get_node_version_() {
 
   if [[ -z $semver_range ]]; then return 1; fi
 
-  # Get list of installed versions from nvm
+  # get list of installed versions from nvm
   local installed_versions=($(nvm ls --no-colors | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[-> ]*//' | sed 's/^v//' | sed 's/ *\*$//'))
 
   if (( ${#installed_versions[@]} == 0 )); then return 1; fi
 
-  # Require 'semver' CLI tool to do semver comparisons
+  # require 'semver' CLI tool to do semver comparisons
   if ! command -v semver &>/dev/null; then
     npm install -g semver --yes &>/dev/null
   fi
@@ -2200,7 +2189,7 @@ function get_node_version_() {
 
   local matching_versions=()
 
-  # Find matching versions
+  # find matching versions
   for version in "${installed_versions[@]}"; do
     if semver -r "$semver_range" "$version" &>/dev/null; then
       matching_versions+=("$version")
@@ -2209,10 +2198,11 @@ function get_node_version_() {
 
   if (( ${#matching_versions[@]} == 0 )); then return 1; fi
 
-  # Sort versions and pick the latest
+  # sort versions and pick the latest
   local best_version=$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 1)
 
-  if (( get_major )) && [[ -n "$best_version" ]]; then
+  # get major version, instead of full version
+  if [[ -n "$best_version" ]]; then
     local major_version="$(semver -v "$best_version" | cut -d. -f1 2>/dev/null)"
     if [[ -n "$major_version" ]]; then
       echo "$major_version"
@@ -2334,8 +2324,19 @@ function which_pro_index_pwd_() {
   return 1;
 }
 
-function which_pro_pwd_() {
+function find_pro_pwd_() {
   local i=0
+  for i in {1..9}; do
+    if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" && -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
+      local proj_path=$(realpath "${PUMP_PROJ_FOLDER[$i]}" 2>/dev/null)
+
+      if [[ -n "$proj_path" && "${PWD}" == "${proj_path}" ]]; then
+        echo "${PUMP_PROJ_SHORT_NAME[$i]}"
+        return 0;
+      fi
+    fi
+  done
+
   for i in {1..9}; do
     if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" && -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
       local proj_path=$(realpath "${PUMP_PROJ_FOLDER[$i]}" 2>/dev/null)
@@ -2354,31 +2355,31 @@ function which_pro_pwd_() {
 function is_proj_folder_() {
   local folder="${1:-$PWD}"
 
-  if ! get_proj_for_pkg_from_within_ "$folder" 1>/dev/null; then return 2; fi
+  if [[ -z "$folder" || ! -d "$folder" ]]; then
+    print " not a folder: $folder" >&2
+    return 1;
+  fi
 
-  return 0;
-}
+  local files=("package.json" ".git" "README" "index.js" "index.ts")
 
-function get_proj_for_pkg_from_within_() {
-  local folder="${1:-$PWD}"
+  for file in "${files[@]}"; do
+    # if [[ -n "$file" && -n $(ls "$folder" | grep -i "^${(q)file}\$") ]]; then
+    #   return 0;
+    # fi
 
-  if [[ -d "$folder" ]]; then
-    if [[ -f "$folder/package.json" || -f "$folder/pyproject.toml" ]]; then # || -f "$folder/environment.yml" || -f "$folder/Cargo.toml"  ]]; then
-      echo "$folder"
+    if [[ -e "${folder}/${file}" ]]; then
       return 0;
     fi
 
-    while [[ "$folder" != "/" ]]; do
-      if [[ -f "$folder/package.json" || -f "$folder/pyproject.toml" ]]; then # || -f "$folder/environment.yml" || -f "$folder/Cargo.toml" ]]; then
-        echo "$folder"
-        return 0;
-      fi
-      folder="$(dirname "$folder")"
-    done
-  fi
+    local pattern=$(printf "%q" "$file")
+    local found_file=$(find "$folder" -maxdepth 1 -iname "${pattern}*" -print -quit 2>/dev/null)
+    
+    if [[ -n "$found_file" ]]; then
+      return 0;
+    fi
+  done
 
   print " not a project folder: $folder" >&2
-
   return 1;
 }
 
@@ -2455,7 +2456,7 @@ function shorten_path_() {
 
 function open_proj_for_pkg_() {
   local folder="${1:-$PWD}"
-  local file="$2"
+  local file="${2:-"package.json"}"
 
   local proj_folder=$(get_proj_for_pkg_ "$folder" "$file")
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -2466,33 +2467,68 @@ function open_proj_for_pkg_() {
 
 function get_proj_for_pkg_() {
   local folder="${1:-$PWD}"
-  local file="$2"
+  local file="${2:-"package.json"}"
 
   if [[ ! -d "$folder" ]]; then return 1; fi
 
-  if [[ -n "$file" && -n $(ls "$folder" | grep -i "^${(q)file}\$") ]]; then
-    echo "$folder"
-    return 0;
-  elif [[ -f "${folder}/${file}" ]]; then
+  if [[ -f "${folder}/${file}" ]]; then
     echo "$folder"
     return 0;
   fi
 
-  local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
+  local pattern=$(printf "%q" "$file")
+  local found_file=$(find "$folder" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+  
+  if [[ -n "$found_file" ]]; then
+    echo "$(dirname "$found_file")"
+    return 0;
+  fi
 
-  # Loop through each folder name
-  local dir=""
-  for dir in "${folders[@]}"; do
-    if [[ -d "${folder}/${dir}" && -n $(ls "${folder}/${dir}" | grep -i "^${(q)file}\$") ]]; then
-      echo "${folder}/${dir}"
-      return 0;
-    else
-      if [[ -f "${folder}/${dir}/${file}" ]]; then
-        echo "${folder}/${dir}"
-        return 0;
-      fi
-    fi
-  done
+  return 1;
+}
+
+# function get_proj_for_pkg_multiple_mode_() {
+#   local folder="${1:-$PWD}"
+#   local file="${2:-"package.json"}"
+
+#   if [[ ! -d "$folder" ]]; then return 1; fi
+
+#   local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
+
+#   local dir=""
+#   for dir in "${dirs[@]}"; do
+#     if [[ ! -d "${folder}/${dir}" ]]; then continue; fi
+
+#     if [[ -f "${folder}/${dir}/${file}" ]]; then
+#       echo "${folder}/${dir}"
+#       return 0;
+#     fi
+
+#     local pattern=$(printf "%q" "$file")
+#     local found_file=$(find "${folder}/${dir}" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+    
+#     if [[ -n "$found_file" ]]; then
+#       echo "${folder}/${dir}"
+#       return 0;
+#     fi
+#   done
+
+#   return 1;
+# }
+
+function get_proj_for_pkg_multiple_mode_() {
+  local folder="${1:-$PWD}"
+  local file="${2:-"package.json"}"
+
+  if [[ ! -d "$folder" ]]; then return 1; fi
+
+  local pattern=$(printf "%q" "$file")
+  local found_file=$(find "$folder" -type f -iname "${pattern}*" -print -quit 2>/dev/null)
+  
+  if [[ -n "$found_file" ]]; then
+    echo "${folder}/${dir}"
+    return 0;
+  fi
 
   return 1;
 }
@@ -2517,6 +2553,15 @@ function get_proj_for_git_() {
     return 0;
   fi
 
+  local found_git=$(find "$folder" -type d -iname ".git" -print -quit 2>/dev/null)
+  
+  if [[ -n "$found_git" ]]; then
+    if is_git_repo_ "$(dirname "$found_git")" &>/dev/null; then
+      echo "$(dirname "$found_git")"
+      return 0;
+    fi
+  fi
+
   local folders=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
 
   # Loop through each folder name
@@ -2535,7 +2580,7 @@ function is_git_repo_() {
   local folder="${1:-$PWD}"
 
   if [[ -z "$folder" || ! -d "$folder" ]]; then
-    print " not a git repository (or any of the parent directories): $folder" >&2 
+    print " not a folder: $folder" >&2 
     return 1;
   fi
 
@@ -3390,8 +3435,8 @@ function refix() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
-  if ! is_git_repo_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   last_commit_msg=$(git --no-pager log -1 --pretty=format:'%s' | xargs -0)
   
@@ -3466,8 +3511,8 @@ function covc() {
     return 1;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
-  if ! is_git_repo_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print " project is not set, use ${yellow_cor}pro${reset_cor} to set project" >&2
@@ -3686,7 +3731,7 @@ function test() {
 
   trap 'print ""; return 130' INT
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   (eval "$CURRENT_PUMP_TEST" $@)
   local RET=$?
@@ -3722,7 +3767,7 @@ function cov() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     covc $@
@@ -3731,7 +3776,7 @@ function cov() {
 
   trap 'print ""; return 130' INT
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   (eval "$CURRENT_PUMP_COV" $@)
   local RET=$?
@@ -3774,7 +3819,7 @@ function testw() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   eval "$CURRENT_PUMP_TEST_WATCH" $@
 }
@@ -3789,7 +3834,7 @@ function e2e() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2E" --project="$1" ${@:2}
@@ -3808,7 +3853,7 @@ function e2eui() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_proj_folder_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2EUI" --project="$1" ${@:2}
@@ -3828,7 +3873,7 @@ function add() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if [[ -n "$1" && $1 != -*  ]]; then
     git add "$1" ${@:2}
@@ -3925,7 +3970,7 @@ function pr() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if gh pr view --web &>/dev/null; then
     return 0;
@@ -4142,7 +4187,7 @@ function run() {
   local folder_to_run=""
 
   if [[ -n "$folder_arg" && -n "$proj_folder" ]]; then
-    if ! is_proj_folder_ "${proj_folder}/${folder_arg}" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ "${proj_folder}/${folder_arg}"; then return 1; fi
 
     folder_to_run="${proj_folder}/${folder_arg}"
   elif [[ -n "$proj_folder" ]]; then
@@ -4159,11 +4204,11 @@ function run() {
       fi
     fi
   elif [[ -n "$folder_arg" ]]; then
-    if ! is_proj_folder_ "$folder_arg" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ "$folder_arg"; then return 1; fi
 
     folder_to_run="$folder_arg"
   else
-    if ! is_proj_folder_ &>/dev/null; then return 2; fi
+    if ! is_proj_folder_; then return 1; fi
 
     folder_to_run="$PWD"
   fi
@@ -4249,7 +4294,7 @@ function setup() {
   local folder_to_setup=""
 
   if [[ -n "$folder_arg" && -n "$proj_folder" ]]; then
-    if ! is_proj_folder_ "$proj_folder/$folder_arg" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ "$proj_folder/$folder_arg" &>/dev/null; then return 1; fi
 
     folder_to_setup="$proj_folder/$folder_arg"
   elif [[ -n "$proj_folder" ]]; then
@@ -4266,11 +4311,11 @@ function setup() {
       fi
     fi
   elif [[ -n "$folder_arg" ]]; then
-    if ! is_proj_folder_ "$folder_arg" &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ "$folder_arg" &>/dev/null; then return 1; fi
 
     folder_to_setup="$folder_arg"
   else
-    if ! is_proj_folder_ &>/dev/null; then return 2; fi
+    if ! is_proj_folder_ &>/dev/null; then return 1; fi
 
     folder_to_setup="."
   fi
@@ -4424,7 +4469,7 @@ function rev() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local branch_arg=""
@@ -4812,7 +4857,7 @@ function clone() {
 
   if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
     local RET=0
-    local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1 &>/dev/null);
+    local readme_file=$(find . -type f -iname "README*" -print -quit 2>/dev/null);
     if [[ -n "$readme_file" ]]; then
       if command -v glow &>/dev/null; then
         glow "$readme_file"
@@ -4849,7 +4894,7 @@ function abort() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   GIT_EDITOR=true git rebase --abort &>/dev/null
   GIT_EDITOR=true git merge --abort  &>/dev/null
@@ -4872,7 +4917,7 @@ function renb() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local current_name="$(git symbolic-ref --short HEAD 2>/dev/null)"
   local base_branch="$(git config --get "branch.${current_name}.gh-merge-base" 2>/dev/null)"
@@ -4900,7 +4945,7 @@ function chp() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
   
   git cherry-pick "$1" ${@:2}
 }
@@ -4914,7 +4959,7 @@ function chc() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   GIT_EDITOR=true git merge --continue &>/dev/null
 }
@@ -4928,7 +4973,7 @@ function mc() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git add .
 
@@ -4944,7 +4989,7 @@ function rc() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git add .
 
@@ -4960,7 +5005,7 @@ function cont() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git add .
   local RET=$?
@@ -4983,7 +5028,7 @@ function reset1() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git --no-pager log -1 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -5000,7 +5045,7 @@ function reset2() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git --no-pager log -2 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -5017,7 +5062,7 @@ function reset3() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git --no-pager log -3 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -5034,7 +5079,7 @@ function reset4() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git --no-pager log -4 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -5051,7 +5096,7 @@ function reset5() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git --no-pager log -5 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -5069,7 +5114,7 @@ function repush() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if (( repush_is_s )); then
     if ! recommit -s --quiet 1>/dev/null; then return 1; fi
@@ -5090,7 +5135,7 @@ function recommit() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -z "$git_status" ]]; then
@@ -5172,7 +5217,7 @@ function fetch() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local RET=0
 
@@ -5227,7 +5272,7 @@ function glog() {
   local RET=0
 
   if (( glog_is_c )); then
-    if ! is_git_repo_; then return 2; fi
+    if ! is_git_repo_; then return 1; fi
     print ""
 
     local merge_commits=""
@@ -5243,7 +5288,7 @@ function glog() {
   else
     local _pwd="$(pwd)";
 
-    if ! open_proj_for_git_; then return 2; fi
+    if ! open_proj_for_git_; then return 1; fi
     
     print ""
     git --no-pager log main HEAD --oneline --graph --date=relative $@
@@ -5267,7 +5312,7 @@ function push() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   fetch --quiet
 
@@ -5335,7 +5380,7 @@ function pushf() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local RET=0
 
@@ -5388,7 +5433,7 @@ function dtag() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_; then return 2; fi
+  if ! open_proj_for_git_; then return 1; fi
   
   prune
 
@@ -5435,7 +5480,7 @@ function pull() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local remote_origin="$(get_remote_origin_)"
 
@@ -5486,7 +5531,7 @@ function drelease() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_; then return 2; fi
+  if ! open_proj_for_git_; then return 1; fi
 
   local tag="$1"
 
@@ -5546,8 +5591,8 @@ function release() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 2; fi
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
+  if ! is_proj_folder_; then return 1; fi
 
   local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
 
@@ -5692,8 +5737,8 @@ function tag() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
-  if ! is_proj_folder_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
+  if ! is_proj_folder_; then return 1; fi
   
   prune &>/dev/null
 
@@ -5736,7 +5781,7 @@ function tags() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_; then return 2; fi
+  if ! open_proj_for_git_; then return 1; fi
 
   prune &>/dev/null
 
@@ -5775,7 +5820,7 @@ function restore() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git restore --quiet .
 }
@@ -5789,7 +5834,7 @@ function clean() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
   
   git clean -fd --quiet
 }
@@ -5803,7 +5848,7 @@ function discard() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git reset HEAD .
   clean
@@ -5819,7 +5864,7 @@ function reseta() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local my_branch="$(git branch --show-current)"
   local remote_origin="$(get_remote_origin_ "$my_branch")"
@@ -5857,7 +5902,7 @@ function glr() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_; then return 2; fi
+  if ! open_proj_for_git_; then return 1; fi
 
   fetch --quiet
 
@@ -5883,7 +5928,7 @@ function gll() {
 
   local _pwd="$(pwd)";
 
-  if ! open_proj_for_git_; then return 2; fi
+  if ! open_proj_for_git_; then return 1; fi
 
   git branch --list "*$1*" --sort=authordate --format="%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=2)" | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
@@ -6016,13 +6061,13 @@ function gha() {
   local _pwd="$(pwd)";
 
   if [[ -n "$proj_folder" ]]; then
-    if ! open_proj_for_git_ "$proj_folder"; then return 2; fi
+    if ! open_proj_for_git_ "$proj_folder"; then return 1; fi
   else
     print " no project folder found" >&2
     return 1;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local ask_save=0
 
@@ -6121,7 +6166,7 @@ function co() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   # co pr
   if (( co_is_p || co_is_r )); then
@@ -6322,7 +6367,7 @@ function back() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git switch -
 
@@ -6342,7 +6387,7 @@ function dev() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if ! co -e dev &>/dev/null; then
     if ! co -e develop &>/dev/null; then
@@ -6362,7 +6407,7 @@ function main() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if ! co -e main &>/dev/null; then
     if ! co -e master &>/dev/null; then
@@ -6382,7 +6427,7 @@ function prod() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if ! co -e prod &>/dev/null; then
     if ! co -e production &>/dev/null; then
@@ -6402,7 +6447,7 @@ function stage() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if ! co -e stage &>/dev/null; then
     if ! co -e staging &>/dev/null; then
@@ -6424,7 +6469,7 @@ function rebase() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local rebase_branch=""
 
@@ -6512,7 +6557,7 @@ function merge() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
   
   local merge_branch=""
 
@@ -6597,7 +6642,7 @@ function prune() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local default_main_branch="$(git config --get init.defaultBranch)"
 
@@ -6662,7 +6707,7 @@ function delb() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   local branch_arg="$1"
   local deleted_branches=();
@@ -6717,7 +6762,7 @@ function st() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   git status -sb $@
 }
@@ -6821,13 +6866,8 @@ function pro() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        if ! open_proj_for_pkg_ "${PUMP_PROJ_FOLDER[$i]}" "readme.md" &>/dev/null; then
-          print " project readme file not found" >&2
-          return 1;
-        fi
-
         # find readme file
-        local readme_file=$(find . -type f \( -iname "README*" -o -iname "readme*" \) | head -n 1);
+        local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" -type f -iname "README*" -print -quit 2>/dev/null);
         if [[ -n "$readme_file" ]]; then
           if command -v glow &>/dev/null; then
             glow "$readme_file"
@@ -6980,7 +7020,7 @@ function pro() {
 
   # pro pwd
   if [[ "$proj_arg" == "pwd" ]]; then
-    proj_arg=$(which_pro_pwd_);
+    proj_arg=$(find_pro_pwd_);
 
     if [[ -z "$proj_arg" ]]; then # didn't find project based on pwd
       if ! is_proj_folder_ &>/dev/null; then return 1; fi
@@ -6991,7 +7031,7 @@ function pro() {
       local i=0 foundI=0 emptyI=0
       for i in {1..9}; do
         # give option to edit the project because it could have been moved to a different folder
-        # that which_pro_pwd_ doesn't pick up
+        # that find_pro_pwd_ doesn't pick up
         if (( foundI == 0 )); then
           if [[ "$proj_cmd" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
             foundI=$i
@@ -7057,7 +7097,7 @@ function pro() {
     
     export CURRENT_PUMP_PROJ_SHORT_NAME="$CURRENT_PUMP_PROJ_SHORT_NAME"
 
-    local node_version="$(get_node_version_ $found 1 2>/dev/null)"
+    local node_version="$(get_node_version_ "$CURRENT_PUMP_PROJ_FOLDER" "$CURRENT_PUMP_SKIP_NVM_LOOKUP" 2>/dev/null)"
     
     local RET=1
     if [[ -n "$node_version" ]]; then
@@ -7209,7 +7249,7 @@ function stash() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if (( stash_is_v )); then
     git stash show -p stash@{${1:-0}}
@@ -7244,7 +7284,7 @@ function pop() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if (( pop_is_a )); then
     local stashes=()
@@ -7313,7 +7353,7 @@ function __commit() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 2; fi
+  if ! is_git_repo_; then return 1; fi
 
   if (( commit_is_a || CURRENT_PUMP_COMMIT_ADD )); then
     git add .
