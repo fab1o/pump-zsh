@@ -479,6 +479,8 @@ function input_from_() {
     stty echoctl
     trap - INT
   fi
+  
+  clear_last_line_
 
   _input="$(echo "$_input" | xargs)"
 
@@ -1191,7 +1193,7 @@ function check_proj_pkg_manager_() {
 # end of data checkers
 
 function clear_last_line_() {
-  print -n "\033[1A\033[2K" 2>/dev/tty
+  print -n "\033[1A\033[2K" 1>/dev/tty
 }
 
 function choose_mode_() {
@@ -1692,6 +1694,7 @@ function save_proj_folder_() {
     fi
 
     proj_folder=$(choose_proj_folder_ $i "$header" "$folder_name" "$folder_exists")
+    clear_last_line_
     if [[ -z "$proj_folder" ]]; then return 1; fi
 
     if ! check_proj_folder_ $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
@@ -1769,12 +1772,12 @@ function save_proj_repo_() {
     else
       # don't pass $proj_folder to check_proj_repo_ so it doesn't ask again if we want to use the same repo
       if ! check_proj_repo_ -s $i "$proj_repo";  then return 1; fi
-
-      print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
     fi
   fi
 
   update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo"
+
+  print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
 }
 
 function save_pkg_manager_() {
@@ -1785,7 +1788,9 @@ function save_pkg_manager_() {
   local proj_folder="$2"
   local proj_repo="$3"
 
-  print " detecting package manager..." >&1
+  if (( ! save_pkg_manager_is_f )); then
+    print " detecting package manager..." >&1
+  fi
 
   local pkg_manager="$(detect_pkg_manager_ "$proj_folder")"
 
@@ -1793,7 +1798,9 @@ function save_pkg_manager_() {
     pkg_manager=$(detect_pkg_manager_online_ "$proj_repo")
   fi
 
-  clear_last_line_
+  if (( ! save_pkg_manager_is_f )); then
+    clear_last_line_
+  fi
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
     confirm_from_ "confirm package manager: "$'\e[38;5;212m'${pkg_manager}$'\e[0m'" "
@@ -1841,12 +1848,11 @@ function save_proj_f_() {
 
   # for pro pwd, all the settings come from $PWD
 
-  update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
-  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1
-
   if (( save_proj_f_is_e )); then
     update_setting_ $i "PUMP_PROJ_FOLDER" $PWD
     update_setting_ $i "PUMP_PROJ_REPO" $proj_repo
+    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
+    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1
 
     # don't edit package manager, not necessary, very rare edge case
     # if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}" 1>/dev/null; then return 1; fi
@@ -1854,16 +1860,19 @@ function save_proj_f_() {
   else
     remove_prj_ $i
 
+    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
+    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1
+
     if ! save_proj_repo_ -f $i "$PWD" "$proj_cmd" "$proj_repo"; then return 1; fi
     if ! save_proj_folder_ -f $i "$proj_cmd" "$proj_repo" "$PWD"; then return 1; fi
 
-    # if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+    if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_cmd_ -fa $i "$proj_cmd"; then return 1; fi
 
     update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
 
-    display_line_ "" "${cor}"
-    print "  ${cor}project saved!${reset_cor}" >&1
+    display_line_ "" "${SAVE_PROJ_COR}"
+    print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
     print "" >&1
   fi
 
@@ -1944,8 +1953,8 @@ function save_proj_() {
   
   update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
 
-  display_line_ "" "${cor}"
-  print "  ${cor}project saved!${reset_cor}" >&1
+  display_line_ "" "${SAVE_PROJ_COR}"
+  print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
   print "" >&1
 
   load_config_entry_ $i
