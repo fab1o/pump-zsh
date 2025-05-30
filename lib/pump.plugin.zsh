@@ -5321,7 +5321,7 @@ function push() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     if [[ -n "$my_branch" ]]; then
       print ""
-      git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --oneline
+      git --no-pager log --oneline "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}"
       # git log -1 --pretty=format:'%H %s' | pbcopy
     fi
   fi
@@ -7309,14 +7309,14 @@ if [[ -n "$COMMIT2" ]]; then
 fi
 
 function __commit() {
-  eval "$(parse_flags_ "commit_" "" "$@")"
+  eval "$(parse_flags_ "commit_" "am" "$@")"
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
     print "  ${yellow_cor}${COMMIT1}${reset_cor} : to open commit wizard"
-    print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : to open wizard and commit all files"
-    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message"
-    print "  ${yellow_cor}${COMMIT1} -a <message>${reset_cor} : to commit all files with message"
+    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message (no wizard)"
+    print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
+    print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
     return 0;
   fi
 
