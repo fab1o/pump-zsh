@@ -1381,7 +1381,7 @@ function detect_pkg_name_online_() {
 
   if command -v gh &>/dev/null; then
     local url="repos/${owner_repo}/contents"
-    local package_json=$(gh api "${url}/package.json" --jq .download_url)
+    local package_json=$(gh api "${url}/package.json" --jq .download_url 2>/dev/null)
 
     if command -v jq &>/dev/null; then
       manager=$(curl -fs "$package_json" | jq -r '.name // empty')
@@ -1455,7 +1455,7 @@ function detect_pkg_manager_online_() {
 
   if command -v gh &>/dev/null; then
     local url="repos/${owner_repo}/contents"
-    local package_json=$(gh api "${url}/package.json" --jq .download_url)
+    local package_json=$(gh api "${url}/package.json" --jq .download_url 2>/dev/null)
 
     if command -v jq &>/dev/null; then
       manager=$(curl -fs "$package_json" | jq -r '.packageManager // empty')
