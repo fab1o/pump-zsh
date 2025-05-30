@@ -1384,8 +1384,7 @@ function detect_pkg_name_online_() {
     local package_json=$(gh api "${url}/package.json" --jq .download_url)
 
     if command -v jq &>/dev/null; then
-      manager=$(curl -fs "$package_json" | jq -r --arg key "name" '.[$key]')
-      if [[ "$manager" == "null" ]]; then manager=""; fi
+      manager=$(curl -fs "$package_json" | jq -r '.name // empty')
     else
       manager=$(curl -fs "$package_json" | grep -E '"'name'"\s*:\s*"' | head -1 | sed -E "s/.*\"name\": *\"([^\"]+)\".*/\1/")
     fi
@@ -1421,8 +1420,7 @@ function detect_pkg_name_online_() {
 
   if command -v jq &>/dev/null; then
     for url in "${urls[@]}"; do
-      pkg_name=$(curl -fs "${url}/package.json" | jq -r --arg key "name" '.[$key]')
-      if [[ "$pkg_name" == "null" ]]; then pkg_name=""; fi
+      pkg_name=$(curl -fs "${url}/package.json" | jq -r '.name // empty')
       if [[ -n "$pkg_name" ]]; then break; fi
     done
   else
@@ -1460,8 +1458,7 @@ function detect_pkg_manager_online_() {
     local package_json=$(gh api "${url}/package.json" --jq .download_url)
 
     if command -v jq &>/dev/null; then
-      manager=$(curl -fs "$package_json" | jq -r --arg key "packageManager" '.[$key]')
-      if [[ "$manager" == "null" ]]; then manager=""; fi
+      manager=$(curl -fs "$package_json" | jq -r '.packageManager // empty')
     else
       manager=$(curl -fs "$package_json" | grep -E '"'packageManager'"\s*:\s*"' | head -1 | sed -E "s/.*\"packageManager\": *\"([^\"]+)\".*/\1/")
     fi
@@ -1495,8 +1492,7 @@ function detect_pkg_manager_online_() {
 
   if command -v jq &>/dev/null; then
     for url in "${urls[@]}"; do
-      manager=$(curl -fs "${url}/package.json" | jq -r --arg key "packageManager" '.[$key]')
-      if [[ "$manager" == "null" ]]; then manager=""; fi
+      manager=$(curl -fs "${url}/package.json" | jq -r '.packageManager // empty')
       if [[ -n "$manager" ]]; then
         manager="${manager%%@*}"
         break;
@@ -2858,10 +2854,7 @@ function get_from_pkg_json_() {
 
   if [[ -f "$file" ]]; then
     if command -v jq &>/dev/null; then
-      value=$(jq -r --arg key "$key_name" '.[$key]' "$file")
-      if [[ "$value" == "null" ]]; then
-        value=""
-      fi
+      value=$(jq -r --arg key "$key_name" '.[$key] // empty' "$file")
     else
       value=$(grep -E '"'$key_name'"\s*:\s*"' "$file" | head -1 | sed -E "s/.*\"$key_name\": *\"([^\"]+)\".*/\1/")
     fi
