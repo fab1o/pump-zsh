@@ -1,6 +1,6 @@
 # Pump-zsh
 
-Pump-zsh is a 3 in 1:
+It's a 3 in 1:
 
 - an **Oh My Zsh** plugin & theme
 - and an **Oh My Posh** theme
@@ -16,6 +16,20 @@ Pump-zsh plugin comes with its own install script, which is the recommended meth
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh
+```
+
+## Configuring Themes
+
+To configure **Oh My Zsh** theme, set in your `~/.zshrc` file:
+```sh
+ZSH_THEME="pump"
+```
+
+To configure **Oh My Posh** theme, set in your `~/.zshrc` file:
+```sh
+if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+   eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
+fi
 ```
 
 ### Dependencies
