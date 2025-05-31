@@ -78,10 +78,6 @@ else
   zsh ./scripts/update_config.zsh
   zsh ./scripts/edit_zshrc.zsh
   zsh ./scripts/check_zshrc.zsh
-
-  print ""
-  print " now restart your terminal then run: help"
-  print ""
   
   popd 1>/dev/null || exit
 fi

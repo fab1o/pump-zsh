@@ -38,7 +38,7 @@ If you prefer to install dependencies manually, here’s the list:
   - [jq](https://jqlang.org/) - for config crud
   - [gum](https://github.com/charmbracelet/gum) – for enhanced UX
   - [glow](https://github.com/charmbracelet/glow) – for enhanced UX
-  - [Github CLI](https://cli.github.com/) – for some functions such as `pr`, `release`, `co`, `delb` etc...
+  - [Github CLI](https://cli.github.com/) – required for some functions such as `pr`, `release`, `co`, `delb` etc...
 
 - **Recommended (not installed by the script)**:
   - [iTerm2](https://iterm2.com/)
