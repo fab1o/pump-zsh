@@ -32,10 +32,6 @@ else
   zsh ./scripts/update_config.zsh
   zsh ./scripts/npm_update.zsh
   zsh ./scripts/check_zshrc.zsh
-
-  print ""
-  print " now restart your terminal then run:\e[93m help \e[0m"
-  print ""
   
   popd 1>/dev/null || exit
 fi
