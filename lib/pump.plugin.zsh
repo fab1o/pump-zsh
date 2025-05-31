@@ -3225,7 +3225,7 @@ function del() {
 
   if (( del_is_h )); then
     print "  ${yellow_cor}del${reset_cor} : to delete in current directory"
-    print "  ${yellow_cor}del <glob>${reset_cor} : to delete files (or folders)"
+    print "  ${yellow_cor}del <glob>${reset_cor} : to delete certain files"
     print "  ${yellow_cor}del -a${reset_cor} : to include hidden files"
     print "  ${yellow_cor}del -s${reset_cor} : to skip confirmation"
     return 0;
@@ -3494,8 +3494,9 @@ function covc() {
   local branch="$1"
 
   if [[ -z "$branch" ]]; then
-    covc -h
-    return 0;
+    print " missing branch name" >&2
+    print " type ${yellow_cor}covc -h${reset_cor} to see usage" >&2
+    return 1;
   fi
 
   local my_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
@@ -3822,7 +3823,7 @@ function add() {
 
   if (( add_is_h )); then
     print "  ${yellow_cor}add${reset_cor} : to add all files to index"
-    print "  ${yellow_cor}add <glob>${reset_cor} : to add files to index"
+    print "  ${yellow_cor}add <glob>${reset_cor} : to add certain files to index"
     return 0;
   fi
 
@@ -4594,11 +4595,6 @@ function clone() {
     return 0;
   fi
 
-  if [[ $1 == -* ]]; then
-    clone -h
-    return 0;
-  fi
-
   local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local branch_arg=""
   local default_branch_arg=""
@@ -4872,8 +4868,9 @@ function renb() {
   local new_name="$1"
 
   if [[ -z "$new_name" ]]; then
-    renb -h
-    return 0;
+    print " missing branch name" >&2
+    print " type ${yellow_cor}renb -h${reset_cor} to see usage" >&2
+    return 1;
   fi
 
   if ! is_git_repo_; then return 1; fi
@@ -4895,13 +4892,14 @@ function chp() {
   (( chp_is_d )) && set -x
 
   if (( chp_is_h )); then
-    print "  ${yellow_cor}chp <commit>${reset_cor} : to cherry-pick a commit"
+    print "  ${yellow_cor}chp <commit_hash>${reset_cor} : to cherry-pick a commit"
     return 0;
   fi
 
   if [[ -z "$1" ]]; then
-    chp -h
-    return 0;
+    print " missing commit hash" >&2
+    print " type ${yellow_cor}chp -h${reset_cor} to see usage" >&2
+    return 1;
   fi
 
   if ! is_git_repo_; then return 1; fi
@@ -5902,13 +5900,6 @@ function gll() {
 
 function gha_() {
   local workflow="$1"
-
-  if [[ -z "$workflow" ]]; then
-    print " no workflow name provided" >&2
-    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
-
-    return 1;
-  fi
 
   local workflow_id="$(gh run list --workflow="${workflow}" --limit 1 --json databaseId --jq '.[0].databaseId')"
 
