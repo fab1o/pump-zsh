@@ -20,12 +20,12 @@ curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scri
 
 ## Configuring Themes
 
-To configure **Oh My Zsh** theme, set in your `~/.zshrc` file:
+To configure the **Oh My Zsh** theme, set the following in your ~/.zshrc file:
 ```sh
 ZSH_THEME="pump"
 ```
 
-To configure **Oh My Posh** theme, set in your `~/.zshrc` file:
+To configure **Oh My Posh** theme, add the following to your `~/.zshrc` file:
 ```sh
 if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
    eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
