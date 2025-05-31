@@ -7,6 +7,7 @@ zshrc_file="$HOME/.zshrc"
 
 if [[ ! -f "$zshrc_file" ]]; then
   print " error: '$zshrc_file' file not found, did not configure zsh to use pump" >&2
+  print "" >&2
   exit 1;
 fi
 
@@ -68,7 +69,7 @@ fi
 
 if ! grep -q '^ZSH_THEME="pump"$' "$zshrc_file"; then
 
-  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update theme to pump? (y/n) "
+  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update Oh My Zsh theme to pump? (y/n) "
   if [[ $REPLY == [yY] ]]; then
     print "y"
   elif [[ $REPLY == [nN] ]]; then
@@ -86,7 +87,9 @@ if ! grep -q '^ZSH_THEME="pump"$' "$zshrc_file"; then
       sed -i 's/^ZSH_THEME=.*$/ZSH_THEME="pump"/' "$zshrc_file"
     fi
   else
-    # If ZSH_THEME is not found, append it to the file
-    echo 'ZSH_THEME="pump"' >> "$zshrc_file"
+    print " error: ZSH_THEME not found in file: $zshrc_file" >&2
+    print " set ZSH_THEME=\"pump\" manually" >&2
+    print "" >&2
+    exit 1
   fi
 fi
