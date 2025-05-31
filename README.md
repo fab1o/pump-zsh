@@ -18,21 +18,7 @@ Pump-zsh plugin comes with its own install script, which is the recommended meth
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh
 ```
 
-## Configuring Themes
-
-To configure the **Oh My Zsh** theme, set the following in your ~/.zshrc file:
-```sh
-ZSH_THEME="pump"
-```
-
-To configure **Oh My Posh** theme, add the following to your `~/.zshrc` file:
-```sh
-if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
-   eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
-fi
-```
-
-### Dependencies
+## Dependencies
 
 Pump-zsh comes with a script to install all the dependencies, but it requires [Homebrew](https://brew.sh/).
 
@@ -57,6 +43,28 @@ If you prefer to install dependencies manually, here’s the list:
 - **Recommended (not installed by the script)**:
   - [iTerm2](https://iterm2.com/)
   - [Gruvbox iTerm2 palette](https://github.com/herrbischoff/iterm2-gruvbox) — customize terminal colors
+
+---
+
+## Themes
+
+To set **Oh My Zsh** theme to pump, set the following in your ~/.zshrc file:
+```sh
+ZSH_THEME="pump"
+```
+
+To set **Oh My Posh** theme to pump, add the following to your `~/.zshrc` file:
+```sh
+if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+   eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
+fi
+```
+
+### Customize Your Own Theme
+
+Pump exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project.
+
+You can use this variable to customize your own theme. To see how this works in practice, take a look at how Pump’s built-in themes implement this feature, you can adapt a similar approach in your own theme.
 
 ---
 
