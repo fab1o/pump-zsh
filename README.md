@@ -48,7 +48,7 @@ If you prefer to install dependencies manually, here’s the list:
 
 ## Themes
 
-To set **Oh My Zsh** theme to pump, update the following in your ~/.zshrc file:
+To set **Oh My Zsh** theme to pump, update the following in your `~/.zshrc` file:
 ```sh
 ZSH_THEME="pump"
 ```
