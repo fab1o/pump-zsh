@@ -5,6 +5,9 @@ set -e
 
 SRC_DIR="./lib"
 DEST_DIR="$HOME/.oh-my-zsh/plugins/pump"
+THEMES_DIR="$HOME/.oh-my-zsh/themes"
+
+cp -Rf $SRC_DIR/pump.zsh-theme "$THEMES_DIR"
 
 mkdir -p "$DEST_DIR"
 cp -Rf $SRC_DIR/pump.omp.json "$DEST_DIR"
