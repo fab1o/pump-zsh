@@ -77,5 +77,6 @@ fi
 #   echo " ✅ Nerd Font installed. Make sure to select it in your terminal preferences."
 # fi
 
+echo " Successfully installed dependencies for Pump-zsh!"
 echo ""
 echo " Restart your terminal if anything was installed."

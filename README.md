@@ -64,7 +64,7 @@ fi
 
 Pump exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project.
 
-You can use this variable to customize your own theme. To see how this works in practice, take a look at how Pump’s built-in themes implement this feature, you can adapt a similar approach in your own theme.
+You can use this variable to customize your own theme. To see how this works in practice, take a look at how Pump’s [built-in themes](/lib/themes) implement this feature, you can adapt a similar approach in your own theme.
 
 ---
 
