@@ -88,10 +88,10 @@ To use Pump with **Oh My Posh**:
    fi
    ```
 
-2. Add `pump` (and optionally `git-prompt`) to your plugins:
+2. Add `pump` to your plugins:
 
    ```zsh
-   plugins=(git-prompt pump)
+   plugins=(pump)
    ```
 
 ---
@@ -114,5 +114,5 @@ To build your own theme:
 Be sure to include `pump` in your plugins list:
 
 ```zsh
-plugins=(git-prompt pump)
+plugins=(pump)
 ```
