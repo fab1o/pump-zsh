@@ -108,7 +108,7 @@
   "upgrade": {
     "auto": false,
     "interval": "168h",
-    "notice": true,
+    "notice": false,
     "source": "cdn"
   },
   "version": 3
