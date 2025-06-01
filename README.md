@@ -2,8 +2,6 @@
 
 **Pump-zsh** is an unofficial 'Oh My Zsh' plugin that provides a configurable set of aliases, functions, and themes to supercharge your terminal workflow.
 
----
-
 ## Installation
 
 The recommended way to install Pump-zsh is via the provided install script:
@@ -12,15 +10,11 @@ The recommended way to install Pump-zsh is via the provided install script:
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh
 ```
 
----
-
 ## Themes
 
 In addition, Pump-zsh includes a collection of [built-in themes](docs/themes.md) for immediate use.
 
 It also exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project. This can be used to customize your own theme.
-
----
 
 ## Dependencies
 
@@ -56,8 +50,6 @@ If you prefer to install dependencies manually, refer to the lists below:
 #### Optional (not installed by the script)
 
 * [Oh My Posh](https://ohmyposh.dev/) — works best with [Nerd Fonts](https://ohmyposh.dev/docs/installation/fonts)
-
----
 
 ## Documentation and Support
 
