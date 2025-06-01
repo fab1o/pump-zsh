@@ -669,7 +669,7 @@ function update_setting_() {
   fi
 
   local i="$1"
-  local key="$2" 
+  local key="$2"
   local value="$3"
 
   if [[ "$value" == "${(P)key}[$i]" ]]; then
@@ -686,6 +686,7 @@ function update_setting_() {
         unset -f "$CURRENT_PUMP_PROJECT" &>/dev/null
       fi
     fi
+    functions[$value]="proj_handler $i \"\$@\";"
   fi
 
   if (( i > 0 )); then
@@ -696,8 +697,6 @@ function update_setting_() {
   else
     eval "CURRENT_${key}=\"$value\""
   fi
-
-  functions[$proj_cmd]="proj_handler $i \"\$@\";"
 
   local key_i="${key}_${i}"
 
@@ -1760,7 +1759,7 @@ function save_proj_folder_() {
   
   if (( save_proj_folder_is_e )); then
     if [[ -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-      confirm_from_ "would you like to keep using project folder: "$'\e[94m'${PUMP_PROJ_FOLDER[$i]}$'\e[0m'" ?"
+      confirm_from_ "would you like to keep using project folder: "$'\e[94m'${PUMP_PROJ_FOLDER[$i]}$'\e[0m'"?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
@@ -1828,7 +1827,7 @@ function save_proj_repo_() {
 
   if (( ! save_proj_repo_is_f )); then
     if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
-      confirm_from_ "would you like to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'" ?"
+      confirm_from_ "would you like to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'"?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
@@ -1904,7 +1903,7 @@ function save_pkg_manager_() {
   local RET=0
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
-    confirm_from_ "package manager: "$'\e[38;5;212m'${pkg_manager}$'\e[0m'" "
+    confirm_from_ "package manager "$'\e[38;5;212m'${pkg_manager}$'\e[0m'"?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -2099,8 +2098,7 @@ function save_proj_() {
     return 0;
   fi
   
-  print "" >&1
-  print " now try running command: ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
+  print " now try running command: ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
   # do not automatically switch pro, user should do it manually
   # eval "${PUMP_PROJ_SHORT_NAME[$i]}"
 }
@@ -2295,12 +2293,6 @@ function clear_curr_proj_() {
 
 function get_node_version_() {
   local folder="$1"
-  local skip_lookup="${2:-0}"
-
-  if (( skip_lookup )); then
-    # skip NVM lookup, return empty
-    return 0;
-  fi
 
   local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -2472,6 +2464,31 @@ function which_pro_index_pwd_() {
   done
 
   echo "0"
+  return 1;
+}
+
+function find_proj_index_() {
+  local proj_arg="$1"
+  local default_index="$2"
+
+  if [[ -z "$proj_arg" ]]; then
+    print " no project argument provided" >&2
+    
+    echo "$default_index"
+    return 1;
+  fi
+
+  local i=0
+  for i in {1..9}; do
+    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+      echo "$i"
+      return 0;
+    fi
+  done
+
+  print " project not found: $proj_arg" >&2
+
+  echo "$default_index"
   return 1;
 }
 
@@ -3369,7 +3386,7 @@ function del() {
       for file in "${selected_files[@]}"; do
         if (( ! del_is_s )) && [[ ".DS_Store" != "$file" ]]; then
           if [[ -d "$file" && -n "$(ls -A "$file")" ]] || [[ ! -d "$file" ]]; then
-            confirm_from_ "delete "$'\e[94m'$file$'\e[0m'" ?"
+            confirm_from_ "delete "$'\e[94m'$file$'\e[0m'"?"
             RET=$?
             if (( RET == 130 || RET == 2 )); then
               return 130;
@@ -6906,16 +6923,15 @@ function pro() {
     print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project's settings"
     print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to reset project's \"don't ask again\" settings"
     print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display the project's readme if available"
-    print "  --"
     pro -l
     return 0;
   fi
 
   if (( pro_is_l )); then
     # list projects pro -l
+    print "  --"
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
-      print " no projects found" >&2
-      print " type ${yellow_cor}pro -a${reset_cor} to add a project" >&2
+      print "  project list is empty" >&2
       return 1;
     fi
     
@@ -6938,94 +6954,67 @@ function pro() {
       proj_arg="${CURRENT_PUMP_PROJECT}"
     fi
 
-    local _pwd="$(pwd)"
-
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        # find readme file
-        local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null)
-        if [[ -n "$readme_file" ]]; then
-          if command -v glow &>/dev/null; then
-            glow "$readme_file"
-          else
-            cat "$readme_file"
-          fi
+    local i=$(find_proj_index_ "$proj_arg")
+    
+    if (( i > 0 )); then
+      local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null)
+      if [[ -n "$readme_file" ]]; then
+        if command -v glow &>/dev/null; then
+          glow "$readme_file"
+        else
+          cat "$readme_file"
         fi
-        cd "$_pwd"
-        return 0;
       fi
-    done
 
-    print " project not found: $proj_arg" >&2
+      return 0;
+    fi
+
     return 1;
   fi
 
   if (( pro_is_u )); then
-    # reset project's flags pro -u
-    if [[ -z "$proj_arg" ]]; then
-      proj_arg="${CURRENT_PUMP_PROJECT}"
+    local i=$(find_proj_index_ "$proj_arg" 0)
+    
+    if (( i >= 0 )); then
+      update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
+      update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
+      update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
+      update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
+      update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
+      update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
+      update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
+      update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
+      update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
+
+      return 0;
     fi
 
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
-        update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
-        update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
-        update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
-        update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
-        update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
-        update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
-        update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
-        update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
-
-        # print " project settings reset successful: $proj_arg"
-        return 0;
-      fi
-    done
-
-    print " project not found: $proj_arg" >&2
     return 1;
   fi
 
   if (( pro_is_c )); then
     # show project config pro -c
-    if [[ -z "$proj_arg" ]]; then
-      print_current_proj_ 0
+    local i=$(find_proj_index_ "$proj_arg" 0)
+    
+    if (( i >= 0 )); then
+      print_current_proj_ $i
       return $?;
     fi
 
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        print_current_proj_ $i
-        return $?;
-      fi
-    done
-
-    print " project not found: $proj_arg" >&2
     return 1;
   fi
 
   # CRUD operations
   if (( pro_is_e )); then
     # edit project pro -e
-    if [[ -z "$proj_arg" ]]; then
-      print " provide a project name to edit" >&2
-      print " type ${yellow_cor}pro -e <name>${reset_cor}" >&2
-      return 1;
+
+    local i=$(find_proj_index_ "$proj_arg")
+    
+    if (( i > 0 )); then
+      save_proj_ -e $i "$proj_arg"
+      return $?;
     fi
 
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        save_proj_ -e $i "$proj_arg"
-        return $?;
-      fi
-    done
-    
-    print " project not found: $proj_arg" >&2
     return 1;
   fi
   
@@ -7048,28 +7037,21 @@ function pro() {
 
   if (( pro_is_r )); then
     # remove project pro -r
-    if [[ -z "$proj_arg" ]]; then
-      print " provide a project name to delete" >&2
-      print " type ${yellow_cor}pro -r <name>${reset_cor}" >&2
-      return 1;
+
+    local i=$(find_proj_index_ "$proj_arg")
+    
+    if (( i > 0 )); then
+      local refresh=0;
+      [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]] && refresh=1;
+
+      if remove_proj_ $i; then
+        if (( refresh )); then
+          refresh_curr_proj_
+        fi
+        return 0;
+      fi
     fi
 
-    local refresh=0;
-    [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]] && refresh=1;
-
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        if remove_proj_ $i; then
-          if (( refresh )); then
-            refresh_curr_proj_
-          fi
-          return 0;
-        fi
-      fi
-    done
-
-    print " project not found: $proj_arg" >&2
     return 1;
   fi # end of remove project
 
@@ -7127,19 +7109,11 @@ function pro() {
     fi
   fi
 
-  local found=0
-  # Check if the project name matches one of the configured projects
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=$i
-      break;
-    fi
-  done
+  # pro <name>
 
+  local found=$(find_proj_index_ "$proj_arg")
+  
   if (( ! found )); then
-    print " project not found: $proj_arg" >&2
-
     pro -l
     return 1;
   fi
@@ -7163,7 +7137,7 @@ function pro() {
 
   # print "HEY proj_arg $proj_arg - CURRENT_PUMP_PROJECT $CURRENT_PUMP_PROJECT" >&2
 
-  if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
+  if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
     refresh=1
   fi
 
@@ -7182,32 +7156,38 @@ function pro() {
     #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_FILE"
     # fi
 
-    local node_version=$(get_node_version_ "$CURRENT_PUMP_PROJ_FOLDER" "$CURRENT_PUMP_SKIP_NVM_LOOKUP" 2>/dev/null)
-    
+    local node_version=""
     local RET=1
-    if [[ -n "$node_version" ]]; then
-      if command -v nvm &>/dev/null; then
-        nvm use "$node_version"
-        RET=$?
+
+    if [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]] || (( CURRENT_PUMP_SKIP_NVM_LOOKUP == 0 )); then
+      node_version=$(get_node_version_ "$CURRENT_PUMP_PROJ_FOLDER" 2>/dev/null)
+      
+      if [[ -n "$node_version" ]]; then
+        if command -v nvm &>/dev/null; then
+          nvm use "$node_version"
+          RET=$?
+        fi
       fi
     fi
 
-    if (( RET == 0 )) && [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
-      confirm_between_ "save \"nvm use $node_version\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
-      RET=$?
-
-      if (( RET == 130 || RET == 2 )); then return 0; fi
+    if [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
       if (( RET == 0 )); then
-        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1 &>/dev/null
-        update_setting_ $found "PUMP_PRO" "nvm use $node_version" &>/dev/null
-      else
-        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0 &>/dev/null
-      fi
-    fi
+        confirm_between_ "save node \"${node_version}\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
+        RET=$?
 
-    if [[ -n "$CURRENT_PUMP_PRO" ]]; then
-      if ! eval "$CURRENT_PUMP_PRO"; then
-        print " failed to run PUMP_PRO_${found}" >&2
+        if (( RET == 130 || RET == 2 )); then return 0; fi
+        if (( RET == 0 )); then
+          update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1 &>/dev/null
+          update_setting_ $found "PUMP_PRO" "nvm use $node_version" &>/dev/null
+        else
+          update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0 &>/dev/null
+        fi
+      fi
+    else
+      if [[ -n "$CURRENT_PUMP_PRO" ]]; then
+        if ! eval "$CURRENT_PUMP_PRO"; then
+          print " failed to run PUMP_PRO_${found}" >&2
+        fi
       fi
     fi
 
@@ -7516,7 +7496,7 @@ function help() {
     print ""
   else
     print ""
-    display_line_ "no project is set!" "${red_cor}"
+    display_line_ "no project is set" "${red_cor}"
     print ""
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
       pro -a
@@ -7796,17 +7776,17 @@ function validate_proj_cmd_strict_() {
   local reserved=""
   reserved="$(whence -w "$proj_cmd" 2>/dev/null)"
   if (( $? == 0 )); then
-    if [[ $reserved =~ ": command" ]]; then
-      if confirm_from_ "project name is reserved: $(whence $proj_cmd) - use it anyway?"; then
-        return 0;
-      fi
-      return 1;
-    elif [[ $reserved =~ ": function" ]]; then
+    # if [[ $reserved =~ ": command" ]]; then
+      # if confirm_from_ "project name is reserved: $(whence $proj_cmd) - use it anyway?"; then
+      #   return 0;
+      # fi
+      # return 1;
+    if [[ $reserved =~ ": function" ]]; then
       if [[ "$old_proj_cmd" == "$proj_cmd" ]]; then
         return 0;
       fi
     fi
-    print " project name is reserved: $(whence $proj_cmd)" 2>/dev/tty
+    print " project name is reserved: $proj_cmd" 2>/dev/tty
     return 1;
   fi
 
