@@ -16,7 +16,7 @@ Pump-zsh provides lightweight, customizable themes for Zsh — including options
 
 ### 1. Pump (Oh My Zsh Theme)
 
-![pump](https://github.com/fab1o/pump-zsh/blob/main/docs/pump.png?raw=true)
+![pump](https://github.com/fab1o/pump-zsh/blob/main/assets/pump.png?raw=true)
 
 To enable this theme:
 
@@ -36,7 +36,7 @@ To enable this theme:
 
 ### 2. Pump Git Prompt (Oh My Zsh Theme)
 
-![pump-git-prompt](https://github.com/fab1o/pump-zsh/blob/main/docs/pump-git-prompt.png?raw=true)
+![pump-git-prompt](https://github.com/fab1o/pump-zsh/blob/main/assets/pump-git-prompt.png?raw=true)
 
 To enable the pump theme with Git prompt enhancements:
 
@@ -56,7 +56,7 @@ To enable the pump theme with Git prompt enhancements:
 
 ### 3. Pump Hybrid (Oh My Zsh Theme)
 
-![pump-hybrid](https://github.com/fab1o/pump-zsh/blob/main/docs/pump-hybrid.png?raw=true)
+![pump-hybrid](https://github.com/fab1o/pump-zsh/blob/main/assets/pump-hybrid.png?raw=true)
 
 To enable the pump theme with Git prompt enhancements:
 
@@ -76,7 +76,7 @@ To enable the pump theme with Git prompt enhancements:
 
 ### 4. Pump (Oh My Posh Theme)
 
-![pump-posh](https://github.com/fab1o/pump-zsh/blob/main/docs/pump-posh.png?raw=true)
+![pump-posh](https://github.com/fab1o/pump-zsh/blob/main/assets/pump-posh.png?raw=true)
 
 To use Pump with **Oh My Posh**:
 
