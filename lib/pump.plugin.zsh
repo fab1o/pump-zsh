@@ -451,6 +451,7 @@ function input_from_() {
   local _input=""
 
   # >&2 needs to display because this is called from a subshell
+  # print " ${header}:" >&2
   print "${purple_cor} ${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
@@ -742,7 +743,7 @@ function input_name_() {
   return 1;
 }
 
-function file_proj_folder_() {
+function find_proj_folder_() {
   local i="$1"
   local header="$2"
   local folder_name="$3"
@@ -762,7 +763,8 @@ function file_proj_folder_() {
   fi
 
   # >&2 needs to display because this is called from a subshell
-  print "${purple_cor} ${header}:${reset_cor}" >&2
+  print " ${header}:" >&2
+  # print "${purple_cor} ${header}:${reset_cor}" >&2
   print "" >&2
 
   cd "${HOME:-/}" # start from home
@@ -781,7 +783,7 @@ function file_proj_folder_() {
 
       local realfolder="${new_folder:A}"
 
-      if [[ ! -d "$realfolder" ]]; then
+      if [[ ! -d "$folder_path" ]]; then
         print "  ${red_cor}not a folder, please select a folder${reset_cor}" >&2
         cd "$HOME"
       else
@@ -1170,7 +1172,7 @@ function check_proj_repo_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" >&2
+    print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
 
     if (( check_proj_repo_is_s )); then
       if (( check_proj_repo_is_a )); then
@@ -1215,8 +1217,21 @@ function check_proj_folder_() {
     fi
   fi
 
+  local j=0
+  local realfolder="${proj_folder:A}"
+  for j in {1..10}; do
+    if [[ $j -ne $i && -n "$PUMP_PROJ_FOLDER[$j]" && -n "${PUMP_PROJ_SHORT_NAME[$j]}" ]]; then
+      local realfolder_proj="${PUMP_PROJ_FOLDER[$j]:A}"
+
+      if [[ "$realfolder" == "$realfolder_proj" ]]; then
+        error_msg="in use, please select another folder" >&2
+        break;
+      fi
+    fi
+  done
+
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" >&2
+    print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
 
     if (( check_proj_folder_is_s )); then
       if save_proj_folder_ -s $i "$pkg_name" "$proj_repo"; then return 0; fi
@@ -1250,7 +1265,7 @@ function check_proj_pkg_manager_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print " $error_msg" 2>/dev/tty
+    print "${yellow_cor}  ${error_msg}${reset_cor}" 2>/dev/tty
 
     if (( check_proj_pkg_manager_is_s )); then
       if save_pkg_manager_ $i "$proj_folder" "$proj_repo"; then return 0; fi
@@ -1692,6 +1707,7 @@ function save_proj_cmd_() {
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
     clear_last_line_1_
     print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
+    print "" >&1
   fi
 }
 
@@ -1739,19 +1755,25 @@ function save_proj_folder_() {
   local proj_repo="$3"
   local proj_folder="$4"
 
+  local folder_exists=0
+
   if (( save_proj_folder_is_a || save_proj_folder_is_r )); then
     if [[ -n "$proj_folder" && "$proj_folder" == "${PUMP_PROJ_FOLDER[$i]}" ]]; then
       return 0;
     fi
-  fi
-
-  if [[ -n "$proj_repo" ]]; then
-    local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
-    folder_name=$(sanitize_pkg_name_ "${repo_name:t}")
+    if (( save_proj_folder_is_a )); then
+      # ask to use pwd
+      confirm_from_ "would you like to use as project folder: "$'\e[94m'$PWD$'\e[0m'"?"
+      RET=$?
+      if (( RET == 130 || RET == 2 )); then return 130; fi
+      if (( RET == 0 )); then
+        proj_folder="$PWD"
+        folder_exists=1
+      fi
+    fi
   fi
 
   local RET=0
-  local folder_exists=0
   
   if (( save_proj_folder_is_e )) && [[ -n "$proj_folder" ]]; then
     confirm_from_ "would you like to keep using project folder: "$'\e[94m'$proj_folder$'\e[0m'"?"
@@ -1774,9 +1796,14 @@ function save_proj_folder_() {
   fi
 
   if [[ -z "$proj_folder" ]]; then
+    if [[ -n "$proj_repo" ]]; then
+      local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
+      folder_name=$(sanitize_pkg_name_ "${repo_name:t}")
+    fi
+    
     if (( RET == 1 )); then
       folder_exists=1
-    else
+    else      
       if [[ -z "$folder_name" ]]; then
         if ! save_proj_cmd_ $i "$folder_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
         folder_name="$TEMP_PUMP_PROJ_SHORT_NAME"
@@ -1785,7 +1812,7 @@ function save_proj_folder_() {
       header="choose the parent directory where the new project folder will be created"
     fi
 
-    proj_folder=$(file_proj_folder_ $i "$header" "$folder_name" "$folder_exists")
+    proj_folder=$(find_proj_folder_ $i "$header" "$folder_name" "$folder_exists")
     clear_last_line_2_
     clear_last_line_2_
     if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -1801,6 +1828,8 @@ function save_proj_folder_() {
         fi
       fi
     fi
+  else
+    if ! check_proj_folder_ -s $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
   fi
 
   if [[ -z "$TEMP_PUMP_PROJ_FOLDER" ]]; then
@@ -2034,15 +2063,18 @@ function save_proj_() {
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
   
+    if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
   else
     # adding a new project
     remove_proj_ $i &>/dev/null
 
+    if ! save_proj_cmd_ $i "$proj_name"; then return 1; fi
+
     while [[ -z "${PUMP_PROJ_FOLDER[$i]}" ]]; do
       proj_cmd="${TEMP_PUMP_PROJ_SHORT_NAME:-$proj_cmd}"
 
-      if ! save_proj_repo_ -a $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-      if ! save_proj_folder_ -a $i "$proj_name" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
+      if ! save_proj_repo_ -a $i "${PUMP_PROJ_FOLDER[$i]}" "$TEMP_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+      if ! save_proj_folder_ -a $i "$TEMP_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
     done
 
     if is_git_repo_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
@@ -2056,14 +2088,14 @@ function save_proj_() {
 
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
 
-  if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
-    if (( save_proj_is_e )); then
-      # editing a project, pass the old name
-      if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
-    else
-      if ! save_proj_cmd_ $i "$proj_name"; then return 1; fi
-    fi
-  fi
+  # if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
+  #   if (( save_proj_is_e )); then
+  #     # editing a project, pass the old name
+  #     if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+  #   else
+  #     if ! save_proj_cmd_ $i "$proj_name"; then return 1; fi
+  #   fi
+  # fi
 
   local pkg_name=$(get_pkg_name_ "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}")
   
@@ -3391,6 +3423,7 @@ function load_config_() {
 
     if ! validate_proj_cmd_strict_ "$proj_cmd"; then
       print "  in config data at PUMP_PROJ_SHORT_NAME_${i}" 2>/dev/tty
+      print "  fix the issue then type ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
@@ -3413,6 +3446,7 @@ function load_config_() {
     if [[ -n "$proj_folder" ]]; then
       if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd" "$proj_repo"; then
         print "  error in config data at PUMP_PROJ_FOLDER_${i}" 2>/dev/tty
+        print "  fix the issue then type ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       fi
     fi
 
@@ -7134,14 +7168,8 @@ function pro() {
     if (( nvm_skip_lookup && pro_is_x )); then
       version_to_use="$nvm_use_v"
     else
-      # unsetopt monitor
-      # unsetopt notify
-
-      # pipe_name=$(mktemp -u)
-      # mkfifo "$pipe_name" &>/dev/null
-
-      # gum spin --title="detecting Node.js engine..." -- sh -c "read < $pipe_name" &
-      # spin_pid=$!
+      #  2>/dev/tty &! is for termianl on vscode
+      gum spin --title="detecting Node.js engine..." -- sleep 2 2>/dev/tty &!
 
       proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
 
@@ -7157,14 +7185,6 @@ function pro() {
         then
           versions+=("${nvm_use_v}")
         fi
-
-        # echo "done" > "$pipe_name" &>/dev/null
-        # # kill $spin_pid &>/dev/null
-        # rm "$pipe_name"
-        # wait $spin_pid &>/dev/null
-
-        # setopt notify
-        # setopt monitor
 
         if (( ${#versions[@]} > 2 )); then
           version_to_use=$(choose_one_ 0 "Node.js version to use with ${proj_arg}'s engine $node_engine" 20 "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
@@ -7182,14 +7202,6 @@ function pro() {
         elif (( ${#versions[@]} == 1 )); then
           version_to_use="${versions[1]}"
         fi
-      else
-        # echo "done" > "$pipe_name" &>/dev/null
-        # # kill $spin_pid &>/dev/null
-        # rm "$pipe_name"
-        # wait $spin_pid &>/dev/null
-
-        # setopt notify
-        # setopt monitor
       fi
     fi
 
@@ -7931,14 +7943,14 @@ function validate_proj_cmd_strict_() {
         return 0;
       fi
     fi
-    print " project name is reserved: $proj_cmd" 2>/dev/tty
+    print "${yellow_cor}  project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
   local invalid_values=("pwd" "-")
 
   if [[ " ${invalid_values[@]} " == *" $proj_cmd "* ]]; then
-    print " project name is reserved: $proj_cmd" 2>/dev/tty
+    print "${yellow_cor}  project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
@@ -7968,7 +7980,7 @@ function validate_proj_cmd_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print " $error_msg" 2>/dev/tty
+    print "${yellow_cor}  ${error_msg}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
