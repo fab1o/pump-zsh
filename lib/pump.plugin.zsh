@@ -5307,7 +5307,7 @@ function recommit() {
     if (( ! ${argv[(Ie)--quiet]} )); then
       print ""
       git --no-pager log -1 --oneline
-      #git log -1 --pretty=format:'%H %s' | pbcopy
+      # no pbcopy
     fi
   fi
 }
@@ -5475,7 +5475,7 @@ function push() {
     if [[ -n "$my_branch" ]]; then
       print ""
       git --no-pager log --oneline "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}"
-      # git log -1 --pretty=format:'%H %s' | pbcopy
+      # no pbcopy
     fi
   fi
 
@@ -5527,7 +5527,7 @@ function pushf() {
     if [[ -n "$my_branch" ]]; then
       print ""
       git --no-pager log "${remote_origin}/${my_branch}@{1}..${remote_origin}/${my_branch}" --oneline
-      # git log -1 --pretty=format:'%H %s' | pbcopy
+      # no pbcopy
     fi
   fi
 
@@ -5619,7 +5619,7 @@ function pull() {
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     print ""
     git --no-pager log -1 --oneline
-    # no pbcopy for pulling
+    # no pbcopy
   fi
 
   return $RET;
