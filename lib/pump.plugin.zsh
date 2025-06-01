@@ -39,6 +39,10 @@ typeset -g purple_cor="\e[38;5;99m"
 
 typeset -g reset_cor="\e[0m"
 
+typeset -g purple_prompt_cor=$'\e[1;38;5;99m'
+typeset -g cyan_prompt_cor=$'\e[38;2;167;139;250m'
+typeset -g reset_prompt_cor=$'\e[0m'
+
 typeset -g PUMP_VERSION="0.0.0"
 
 typeset -g PUMP_VERSION_FILE="$(dirname "$0")/.version"
@@ -188,14 +192,9 @@ function confirm_between_() {
   local option1="$2"
   local option2="$3"
   local default="$4"
-  local clear_after="$5"
 
   local opt1="${option1[1]}"
   local opt2="${option2[1]}"
-
-  ##########################################################################
-  # VERY IMPORTANT: 2>/dev/tty to display on VSCode Terminal and on refresh
-  ##########################################################################
 
   local RET=0
 
@@ -205,6 +204,10 @@ function confirm_between_() {
     else
       change_default=0
     fi
+
+    ##########################################################################
+    # VERY IMPORTANT: 2>/dev/tty to display on VSCode Terminal and on refresh
+    ##########################################################################
 
     if (( change_default )); then
       gum confirm ""confirm:$'\e[0m'" $question" \
@@ -271,21 +274,7 @@ function confirm_from_() {
     return $RET;
   fi
 
-  trap 'print ""; return 130' INT # for some reason it returns 2
-  
-  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" $question (y/n) "
-  
-  if [[ $REPLY == [yY] ]]; then
-    print "y"
-    return 0;
-  fi
-  
-  if [[ $REPLY == [nN] ]]; then
-    print "n"
-    return 1;
-  fi
-
-  trap - INT
+  confirm_between_ "$question" "yes" "no"
 }
 
 function update_() {
@@ -500,11 +489,7 @@ function input_from_() {
 }
 
 function choose_multiple_() {
-  local purple=$'\e[38;5;99m'
-  local cor=$'\e[38;2;167;139;250m'
-  local reset=$'\e[0m'
-
-  local auto=$1
+  local auto="$1"
   local header="$2"
   local height="${3:-20}"
 
@@ -513,9 +498,9 @@ function choose_multiple_() {
   if command -v gum &>/dev/null; then
     local choice=""
     if (( auto )); then
-      choice="$(gum choose --select-if-one --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4})"
+      choice="$(gum choose --select-if-one --no-limit --header=" choose $header ${cyan_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
     else
-      choice="$(gum choose --no-limit --header="${purple} $header ${cor}(use spacebar)${purple}:${reset}" --height="$height" ${@:4})"
+      choice="$(gum choose --no-limit --header=" choose $header ${cyan_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
     fi
     RET=$?
     
@@ -527,7 +512,7 @@ function choose_multiple_() {
 
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${purple}$header: ${reset}"
+  PS3="${purple_prompt_cor}$header: ${reset_prompt_cor}"
 
   select choice in "${@:4}" "quit"; do
     case $choice in
@@ -546,25 +531,28 @@ function choose_multiple_() {
 
 function filter_one_() {
   local auto="$1"
+  local header="$2"
+  local height="${3:-20}"
 
   local RET=0
 
   if command -v gum &>/dev/null; then
-    print "${purple_cor} $2: ${reset_cor}" >&2
+    print "${purple_prompt_cor} choose $header: ${reset_cor}" >&2
     
     local choice=""
     
     if (( auto )); then
-      choice="$(gum filter --height 20 --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4})"
+      choice="$(gum filter --height="$height" --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4})"
     else
-      choice="$(gum filter --height 20 --limit=1 --indicator=">" --placeholder=" $3" ${@:4})"
+      choice="$(gum filter --height="$height" --limit=1 --indicator=">" --placeholder=" $3" ${@:4})"
     fi
     RET=$?
     
     if (( RET != 0 )); then return $RET; fi
+    
     echo "$choice"
   else
-    choose_one_ $auto "$3" 20 "$4"
+    choose_one_ $auto "$header" "$height" ${@:4}
   fi
 }
 
@@ -573,17 +561,14 @@ function choose_one_() {
   local header="$2"
   local height="${3:-20}"
 
-  local purple=$'\e[38;5;99m'
-  local reset=$'\e[0m'
-
   local RET=0
 
   if command -v gum &>/dev/null; then
     local choice=""
     if (( auto )); then
-      choice="$(gum choose --limit=1 --select-if-one --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --select-if-one --header=" choose $header:${reset_prompt_cor}" --height="$height" ${@:4} 2>/dev/tty)"
     else
-      choice="$(gum choose --limit=1 --header="${purple} $header:${reset}" --height="$height" ${@:4} 2>/dev/tty)"
+      choice="$(gum choose --limit=1 --header=" choose $header:${reset_prompt_cor}" --height="$height" ${@:4} 2>/dev/tty)"
     fi
     RET=$?
     if (( RET != 0 )); then return $RET; fi
@@ -593,7 +578,7 @@ function choose_one_() {
   
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${purple}$header: ${reset}"
+  PS3="${purple_prompt_cor}$header: ${reset_prompt_cor}"
 
   select choice in "${@:4}" "quit"; do
     case $choice in
@@ -611,20 +596,19 @@ function choose_one_() {
 }
 
 function get_folders_() {
-  if [[ -n "$1" && -d "$1" ]]; then
-    cd "$1"
-  else
-    return 1;
-  fi
+  local folder="$1"
 
-  #dirs=(*(/))
-  #dirs=(*(N/om))  # o = sort by modified time
-  #dirs=(*(N/on))  # n = sort by name
-  local dirs=(*(/N/on))
+  [[ ! -d "$folder" ]] && return 1
+
+  #dirs=("$folder"/*(/))
+  #dirs=("$folder"/*(N/om))  # o = sort by modified time
+  #dirs=("$folder"/*(N/on))  # n = sort by name
+  local dirs=("$folder"/*(/N/on))
   local filtered=()
 
-  local name=""
-  for name in "${dirs[@]}"; do
+  local dir=""
+  for dir in "${dirs[@]}"; do
+    local name="${dir##*/}"
     [[ $name != "revs" ]] && filtered+=("$name")
   done
 
@@ -638,7 +622,7 @@ function get_folders_() {
   done
 
   for name in "${filtered[@]}"; do
-    if [[ " ${priorities[@]} " != *" $name "* ]]; then
+    if [[ ! " ${priorities[@]} " == *" $name "* ]]; then
       ordered+=("$name")
     fi
   done
@@ -792,44 +776,45 @@ function file_proj_folder_() {
       if (( folder_exists )); then
         new_folder="$folder_path"
       else
-        new_folder="${folder_path}/$folder_name"
+        new_folder="${folder_path}/${folder_name}"
       fi
 
-      confirm_between_ "set project folder to: "$'\e[94m'${new_folder}$'\e[0m'" or continue to browse further?" "set folder" "continue to browse" >&2
-      RET=$?
-      if (( RET == 130 || RET == 2 )); then return 130; fi
-      if (( RET == 1 )); then
-        cd "$folder_path"
+      local realfolder="${new_folder:A}"
+
+      if [[ ! -d "$realfolder" ]]; then
+        print "  ${red_cor}not a folder, please select a folder${reset_cor}" >&2
+        cd "$HOME"
       else
-        local found=0
-        local realfolder="${folder_path:A}"
-        if (( ! folder_exists )); then
-          realfolder="${realfolder}/$folder_name"
-        fi
-        for j in {1..10}; do
-          if [[ $j -ne $i && -n "$PUMP_PROJ_FOLDER[$j]" && -n "${PUMP_PROJ_SHORT_NAME[$j]}" ]]; then
-            local realfolder_proj="${PUMP_PROJ_FOLDER[$j]:A}"
+        confirm_between_ "set project folder to: "$'\e[94m'${realfolder}$'\e[0m'" or continue to browse further?" "set folder" "continue to browse"
+        RET=$?
+        if (( RET == 130 || RET == 2 )); then return 130; fi
+        if (( RET == 1 )); then
+          cd "$folder_path"
+        else
+          local found=0
+          local j=0
+          for j in {1..10}; do
+            if [[ $j -ne $i && -n "$PUMP_PROJ_FOLDER[$j]" && -n "${PUMP_PROJ_SHORT_NAME[$j]}" ]]; then
+              local realfolder_proj="${PUMP_PROJ_FOLDER[$j]:A}"
 
-            if [[ "$realfolder" == "$realfolder_proj" ]]; then
-              found=1
-              print "  ${yellow_cor}project folder already in use by another project, choose a new one ${reset_cor}" >&2
-              cd "$HOME"
+              if [[ "$realfolder" == "$realfolder_proj" ]]; then
+                found=1
+                print "  ${yellow_cor}in use, please select another folder${reset_cor}" >&2
+                cd "$HOME"
+              fi
             fi
+          done
+
+          if (( found == 0 )); then
+            echo "$folder_path"
+            return 0;
           fi
-        done
-
-        if (( found == 0 )); then
-          clear_last_line_2_
-          clear_last_line_2_
-
-          echo "$folder_path"
-          return 0;
         fi
       fi
     fi
-
+    
     local dirs=($(get_folders_ "$folder_path"))
-    if (( ! ${#dirs[@]} )); then
+    if [[ -z "$dirs" ]]; then
       cd "${HOME:-/}"
     fi
 
@@ -886,6 +871,9 @@ function find_repo_() {
   local RET=0
 
   if command -v gh &>/dev/null; then
+    ############################################
+    # VERY IMPORTANT to display the prompt: >&2
+    ############################################
     confirm_from_ "would you like to access your Github account to choose from a list of repositories?" >&2
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
@@ -901,13 +889,13 @@ function find_repo_() {
         
         if (( $? == 0 && ${#repos[@]} > 1 )); then
           local selected_repo=""
-          selected_repo=$(choose_one_ 0 "choose repository" 30 "${repos[@]}")
+          selected_repo=$(choose_one_ 0 "repository" 30 "${repos[@]}")
           if (( $? != 0 )); then return 1; fi
   
           if [[ -n "$selected_repo" ]]; then
             local repo_uri=""
             
-            confirm_between_ "ssh or https?" "ssh" "https" >&2
+            confirm_between_ "ssh or https?" "ssh" "https"
             RET=$?
             if (( RET == 130 || RET == 2 )); then return 130; fi
             
@@ -921,16 +909,18 @@ function find_repo_() {
             return 0;
           fi
         else
-          print "  no repositories found for $gh_owner" >&2
+          print "  no repositories found for: $gh_owner" >&2
         fi
       fi
     fi
   fi
 
-  # while true; do
+  while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header" "$placeholder")
-    if (( $? != 0 )); then return 1; fi
+    if (( $? != 0 )); then
+      return 1;
+    fi
     
     if [[ -z "$typed_value" ]]; then
       if [[ -n "$placeholder" ]] && command -v gum &>/dev/null; then
@@ -942,14 +932,14 @@ function find_repo_() {
       if validate_repo_ "$typed_value"; then
         echo "$typed_value"
         return 0;
+      else
       fi
-      return 1;
+    else
+      # it's okay if repository is left empty because the project may not have a git repository yet
+      echo "$typed_value"
+      return 0;
     fi
-
-    # it's okay if repository is left empty because the project may not have a git repository yet
-    echo "$typed_value"
-    return 0;
-  # done
+  done
 
   # return 1;
 }
@@ -1033,7 +1023,7 @@ function display_double_line_() {
     line="$line1 | ${color2}$line2"
   fi
 
-  print "${color} $line ${reset_cor}"
+  print "${color} $line ${reset_cor}" >&1
 }
 
 function display_line_() {
@@ -1067,7 +1057,7 @@ function display_line_() {
     line="$line1"
   fi
 
-  print "${color} $line ${reset_cor}"
+  print "${color} $line ${reset_cor}" >&1
 }
 
 function delete_pump_working_() {
@@ -1168,9 +1158,9 @@ function check_proj_repo_() {
     else
       if command -v gum &>/dev/null; then
         # so that the spinner can display, add to the end: 2>/dev/tty
-        gum spin --timeout=7s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet 2>/dev/tty
+        gum spin --timeout=9s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet 2>/dev/tty
       else
-        print " checking repository uri..."
+        print " checking repository uri..." >&2
         git ls-remote "${proj_repo}" --quiet
       fi
       if (( $? != 0 )); then
@@ -1180,7 +1170,7 @@ function check_proj_repo_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" 2>/dev/tty
+    print "  $error_msg" >&2
 
     if (( check_proj_repo_is_s )); then
       if (( check_proj_repo_is_a )); then
@@ -1194,8 +1184,6 @@ function check_proj_repo_() {
 
     return 1;
   fi
-
-  TEMP_PUMP_PROJ_REPO="$proj_repo"
 
   return 0;
 }
@@ -1228,7 +1216,7 @@ function check_proj_folder_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  $error_msg" 2>/dev/tty
+    print "  $error_msg" >&2
 
     if (( check_proj_folder_is_s )); then
       if save_proj_folder_ -s $i "$pkg_name" "$proj_repo"; then return 0; fi
@@ -1280,6 +1268,10 @@ function clear_last_line_1_() {
 
 function clear_last_line_2_() {
   print -n "\033[1A\033[2K" >&2
+}
+
+function clear_last_line_tty_() {
+  print -n "\033[1A\033[2K" 2>/dev/tty
 }
 
 function choose_mode_() {
@@ -1344,7 +1336,7 @@ function choose_mode_() {
   local RET=$?
 
   local i=0
-  for i in {1..16}; do
+  for i in {1..15}; do
     clear_last_line_2_
   done
 
@@ -1684,18 +1676,19 @@ function save_proj_cmd_() {
   if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
 
   if ! check_proj_cmd_ $i "$typed_proj_cmd" "$pkg_name" "$old_proj_cmd"; then
+    (( TEMP_SAVE_PROJ_CMD_ATTEMPTS++ ))
     if save_proj_cmd_ $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
-    # if (( save_proj_cmd_is_e )); then
-    #   if save_proj_cmd_ -e $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
-    # elif (( save_proj_cmd_is_a )); then
-    #   if save_proj_cmd_ -a $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
-    # else
-    #   if save_proj_cmd_ $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
-    # fi
     return 1;
   fi
 
   if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
+    if (( TEMP_SAVE_PROJ_CMD_ATTEMPTS > 0 )); then
+      local i=0
+      for i in {1..$TEMP_SAVE_PROJ_CMD_ATTEMPTS}; do
+        clear_last_line_tty_
+      done
+      TEMP_SAVE_PROJ_CMD_ATTEMPTS=0
+    fi
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
     clear_last_line_1_
     print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
@@ -1727,6 +1720,7 @@ function save_proj_mode_() {
 
   update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
 
+  clear_last_line_2_
   clear_last_line_1_
   if (( single_mode )); then
     print "  ${SAVE_PROJ_COR}project mode:${reset_cor} single" >&1
@@ -1745,27 +1739,27 @@ function save_proj_folder_() {
   local proj_repo="$3"
   local proj_folder="$4"
 
-  if [[ -n "$proj_folder" && "$proj_folder" == "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-    return 0;
+  if (( save_proj_folder_is_a || save_proj_folder_is_r )); then
+    if [[ -n "$proj_folder" && "$proj_folder" == "${PUMP_PROJ_FOLDER[$i]}" ]]; then
+      return 0;
+    fi
   fi
 
   if [[ -n "$proj_repo" ]]; then
-    local repo_name="$(get_repo_name_ "$proj_repo" 1)"
-    folder_name=$(sanitize_pkg_name_ "$repo_name")
+    local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
+    folder_name=$(sanitize_pkg_name_ "${repo_name:t}")
   fi
 
   local RET=0
   local folder_exists=0
   
-  if (( save_proj_folder_is_e )); then
-    if [[ -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-      confirm_from_ "would you like to keep using project folder: "$'\e[94m'${PUMP_PROJ_FOLDER[$i]}$'\e[0m'"?"
-      RET=$?
-      if (( RET == 130 || RET == 2 )); then return 130; fi
-      if (( RET == 0 )); then
-        print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${PUMP_PROJ_FOLDER[$i]}" >&1
-        return 0;
-      fi
+  if (( save_proj_folder_is_e )) && [[ -n "$proj_folder" ]]; then
+    confirm_from_ "would you like to keep using project folder: "$'\e[94m'$proj_folder$'\e[0m'"?"
+    RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+    if (( RET == 1 )); then
+      proj_folder=""
+      header="select the project folder"
     fi
   elif (( save_proj_folder_is_r )); then
     RET=1
@@ -1792,6 +1786,8 @@ function save_proj_folder_() {
     fi
 
     proj_folder=$(file_proj_folder_ $i "$header" "$folder_name" "$folder_exists")
+    clear_last_line_2_
+    clear_last_line_2_
     if [[ -z "$proj_folder" ]]; then return 1; fi
 
     if ! check_proj_folder_ $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
@@ -1807,11 +1803,15 @@ function save_proj_folder_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_FOLDER" "$proj_folder" &>/dev/null
-  
-  clear_last_line_1_
-  print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${proj_folder}" >&1
-  print "" >&1
+  if [[ -z "$TEMP_PUMP_PROJ_FOLDER" ]]; then
+    TEMP_PUMP_PROJ_FOLDER="$proj_folder"
+    update_setting_ $i "PUMP_PROJ_FOLDER" "$TEMP_PUMP_PROJ_FOLDER" &>/dev/null
+
+    clear_last_line_1_
+
+    print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${TEMP_PUMP_PROJ_FOLDER}" >&1
+    print "" >&1
+  fi
 }
 
 function save_proj_repo_() {
@@ -1830,9 +1830,8 @@ function save_proj_repo_() {
       confirm_from_ "would you like to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'"?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
-      if (( RET == 0 )); then
-        print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
-        return 0;
+      if (( RET == 1 )); then
+        proj_repo=""
       fi
     elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
       confirm_from_ "are you adding an existing cloned project?"
@@ -1850,15 +1849,13 @@ function save_proj_repo_() {
     fi
   fi
 
-  if [[ -z "$proj_repo" && -n "$proj_folder" ]]; then
-    local _pwd="$(pwd)"
+  if (( RET != 1 )) && [[ -z "$proj_repo" && -n "$proj_folder" ]]; then
     proj_repo=$(get_repo_ "$proj_folder")
-    cd "$_pwd"
   fi
 
   if (( ! save_proj_repo_is_f )); then
     if [[ -z "$proj_repo" ]]; then
-      proj_repo=$(find_repo_ "type the repository uri (ssh or https)" "$proj_repo")
+      proj_repo="$(find_repo_ "type the repository uri (ssh or https)" "$proj_repo")"
       # if proj_repo is not typed, it's fine to skip
       if [[ -z "$proj_repo" ]]; then return 0; fi
     fi
@@ -1871,11 +1868,16 @@ function save_proj_repo_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo" &>/dev/null
+  if [[ -z "$TEMP_PUMP_PROJ_REPO" ]]; then
+    TEMP_PUMP_PROJ_REPO="$proj_repo"
+  
+    update_setting_ $i "PUMP_PROJ_REPO" "$TEMP_PUMP_PROJ_REPO" &>/dev/null
 
-  clear_last_line_1_
-  print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
-  print "" >&1
+    clear_last_line_1_
+
+    print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${TEMP_PUMP_PROJ_REPO}" >&1
+    print "" >&1
+  fi
 }
 
 function save_pkg_manager_() {
@@ -1912,7 +1914,7 @@ function save_pkg_manager_() {
   fi
 
   if [[ -z "$pkg_manager" ]]; then
-    pkg_manager=($(choose_one_ 0 "choose package manager" 10 "npm" "yarn" "pnpm" "bun")) # "poe"
+    pkg_manager=($(choose_one_ 0 "package manager" 10 "npm" "yarn" "pnpm" "bun")) # "poe"
     if [[ -z "$pkg_manager" ]]; then return 1; fi
 
     if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
@@ -1940,7 +1942,10 @@ function save_proj_f_() {
 
   local proj_repo=$(get_repo_)
 
+  TEMP_PUMP_PROJ_FOLDER=""
+  TEMP_PUMP_PROJ_REPO=""
   TEMP_PUMP_PROJ_SHORT_NAME=""
+  TEMP_SAVE_PROJ_CMD_ATTEMPTS=0
   SAVE_PROJ_COR="${bright_yellow_cor}"
 
   if (( save_proj_f_is_a )); then
@@ -1997,7 +2002,10 @@ function save_proj_() {
     return 1;
   fi
 
+  TEMP_PUMP_PROJ_FOLDER=""
+  TEMP_PUMP_PROJ_REPO=""
   TEMP_PUMP_PROJ_SHORT_NAME=""
+  TEMP_SAVE_PROJ_CMD_ATTEMPTS=0
 
   # display header
   if (( save_proj_is_e )); then
@@ -2022,7 +2030,7 @@ function save_proj_() {
     old_pkg_manager="${PUMP_PKG_MANAGER[$i]}"
 
     if ! save_proj_repo_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-    if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+    if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
   
@@ -2079,17 +2087,11 @@ function save_proj_() {
 
   if (( ! single_mode )); then
     if is_git_repo_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
-      create_backup_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}"
+      if create_backup_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}"; then
+        print " project must be cloned again as project mode has changed" >&1
+        print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
+      fi
     fi
-  # else
-    #rm -rf "${PUMP_PROJ_FOLDER[$i]}/.DS_Store"
-    # local folder_contents="$(ls -A "${PUMP_PROJ_FOLDER[$i]}")"
-
-    # if [[ -n "$folder_contents" ]]; then
-    #   if print_tree_ascii_ "${PUMP_PROJ_FOLDER[$i]}" "$green_cor" 6; then
-    #     create_backup_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}"
-    #   fi
-    # fi
   fi
 
   if (( refresh )); then
@@ -2098,9 +2100,7 @@ function save_proj_() {
     return 0;
   fi
   
-  print " now try running command: ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
-  # do not automatically switch pro, user should do it manually
-  # eval "${PUMP_PROJ_SHORT_NAME[$i]}"
+  print " now run command: ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
 }
 # end of save project data to config file =========================================
 
@@ -2208,8 +2208,11 @@ function remove_proj_() {
 
   local proj_name="${PUMP_PROJ_SHORT_NAME[$i]}"
 
-  unset_aliases_
-  unset -f $proj_name &>/dev/null
+  if [[ -n "$proj_name" ]]; then
+    unset -f $proj_name &>/dev/null
+  fi
+
+  # unset_aliases_
 
   update_setting_ $i "PUMP_PROJ_SHORT_NAME" "" # let this one
   update_setting_ $i "PUMP_PROJ_FOLDER" "" &>/dev/null
@@ -2241,7 +2244,8 @@ function remove_proj_() {
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" &>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
-  update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
+  update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
+  update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
   update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
   
   if [[ -n "$proj_name" ]]; then
@@ -2282,7 +2286,8 @@ function set_current_proj_() {
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
-  CURRENT_PUMP_SKIP_NVM_LOOKUP="${PUMP_SKIP_NVM_LOOKUP[$i]}"
+  CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
+  CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
 }
 
@@ -2291,8 +2296,8 @@ function clear_curr_proj_() {
   set_current_proj_ 0
 }
 
-function get_node_version_() {
-  local folder="$1"
+function get_node_engine_() {
+  local folder="${1:-$PWD}"
 
   local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -2302,18 +2307,165 @@ function get_node_version_() {
 
   if ! command -v nvm &>/dev/null; then return 1; fi
 
-  local semver_range=""
+  local node_engine=""
 
   if command -v jq &>/dev/null; then
-    semver_range=$(jq -r '.engines.node // empty' "$package_json")
+    node_engine=$(jq -r '.engines.node // empty' "$package_json")
   else
-    semver_range=$(grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' "$package_json" | sed -E 's/.*"node"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
+    node_engine=$(grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' "$package_json" | sed -E 's/.*"node"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
   fi
 
-  if [[ -z $semver_range ]]; then return 1; fi
+  if [[ -z "$node_engine" ]]; then return 1; fi
+
+  echo "$node_engine"
+}
+
+function get_major_version_() {
+  local version="$1"
+
+  local major_version="$version"
+
+  if [[ -n "$version" ]] && command -v semver &>/dev/null; then
+    major_version=$(semver -v "$version" | cut -d. -f1 2>/dev/null)
+  fi
+
+  echo "$major_version"
+}
+
+function get_unpadded_version_() {
+  local version="$1"
+
+  local parts=("${(s:.:)version}")
+  local result=()
+
+  for part in $parts; do
+    [[ "$part" == "x" ]] && break
+    result+=("$part")
+  done
+
+  echo "${(j:.:)result}"
+}
+
+function get_display_version_() {
+  local version="$1"
+   
+  local padded_version=$(get_padded_version_ "$version" 0)
+  local major_version=$(get_major_version_ "$padded_version")
+
+  echo $(get_padded_version_ "$major_version")
+}
+
+function get_padded_version_() {
+  local version="$1"
+  local replacer="${2:-x}"
+  
+  local parts=("${(s:.:)version}")
+  
+  echo "${parts[1]:-$replacer}.${parts[2]:-$replacer}.${parts[3]:-$replacer}"
+}
+
+function is_node_version_valid_() {
+  local node_engine="$1"
+  local version="$2"
+
+  # require 'semver' CLI tool to do semver comparisons
+  if ! command -v semver &>/dev/null; then
+    if command -v npm &>/dev/null; then
+      npm install -g semver --yes &>/dev/null
+    else
+      return 1;
+    fi
+  fi
+
+  if ! command -v semver &>/dev/null; then return 1; fi
+
+  semver -r "$node_engine" "$version" &>/dev/null
+}
+
+function get_node_versions_() {
+  local folder="${1:-$PWD}"
+  local sort_by="${2:-latest}"
+  local node_engine="$3"
+
+  if ! command -v nvm &>/dev/null; then return 1; fi
+
+  if [[ -z "$node_engine" ]]; then
+    local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
+    if [[ -z "$proj_folder" ]]; then return 1; fi
+
+    local package_json="${proj_folder}/package.json"
+    if [[ ! -f $package_json ]]; then return 1; fi
+
+    if ! command -v nvm &>/dev/null; then return 1; fi
+
+    if command -v jq &>/dev/null; then
+      node_engine=$(jq -r '.engines.node // empty' "$package_json")
+    else
+      node_engine=$(grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' "$package_json" | sed -E 's/.*"node"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
+    fi
+    
+    if [[ -z "$node_engine" ]]; then return 1; fi
+  fi
 
   # get list of installed versions from nvm
   local installed_versions=($(nvm ls --no-colors | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[-> ]*//' | sed 's/^v//' | sed 's/ *\*$//'))
+
+  if (( ${#installed_versions[@]} == 0 )); then return 1; fi
+
+  local matching_versions=()
+
+  # find matching versions
+  for version in "${installed_versions[@]}"; do
+    if is_node_version_valid_ "$node_engine" "$version"; then
+      matching_versions+=("$version")
+    fi
+  done
+
+  if (( ${#matching_versions[@]} == 0 )); then return 1; fi
+
+  if [[ "$sort_by" == "latest" ]]; then
+    echo "$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 10)"
+  else
+    echo "$(printf "%s\n" "${matching_versions[@]}" | sort -V | head -n 10)"
+  fi
+}
+
+function get_node_version_() {
+  local folder="${1:-$PWD}"
+  local sort_by="${2:-latest}"
+  local node_engine="$3"
+
+  if ! command -v nvm &>/dev/null; then return 1; fi
+
+  if [[ -z "$node_engine" ]]; then
+    local proj_folder=$(get_proj_for_pkg_ "$folder" "package.json")
+    if [[ -z "$proj_folder" ]]; then return 1; fi
+
+    local package_json="${proj_folder}/package.json"
+    if [[ ! -f $package_json ]]; then return 1; fi
+
+    if ! command -v nvm &>/dev/null; then return 1; fi
+
+    if command -v jq &>/dev/null; then
+      node_engine=$(jq -r '.engines.node // empty' "$package_json")
+    else
+      node_engine=$(grep -o '"node"[[:space:]]*:[[:space:]]*"[^"]*"' "$package_json" | sed -E 's/.*"node"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/')
+    fi
+    
+    if [[ -z "$node_engine" ]]; then return 1; fi
+  fi
+
+  # setopt shwordsplit
+  # get list of installed versions from nvm
+  local installed_versions=()
+  installed_versions=($(
+    nvm ls --no-colors \
+      | grep -E '^[-> ]+\s+v[0-9]+\.[0-9]+\.[0-9]+' \
+      | sed 's/^[-> ]*//' \
+      | sed 's/^v//' \
+      | sed 's/ *\*$//'
+  ))
+  # unsetopt shwordsplit
 
   if (( ${#installed_versions[@]} == 0 )); then return 1; fi
 
@@ -2332,7 +2484,7 @@ function get_node_version_() {
 
   # find matching versions
   for version in "${installed_versions[@]}"; do
-    if semver -r "$semver_range" "$version" &>/dev/null; then
+    if semver -r "$node_engine" "$version" &>/dev/null; then
       matching_versions+=("$version")
     fi
   done
@@ -2340,15 +2492,12 @@ function get_node_version_() {
   if (( ${#matching_versions[@]} == 0 )); then return 1; fi
 
   # sort versions and pick the latest
-  local best_version=$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 1)
-
-  # get major version, instead of full version
-  if [[ -n "$best_version" ]]; then
-    local major_version=$(semver -v "$best_version" | cut -d. -f1 2>/dev/null)
-    if [[ -n "$major_version" ]]; then
-      echo "$major_version"
-      return 0;
-    fi
+  local best_version=""
+  
+  if [[ "$sort_by" == "latest" ]]; then
+    best_version=$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 1)
+  else
+    best_version=$(printf "%s\n" "${matching_versions[@]}" | sort -V | head -n 1)
   fi
 
   echo "$best_version"
@@ -2412,7 +2561,8 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
-    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_SKIP_NVM_LOOKUP[$i]}]"
+    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
+    print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
     print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
 
     return 0;
@@ -2448,7 +2598,8 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
-  print " [${solid_pink_cor}CURRENT_PUMP_SKIP_NVM_LOOKUP=${reset_cor}$CURRENT_PUMP_SKIP_NVM_LOOKUP]"
+  print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP]"
+  print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}$CURRENT_PUMP_NVM_USE_V]"
   print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
 }
 
@@ -2473,6 +2624,7 @@ function find_proj_index_() {
 
   if [[ -z "$proj_arg" ]]; then
     print " no project argument provided" >&2
+    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     
     echo "$default_index"
     return 1;
@@ -2551,8 +2703,7 @@ function get_default_folder_() {
 
   if [[ -z "$git_folder" ]]; then return 1; fi
 
-  cd "$git_folder"
-  local default_folder=$(git config --get init.defaultBranch)
+  local default_folder=$(git -C "$git_folder" config --get init.defaultBranch)
 
   if is_git_repo_ "${proj_folder}/${default_folder}" &>/dev/null; then    
     echo "${default_folder}"
@@ -2616,17 +2767,6 @@ function shorten_path_() {
   echo "$output"
 }
 
-function open_proj_for_pkg_() {
-  local folder="${1:-$PWD}"
-  local file="${2:-"package.json"}"
-
-  local proj_folder=$(get_proj_for_pkg_ "$folder" "$file")
-  if [[ -z "$proj_folder" ]]; then return 1; fi
-
-  cd "$proj_folder"
-  return 0;
-}
-
 function get_proj_for_pkg_() {
   local folder="${1:-$PWD}"
   local file="${2:-"package.json"}"
@@ -2640,7 +2780,6 @@ function get_proj_for_pkg_() {
 
   local pattern=$(printf "%q" "$file")
   local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 2 -type f -iname "${pattern}*" -print -quit 2>/dev/null)
-
   if [[ -z "$found_file" ]]; then
     found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -type f -iname "${pattern}*" -print -quit 2>/dev/null)
   fi
@@ -2653,18 +2792,6 @@ function get_proj_for_pkg_() {
   return 1;
 }
 
-function open_proj_for_git_() {
-  local folder="${1:-$PWD}"
-
-  local git_folder=$(get_proj_for_git_ "$folder")
-  if [[ -z "$git_folder" ]]; then
-    print " not a git repository (or any of the parent directories): $folder" >&2 
-    return 1;
-  fi
-
-  cd "$git_folder"
-}
-
 function get_proj_for_git_() {
   local folder="${1:-$PWD}"
 
@@ -2674,7 +2801,6 @@ function get_proj_for_git_() {
   fi
 
   local found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -maxdepth 2 -type d -name ".git" -print -quit 2>/dev/null)
-  
   if [[ -z "$found_git" ]]; then
     found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -type d -name ".git" -print -quit 2>/dev/null)
   fi
@@ -2710,16 +2836,14 @@ function get_remote_origin_() {
 
   if [[ ! -d "$proj_folder" ]]; then return 1; fi
 
-  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
-
   if [[ -z "$branch" ]]; then
-    branch=$(git branch --show-current 2>/dev/null)
+    branch=$(git -C "$proj_folder" branch --show-current 2>/dev/null)
   fi
 
   local remote_origin=""
   
   if [[ -n "$branch" ]]; then
-    remote_origin=$(git config --get branch.${branch}.remote 2>/dev/null)
+    remote_origin=$(git -C "$proj_folder" config --get branch.${branch}.remote 2>/dev/null)
   fi
 
   if [[ -z "$remote_origin" ]]; then
@@ -2737,9 +2861,7 @@ function get_remote_branch_() {
   local remote_origin=$(get_remote_origin_ "$branch_to_look_up_origin" "$proj_folder")
   if [[ -z "$remote_origin" ]]; then return 1; fi
 
-  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
-
-  local remote_branch=$(git ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
+  local remote_branch=$(git -C "$proj_folder" ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
 
   if [[ -n "$remote_branch" ]]; then
     echo "$remote_branch"
@@ -2756,9 +2878,7 @@ function get_repo_() {
   local remote_origin=$(get_remote_origin_ "$branch" "$proj_folder")
   if [[ -z "$remote_origin" ]]; then return 1; fi
 
-  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
-
-  local remote_repo=$(git remote get-url "$remote_origin" 2>/dev/null)
+  local remote_repo=$(git -C "$proj_folder" remote get-url "$remote_origin" 2>/dev/null)
 
   if [[ -n "$remote_repo" ]]; then
     echo "$remote_repo"
@@ -2770,35 +2890,18 @@ function get_repo_() {
 
 function get_repo_name_() {
   local uri="$1"
-  local mode="$2"
 
   local repo=""
 
-  if (( mode == 1 )); then # remove trailing .git if present
-    uri="${uri%.git}"
-
-    # extract the last path segment (after the last slash or colon)
-    repo="${uri##*/}" # handles https
-    repo="${repo##*:}" # handles ssh
-
-    echo "$repo"
-    return 0;
-  fi
+  uri="${uri%.git}"
 
   if [[ "$uri" == git@*:* ]]; then
-    # SSH-style: git@host:user/repo.git
-    if [[ "$uri" =~ '^[^@]+@[^:]+:([^[:space:]]+)(\.git)?$' ]]; then
-      repo="${match[1]}"
-    fi
+    repo="${uri##*:}"
   elif [[ "$uri" == http*://* ]]; then
-    # HTTPS-style: https://host/user/repo(.git)
-    if [[ "$uri" =~ '^https\?*://[^/]+/([^[:space:]]+)(\.git)?$' ]]; then
-      repo="${match[1]}"
-    fi
+    repo="${uri#*://*/}"
   fi
 
   echo "$repo"
-  return 0;
 }
 
 function select_branch_() {
@@ -2813,29 +2916,30 @@ function select_branch_() {
 
   local remote_origin=$(get_remote_origin_)
 
-  local branch_choices=""
+  local branch_choices=()
 
   # | sed "s/^${remote_origin}\///" \
 
   if [[ "$filter" == "--all" || "$filter" == "-a" ]]; then
-    branch_choices=$(git branch --all --format="%(refname:short)" \
+    branch_choices=("${(@f)$(git branch --all --format="%(refname:short)" \
+      | grep -v "^${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
-    )
+    )}")
   elif [[ "$filter" == "-r" ]]; then
-    branch_choices=$(git for-each-ref --format='%(refname:short)' refs/remotes \
-      | grep -v "^${remote_origin}/HEAD\$" \
+    branch_choices=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/remotes \
+      | grep -v "^${remote_origin}/" \
       | grep -i "$searchText" \
       | sort -fu
-    )
+    )}")
   else
-    branch_choices=$(git branch --list --format="%(refname:short)" \
+    branch_choices=("${(@f)$(git branch --list --format="%(refname:short)" \
       | grep -v "${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
-    )
+    )}")
   fi
 
   local excluded_branches=($excluded_branch)
@@ -2844,18 +2948,15 @@ function select_branch_() {
     excluded_branches+=("main" "master" "dev" "develop" "stage" "staging" "prod" "production" "release")
   fi
 
-  local branch_choices_array=($(echo "$branch_choices" | tr '\n' ' '))
   local filtered_branches=()
 
-  for branch in "${branch_choices_array[@]}"; do
+  for branch in "${branch_choices[@]}"; do
     if [[ ! " ${excluded_branches[@]} " == *" $branch "* ]]; then
       filtered_branches+=("$branch")
     fi
   done
 
-  branch_choices="${filtered_branches[@]}"
-
-  if [[ -z "$branch_choices" ]]; then
+  if [[ -z "$filtered_branches" ]]; then
     if [[ -n "$searchText" ]]; then
       print " did not match any branch known to git: $searchText" >&2
     else
@@ -2868,21 +2969,19 @@ function select_branch_() {
   local RET=0
 
   if (( multiple )); then
-    header=${5:-"choose branches"}
-    select_branch_choices=$(choose_multiple_ 0 "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+    header=${5:-"branches"}
+    select_branch_choices=$(choose_multiple_ 0 "$header" 20 $filtered_branches)
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
   else
-    header=${5:-"choose a branch"}
-
-    local branch_choices_count=$(echo "$branch_choices" | wc -l)
+    header=${5:-"branch"}
     
-    if [[ $branch_choices_count -gt 20 ]]; then
-      select_branch_choices=$(filter_one_ $auto "$header" "type to filter" $(echo "$branch_choices" | tr ' ' '\n'))
+    if [[ ${#filtered_branches[@]} -gt 20 ]]; then
+      select_branch_choices=$(filter_one_ $auto "$header" "type to filter" $filtered_branches)
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
     else
-      select_branch_choices=$(choose_one_ $auto "$header" 20 $(echo "$branch_choices" | tr ' ' '\n'))
+      select_branch_choices=$(choose_one_ $auto "$header" 20 $filtered_branches)
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
     fi
@@ -3011,7 +3110,7 @@ function get_clone_default_branch_() {
 
   if [[ -n "$default_branch" && -n "$my_branch" && "$default_branch" != "$my_branch" ]]; then
     local default_branch_choice=""
-    default_branch_choice=$(choose_one_ 1 "choose default branch" 5 "$default_branch" "$my_branch")
+    default_branch_choice=$(choose_one_ 1 "default branch" 5 "$default_branch" "$my_branch")
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
 
@@ -3078,7 +3177,8 @@ function load_config_entry_() {
     PUMP_PUSH_ON_REFIX
     PUMP_PRINT_README
     PUMP_PKG_NAME
-    PUMP_SKIP_NVM_LOOKUP
+    PUMP_NVM_SKIP_LOOKUP
+    PUMP_NVM_USE_V
     PUMP_DEFAULT_BRANCH
   )
 
@@ -3092,7 +3192,7 @@ function load_config_entry_() {
 
       case "$key" in
         # PUMP_PROJ_SINGLE_MODE) # on clone we want to let the user select the mode if nothing is set on the config
-        #   value="0"
+        #   value=0
         #   ;;
         PUMP_PKG_MANAGER)
           value="npm"
@@ -3116,7 +3216,7 @@ function load_config_entry_() {
           value="${PUMP_PKG_MANAGER[$i]} ${run}test"
           ;;
         PUMP_RETRY_TEST)
-          value="0"
+          value=0
           ;;
         PUMP_COV)
           value="${PUMP_PKG_MANAGER[$i]} ${run}test:coverage"
@@ -3131,10 +3231,10 @@ function load_config_entry_() {
           value="${PUMP_PKG_MANAGER[$i]} ${run}test:e2e-ui"
           ;;
         PUMP_PR_APPEND)
-          value="0"
+          value=0
           ;;
         PUMP_GHA_INTERVAL)
-          value="10"
+          value=10
           ;;
         *)
           continue
@@ -3225,8 +3325,11 @@ function load_config_entry_() {
       PUMP_PKG_NAME)
         PUMP_PKG_NAME[$i]="$value"
         ;;
-      PUMP_SKIP_NVM_LOOKUP)
-        PUMP_SKIP_NVM_LOOKUP[$i]="$value"
+      PUMP_NVM_SKIP_LOOKUP)
+        PUMP_NVM_SKIP_LOOKUP[$i]="$value"
+        ;;
+      PUMP_NVM_USE_V)
+        PUMP_NVM_USE_V[$i]="$value"
         ;;
       PUMP_DEFAULT_BRANCH)
         PUMP_DEFAULT_BRANCH[$i]="$value"
@@ -3376,7 +3479,7 @@ function del() {
     fi
 
     if (( ${#files[@]} )); then
-      local selected_files=("${(@f)$(choose_multiple_ 1 "choose what to delete" 20 "${files[@]}")}")
+      local selected_files=("${(@f)$(choose_multiple_ 1 "files to delete" 20 "${files[@]}")}")
       if [[ -z "$selected_files" ]]; then
         return 1;
       fi
@@ -3385,7 +3488,7 @@ function del() {
       local file=""
       for file in "${selected_files[@]}"; do
         if (( ! del_is_s )) && [[ ".DS_Store" != "$file" ]]; then
-          if [[ -d "$file" && -n "$(ls -A "$file")" ]] || [[ ! -d "$file" ]]; then
+          if [[ -d "$file" && -e "$file"/* ]] || [[ ! -d "$file" ]]; then
             confirm_from_ "delete "$'\e[94m'$file$'\e[0m'"?"
             RET=$?
             if (( RET == 130 || RET == 2 )); then
@@ -3445,7 +3548,7 @@ function del() {
       fi
 
       if (( ! del_is_s && _count < 3 )) && [[ ".DS_Store" != "$f" ]]; then
-        if [[ -d "$f" && -n "$(ls -A "$f")" ]] || [[ ! -d "$f" ]]; then
+        if [[ -d "$f" && -e "$f"/* ]] || [[ ! -d "$f" ]]; then
           confirm_from_ "delete${file_type}: "$'\e[94m'$f$'\e[0m'" ?"
           RET=$?
           if (( RET == 130 || RET == 2 )); then
@@ -3477,7 +3580,7 @@ function del() {
         fi
 
         if (( is_all == 0 )); then
-          if [[ -d "$f" && -n "$(ls -A "$f")" ]] || [[ ! -d "$f" ]]; then
+          if [[ -d "$f" && -e "$f"/* ]] || [[ ! -d "$f" ]]; then
             confirm_from_ "delete${file_type}: "$'\e[94m'$f$'\e[0m'" ?"
             RET=$?
             if (( RET == 130 || RET == 2 )); then
@@ -4092,25 +4195,32 @@ function pr() {
     return 1;
   fi
 
-  local pr_body=""
+  local PR_BODY=""
 
   for commit in "${pr_commit_msgs[@]}"; do
-    pr_body+="${commit}\n"
+    PR_BODY+="${commit}\n"
   done
 
   if [[ -n "$CURRENT_PUMP_PR_REPLACE" && -f "$CURRENT_PUMP_PR_TEMPLATE" ]]; then
     local pr_template="$(cat $CURRENT_PUMP_PR_TEMPLATE)"
-
-    if (( CURRENT_PUMP_PR_APPEND )); then
-      # Append commit msgs right after CURRENT_PUMP_PR_REPLACE in pr template
-      pr_body=$(echo "$pr_template" | perl -pe "s/(\Q$CURRENT_PUMP_PR_REPLACE\E)/\1\n\n$pr_body\n/")
-    else
-      # Replace CURRENT_PUMP_PR_REPLACE with commit msgs in pr template
-      pr_body=$(echo "$pr_template" | perl -pe "s/\Q$CURRENT_PUMP_PR_REPLACE\E/$pr_body/g")
+    
+    if [[ -n "$pr_template" ]]; then
+      if (( CURRENT_PUMP_PR_APPEND )); then
+        # Append commit msgs right after CURRENT_PUMP_PR_REPLACE in pr template
+        PR_BODY=$(echo "$pr_template" | perl -pe "s/(\Q${CURRENT_PUMP_PR_REPLACE}\E)/\1\n\n${PR_BODY}\n/")
+      else
+        # Replace CURRENT_PUMP_PR_REPLACE with commit msgs in pr template
+        PR_BODY=$(echo "$pr_template" | perl -pe "s/\Q${CURRENT_PUMP_PR_REPLACE}\E/${PR_BODY}/g")
+      fi
     fi
   fi
 
-  if [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
+  if [[ -z "$PR_BODY" ]]; then
+    print " no pull request body, cannot create pull request" >&2
+    return 1;
+  fi
+
+  if (( ! pr_is_t )) && [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
     if confirm_from_ "run tests before pull request?"; then
       if confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
@@ -4122,16 +4232,17 @@ function pr() {
         done
         print ""
       fi
-      test || return 1;
     fi
-  elif (( CURRENT_PUMP_PR_RUN_TEST || pr_is_t )); then
+  fi
+
+  if (( CURRENT_PUMP_PR_RUN_TEST || pr_is_t )); then
     test || return 1;
   fi
 
   ## debugging purposes
   # print " pr_title:$pr_title"
   # print ""
-  # print "$pr_body"
+  # print "$PR_BODY"
   # return 0;
 
   push || return 1;
@@ -4153,20 +4264,20 @@ function pr() {
       local labels=("${(@f)$(gh label list --repo "$proj_repo" --limit 25 | awk '{print $1}')}")
       
       if [[ -n "$labels" ]]; then
-        local choose_labels=$(choose_multiple_ 0 "choose labels" 20 "none ${labels[@]}")
+        local choose_labels=$(choose_multiple_ 0 "labels" 20 "none ${labels[@]}")
 
         if [[ "$choose_labels" == "none" ]]; then
-          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
+          gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch"
         elif [[ -n "$choose_labels" ]]; then
           local choose_labels_comma="${(j:,:)${(f)choose_labels}}"
-          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch" --label="$choose_labels_comma"
+          gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch" --label="$choose_labels_comma"
         fi
       fi
       return 0;
     fi
   fi
 
-  gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
+  gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch"
 }
 
 function run() {
@@ -4294,7 +4405,7 @@ function run() {
     else
       local dirs=($(get_folders_ "$proj_folder"))
       if (( ${#dirs[@]} )); then
-        folder_to_run=($(choose_one_ 1 "choose folder to run" 20 "${dirs[@]}"))
+        folder_to_run=($(choose_one_ 1 "folder to run" 20 "${dirs[@]}"))
         local RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if [[ -z "$folder_to_run" ]]; then
@@ -4324,7 +4435,7 @@ function run() {
   print " run $_env on ${gray_cor}$(shorten_path_until_ "$folder_to_run" $HOME) ${reset_cor}:${solid_pink_cor} $_run ${reset_cor}"
   
   if ! eval "$_run"; then
-    print " failed to run PUMP_RUN_${found}" >&2
+    print " ${red_cor}failed to run PUMP_RUN_${found}${reset_cor}" >&2
   fi
 }
 
@@ -4409,7 +4520,7 @@ function setup() {
     else
       local dirs=($(get_folders_ "$proj_folder"))
       if (( ${#dirs[@]} )); then
-        folder_to_setup=($(choose_one_ 1 "choose folder to setup" 20 "${dirs[@]}"))
+        folder_to_setup=($(choose_one_ 1 "folder to setup" 20 "${dirs[@]}"))
         local RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if [[ -z "$folder_to_setup" ]]; then
@@ -4438,7 +4549,7 @@ function setup() {
   print " setup ${gray_cor}$(shorten_path_until_ "$PWD" $HOME) ${reset_cor}:${solid_pink_cor} $_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
-    print " failed to run PUMP_SETUP_${found}" >&2
+    print " ${red_cor}failed to run PUMP_SETUP_${found}${reset_cor}" >&2
   fi
 }
 
@@ -4539,7 +4650,6 @@ function revs() {
     return 1;
   fi
 
-  local _pwd="$(pwd)"
   local revs_folder=$(get_revs_folder_ "$proj_folder")
 
   if [[ -z "$revs_folder" ]]; then
@@ -4548,9 +4658,9 @@ function revs() {
     return 1; 
   fi
 
-  local rev_options="$(ls "${revs_folder}/rev.*" 2>/dev/null)"
+  local rev_options=(${~revs_folder}/rev.*(N/))
 
-  local rev_choice=$(echo "$rev_options" | xargs -0 | sort -fu | gum choose --limit=1 --header " choose review to open:")
+  local rev_choice=$(choose_one_ 0 "review to open" 20 "${(@f)$(printf "%s\n" "${rev_options[@]}" | sed 's|.*/||')}")
   if [[ -z "$rev_choice" ]]; then return 1; fi
 
   rev "$proj_arg" "${rev_choice//rev./}"
@@ -4749,7 +4859,7 @@ function clone() {
     return 0;
   fi
 
-  local proj_arg="$CURRENT_PUMP_PROJECT"
+  local proj_arg=""
   local branch_arg=""
   local default_branch_arg=""
 
@@ -4786,7 +4896,7 @@ function clone() {
       return 1;
     fi
 
-    proj_arg=$(choose_one_ 1 "choose project to clone" 20 "${PUMP_PROJ_SHORT_NAME[@]}")
+    proj_arg=$(choose_one_ 1 "project to clone" 20 "${PUMP_PROJ_SHORT_NAME[@]}")
     if [[ -z "$proj_arg" ]]; then return 1; fi
   fi
 
@@ -4797,39 +4907,31 @@ function clone() {
   local pump_default_branch=""
   local single_mode=""
   
-  local found=0
+  local i=$(find_proj_index_ "$proj_arg")
 
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=$i
-
-      if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-        return 1;
-      fi
-      proj_repo="${PUMP_PROJ_REPO[$i]}"
-
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
-
-      _clone="${PUMP_CLONE[$i]}"
-      print_readme="${PUMP_PRINT_README[$i]}"
-      pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
-      single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-      break;
-    fi
-  done
-
-  if (( found == 0 )); then
+  if (( ! i )); then
     print " not a valid project or no project is set" >&2
     print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
     print " type ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
+
+  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
+    return 1;
+  fi
+  proj_repo="${PUMP_PROJ_REPO[$i]}"
+
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
+    return 1;
+  fi
+  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
+
+  _clone="${PUMP_CLONE[$i]}"
+  print_readme="${PUMP_PRINT_README[$i]}"
+  pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
+  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   if [[ -z "$proj_repo" ]]; then
     print " missing repository uri for: $proj_arg" >&2
@@ -4849,10 +4951,7 @@ function clone() {
     return 1;
   fi
 
-  local folders=($(get_folders_ "$proj_folder"))
-
   local branch_to_clone="$branch_arg"
-
   local folder_to_clone=""
 
   if (( single_mode )); then
@@ -4898,13 +4997,14 @@ function clone() {
     fi
 
     if confirm_from_ "save default branch '"$'\e[32m'$default_branch$'\e[0m'"' and don't ask again?"; then
-      update_setting_ $found "PUMP_DEFAULT_BRANCH" $default_branch
+      update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch
     fi
   fi
 
   if [[ -z "$branch_to_clone" ]]; then
     branch_to_clone="$default_branch"
   fi
+
   if [[ -z "$folder_to_clone" ]]; then
     local branch_folder="${branch_to_clone//\\/-}"
     branch_folder="${branch_folder//\//-}"
@@ -4914,7 +5014,7 @@ function clone() {
 
   if command -v gum &>/dev/null; then
     if ! gum spin --title="cloning... $proj_repo on $branch_to_clone" -- git clone "$proj_repo" "$folder_to_clone"; then
-      print " failed to clone, repository uri is invalid or no access rights: $proj_repo" >&2
+      print " failed to clone, either folder is not empty or no access rights: $proj_repo" >&2
       return 1;
     fi
   else
@@ -4954,13 +5054,19 @@ function clone() {
   if [[ -n "$_clone" ]]; then
     print " ${solid_pink_cor}$_clone ${reset_cor}"
     if ! eval "$_clone"; then
-      print " failed to run PUMP_CLONE_${found}" >&2
+      print " ${red_cor}failed to run PUMP_CLONE_${i}${reset_cor}" >&2
     fi
   fi
 
   if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
+    local maxdepth=2; (( single_mode )) && maxdepth=1
+
+    local readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -maxdepth $maxdepth -type f -iname "README.md*" -print -quit 2>/dev/null)
+    if [[ -z "$readme_file" ]]; then
+      readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "readme.md*" -print -quit 2>/dev/null)
+    fi
+    
     local RET=0
-    local readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null)
     if [[ -n "$readme_file" ]]; then
       if command -v glow &>/dev/null; then
         glow "$readme_file"
@@ -4974,18 +5080,14 @@ function clone() {
     if (( RET == 0 )) && [[ -z "$print_readme" ]]; then
       print ""
       if confirm_between_ "always display the readme file for future branches in "$'\e[34m'$proj_arg$'\e[0m'" when available?" "always" "never"; then
-        update_setting_ $found "PUMP_PRINT_README" 1
+        update_setting_ $i "PUMP_PRINT_README" 1
       else
-        update_setting_ $found "PUMP_PRINT_README" 0
+        update_setting_ $i "PUMP_PRINT_README" 0
       fi
     fi
   fi
 
   print " default branch is ${bright_green_cor}$(git config --get init.defaultBranch) ${reset_cor}"
-
-  if [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
-    pro "$proj_arg"
-  fi
 }
 
 function abort() {
@@ -5380,13 +5482,14 @@ function glog() {
     print "  ${yellow_cor}glog -c${reset_cor} : to log commits from current branch for posting in comments (and to clipboard)"
     return 0;
   fi
+  
+  if ! is_git_repo_; then return 1; fi
 
+  print ""
+  
   local RET=0
 
   if (( glog_is_c )); then
-    if ! is_git_repo_; then return 1; fi
-    print ""
-
     local merge_commits=""
     merge_commits=($(git log -100 --pretty=format:"%H %P" | awk '{ if (NF > 2) print $1 }'))
 
@@ -5398,15 +5501,8 @@ function glog() {
     git log --no-merges --first-parent "$first" "^$last" --pretty=format:'- %H - %s' | pbcopy
     RET=$?
   else
-    local _pwd="$(pwd)"
-
-    if ! open_proj_for_git_; then return 1; fi
-    
-    print ""
     git --no-pager log main HEAD --oneline --graph --date=relative $@
     RET=$?
-
-    cd "$_pwd"
   fi
 
   print ""
@@ -5547,9 +5643,7 @@ function dtag() {
     return 0;
   fi
 
-  local _pwd="$(pwd)"
-
-  if ! open_proj_for_git_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
   
   prune
 
@@ -5560,26 +5654,21 @@ function dtag() {
     local tags=$(tags 2>/dev/null)
     if [[ -z "$tags" ]]; then
       print " no tags found to delete" >&2
-      cd "$_pwd"
       return 0;
     fi
-    local selected_tags=($(choose_multiple_ 0 "select tags to delete" 20 $(echo "$tags" | tr '\n' ' ')))
+    local selected_tags=($(choose_multiple_ 0 "tags to delete" 20 $(echo "$tags" | tr '\n' ' ')))
     if [[ -z "$selected_tags" ]]; then
-      cd "$_pwd"
       return 1;
     fi
     for tag in $selected_tags; do
       git tag "$remote_origin" --delete "$tag" 2>/dev/null
       git push "$remote_origin" --delete "$tag" ${@:2} 2>/dev/null
     done
-    cd "$_pwd"
     return 0;
   fi
 
   git tag "$remote_origin" --delete "$1" 2>/dev/null
   git push "$remote_origin" --delete "$1" 2>/dev/null
-
-  cd "$_pwd"
 
   return 0; # don't care if it fails to delete, consider success
 }
@@ -5645,23 +5734,19 @@ function drelease() {
     return 1;
   fi
 
-  local _pwd="$(pwd)"
-
-  if ! open_proj_for_git_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   local tag="$1"
 
   if [[ -z "$tag" ]]; then
     local tags=$(tags 2>/dev/null)
     if [[ -z "$tags" ]]; then
-      cd "$_pwd"
       print " no tags found to delete" >&2
       return 0;
     fi
 
-    local selected_tags=($(choose_multiple_ 0 "select tags to delete" 20 $(echo "$tags" | tr '\n' ' ')))
+    local selected_tags=($(choose_multiple_ 0 "tags to delete" 20 $(echo "$tags" | tr '\n' ' ')))
     if [[ -z "$selected_tags" ]]; then
-      cd "$_pwd"
       return 1;
     fi
 
@@ -5675,13 +5760,10 @@ function drelease() {
       print " deleted release: $tag"
     done
 
-    cd "$_pwd"
     return 0;
   fi
 
   gh release delete "$tag" --cleanup-tag -y
-
-  cd "$_pwd"
 
   return 0; # don't care if it fails to delete, consider success
 }
@@ -5895,9 +5977,7 @@ function tags() {
     return 0;
   fi
 
-  local _pwd="$(pwd)"
-
-  if ! open_proj_for_git_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   prune &>/dev/null
 
@@ -5918,12 +5998,10 @@ function tags() {
 
   if [[ -z "$tags" ]]; then
     print " no tags found" >&2
-    cd "$_pwd"
     return 1;
   fi
   
   print "$tags"
-  cd "$_pwd"
 }
 # end of tagging functions ===============================================
 
@@ -6016,20 +6094,13 @@ function glr() {
     return 0;
   fi
 
-  local _pwd="$(pwd)"
-
-  if ! open_proj_for_git_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   fetch --quiet
 
   git branch -r --list "*$1*" --sort=authordate --format='%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=3)' | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e 's/\([^\ ]*\)$/\x1b[34m\x1b]8;;https:\/\/github.com\/wmgtech\/wmg2-one-app\/tree\/\1\x1b\\\1\x1b]8;;\x1b\\\x1b[0m/'
-  local RET=$?
-  
-  cd "$_pwd"
-
-  return $RET;
 }
 
 function gll() {
@@ -6042,18 +6113,11 @@ function gll() {
     return 0;
   fi
 
-  local _pwd="$(pwd)"
-
-  if ! open_proj_for_git_; then return 1; fi
+  if ! is_git_repo_; then return 1; fi
 
   git branch --list "*$1*" --sort=authordate --format="%(authordate:format:%m-%d-%Y) %(align:17,left)%(authorname)%(end) %(refname:strip=2)" | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e 's/\([^ ]*\)$/\x1b[34m\1\x1b[0m/'
-  local RET=$?
-  
-  cd "$_pwd"
-
-  return $RET;
 }
 
 function gha_() {
@@ -6083,7 +6147,6 @@ function gha_() {
     local repo_name=$(get_repo_name_ "$repo" 2>/dev/null)
 
     if [[ -n "$repo_name" ]]; then
-      repo_name="${repo_name%.git}"
       print "  check out${blue_cor} https://github.com/$repo_name/actions/runs/$workflow_id ${reset_cor}"
     fi
   fi
@@ -6140,51 +6203,35 @@ function gha() {
     proj_arg="$CURRENT_PUMP_PROJECT"
   fi
 
-  local proj_folder=""
+  local proj_repo=""
   local gha_interval=""
   local gha_workflow=""
   local found=0
 
-  if [[ -z "$proj_arg" ]]; then
-    print " no project is set" >&2
+  local i=$(find_proj_index_ "$proj_arg")
+  
+  if (( ! i )); then
+    print " not a valid project or no project is set" >&2
+    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
     print " type ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=$i
-
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-      gha_interval="${PUMP_GHA_INTERVAL[$i]}"
-      gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
-      break;
-    fi
-  done
-
-  local _pwd="$(pwd)"
-
-  if [[ -n "$proj_folder" ]]; then
-    if ! open_proj_for_git_ "$proj_folder"; then return 1; fi
-  else
-    print " no project folder found" >&2
+  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  proj_repo="${PUMP_PROJ_REPO[$i]}"
+  gha_interval="${PUMP_GHA_INTERVAL[$i]}"
+  gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
 
   local ask_save=0
   local RET=0
 
   if [[ -z "$workflow_arg" && -z "$gha_workflow" ]]; then
-    local workflow_choices=$(gh workflow list | cut -f1)
+    local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
+    local workflow_choices=$(gh workflow list --repo "$repo_name" | cut -f1)
     if [[ -z "$workflow_choices" || "$workflow_choices" == "No workflows found" ]]; then
-      cd "$_pwd"
       print " no workflows found" >&2
       return 1;
     fi
@@ -6195,7 +6242,6 @@ function gha() {
     if (( RET == 130 || RET == 2 )); then return 130; fi
     
     if [[ -z "$chosen_workflow" ]]; then
-      cd "$_pwd"
       return 1;
     fi
 
@@ -6338,44 +6384,14 @@ function co() {
       return $?;
     fi
 
-    if [[ -z "$branch" ]]; then
-      print " branch is required" >&2
-      return 1;
-    fi
-
     base_branch=$(git branch --show-current)
-    
-    local remote_origin=$(get_remote_origin_ "$base_branch")
-
-    fetch --quiet
-    RET=$?
 
     if [[ -n "$base_branch" ]]; then
-      git checkout -b "$branch" "${remote_origin}/$base_branch" ${@:2}
-      RET=$?
+      co "$branch" "$base_branch" ${@:2}
     else
-      git checkout -b "$branch" ${@:2}
-      RET=$?
-      if (( RET == 0 )); then
-        base_branch=$(git config --get init.defaultBranch)
-      fi
+      print " no base branch found, cannot create branch" >&2
+      return 1;
     fi
-
-    if (( RET != 0 )); then return 1; fi
-
-    ll_add_node_
-    
-    local remote_branch=$(get_remote_branch_"$base_branch")
-
-    if [[ -n "$remote_branch" ]]; then
-      git config "branch.${branch}.gh-merge-base" "$remote_branch"
-      print " base branch is: $remote_branch"
-    else
-      git config "branch.${branch}.gh-merge-base" "$base_branch"
-      print " base branch is: $base_branch"
-    fi
-
-    return 0;
   fi
 
   # co -e branch just checkout, do not create branch
@@ -6408,6 +6424,11 @@ function co() {
 
   # co branch BASE_BRANCH (creating branch)
   local branch="$1"
+
+  if [[ -z "$branch" ]]; then
+    print " branch is required" >&2
+    return 1;
+  fi
   
   fetch --quiet
 
@@ -6910,7 +6931,7 @@ function get_pkg_name_() {
 }
 
 function pro() {
-  eval "$(parse_flags_ "pro_" "aerucfil" "$@")"
+  eval "$(parse_flags_ "pro_" "aerucfilnx" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
@@ -6919,16 +6940,16 @@ function pro() {
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -c${reset_cor} : to show current project's settings"
+    print "  ${yellow_cor}pro -i <name>${reset_cor} : to display the project's readme if available"
+    print "  ${yellow_cor}pro -n <name>${reset_cor} : to set Node.js version for a project"
     print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project's settings"
     print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to reset project's \"don't ask again\" settings"
-    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display the project's readme if available"
     pro -l
     return 0;
   fi
 
   if (( pro_is_l )); then
-    # list projects pro -l
+    # pro -l list projects
     print "  --"
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
       print "  project list is empty" >&2
@@ -6943,83 +6964,78 @@ function pro() {
         fi
       done
     fi
+
     return 0;
   fi
 
   local proj_arg="$1"
 
   if (( pro_is_i )); then
-    # display readme file of project pro -i
+    # pro -i <name> display project readme
     if [[ -z "$proj_arg" ]]; then
       proj_arg="${CURRENT_PUMP_PROJECT}"
     fi
 
     local i=$(find_proj_index_ "$proj_arg")
-    
-    if (( i > 0 )); then
-      local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null)
-      if [[ -n "$readme_file" ]]; then
-        if command -v glow &>/dev/null; then
-          glow "$readme_file"
-        else
-          cat "$readme_file"
-        fi
-      fi
+    (( i )) || return 1;
 
-      return 0;
+    local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+    local maxdepth=2; (( single_mode )) && maxdepth=1
+    
+    local readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -maxdepth $maxdepth -type f -iname "README.md*" -print -quit 2>/dev/null)
+    if [[ -z "$readme_file" ]]; then
+      readme_file=$(find "${PUMP_PROJ_FOLDER[$i]}" \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "README.md*" -print -quit 2>/dev/null)
     fi
 
-    return 1;
+    if [[ -n "$readme_file" ]]; then
+      print " displaying readme at ${green_cor}${readme_file}${reset_cor}" >&1
+
+      if command -v glow &>/dev/null; then
+        glow "$readme_file"
+      else
+        cat "$readme_file"
+      fi
+    fi
+    return $?;
   fi
 
   if (( pro_is_u )); then
-    local i=$(find_proj_index_ "$proj_arg" 0)
+    # pro -u <name> reset project settings
+    local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
+
+    update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
+    update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
+    update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
+    update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
+    update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
+    update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
+    update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
+    update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
+    update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
+    update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
     
-    if (( i >= 0 )); then
-      update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
-      update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
-      update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
-      update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
-      update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
-      update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
-      update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
-      update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
-      update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
-
-      return 0;
-    fi
-
-    return 1;
+    return $?;
   fi
 
   if (( pro_is_c )); then
-    # show project config pro -c
-    local i=$(find_proj_index_ "$proj_arg" 0)
+    # pro -c <name> show project config
+    local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
     
-    if (( i >= 0 )); then
-      print_current_proj_ $i
-      return $?;
-    fi
-
-    return 1;
+    print_current_proj_ $i
+    return $?;
   fi
 
-  # CRUD operations
   if (( pro_is_e )); then
-    # edit project pro -e
-
+    # pro -e <name> edit project
     local i=$(find_proj_index_ "$proj_arg")
-    
-    if (( i > 0 )); then
-      save_proj_ -e $i "$proj_arg"
-      return $?;
-    fi
+    (( i )) || return 1;
 
-    return 1;
+    save_proj_ -e $i "$proj_arg"
+    return $?;
   fi
   
   if (( pro_is_a )); then
-    # add project pro -a
+    # pro -a <name> add project
     local i=0
     for i in {1..9}; do
       if [[ -z "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -7036,41 +7052,140 @@ function pro() {
   fi
 
   if (( pro_is_r )); then
-    # remove project pro -r
-
+    # pro -r <name> remove project
     local i=$(find_proj_index_ "$proj_arg")
-    
-    if (( i > 0 )); then
-      local refresh=0;
-      [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]] && refresh=1;
+    (( i )) || return 1;
 
-      if remove_proj_ $i; then
-        if (( refresh )); then
-          refresh_curr_proj_
-        fi
-        return 0;
-      fi
+    confirm_from_ "remove project ${PUMP_PROJ_SHORT_NAME[$i]} ?"
+    local RET=$?
+    if (( RET != 0 )); then return 1; fi
+
+    local refresh=0;
+    [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]] && refresh=1;
+
+    if ! remove_proj_ $i; then
+      return 1;
     fi
 
-    return 1;
-  fi # end of remove project
-
-  if [[ -z "$proj_arg" ]]; then
-    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-      print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
-      if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
-        print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
-      fi
-      print ""
-    else
-      print " provide a project name" >&2
+    if (( refresh )); then
+      clear_curr_proj_
+      refresh_curr_proj_ $i
     fi
 
-    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
-    return 1;
+    return $?;
   fi
 
-  # pro pwd pro
+  if (( pro_is_n )); then
+    # pro -n <name> set Node.js version for a project
+    local i=$(find_proj_index_ "$proj_arg")
+    (( i )) || return 1;
+
+    local RET=1;
+
+    local nvm_skip_lookup="${PUMP_NVM_SKIP_LOOKUP[$i]}"
+    local nvm_use_v="${PUMP_NVM_USE_V[$i]}"
+    local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+    local pump_pro="${PUMP_PRO[$i]}"
+
+    # if (( pro_is_f )); then
+    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_PWD_FILE"
+    # else
+    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_FILE"
+    # fi
+
+    local version_to_use=""
+
+    if (( nvm_skip_lookup && pro_is_x )); then
+      version_to_use="$nvm_use_v"
+    else
+      # unsetopt monitor
+      # unsetopt notify
+
+      # pipe_name=$(mktemp -u)
+      # mkfifo "$pipe_name" &>/dev/null
+
+      # gum spin --title="detecting Node.js engine..." -- sh -c "read < $pipe_name" &
+      # spin_pid=$!
+
+      local node_engine=$(get_node_engine_ "$proj_folder")
+
+      if [[ -n "$node_engine" ]]; then
+        local versions=()
+        versions=("${(@f)$(get_node_versions_ "$proj_folder" "oldest" "$node_engine")}")
+          
+        if [[ -n "$nvm_use_v" ]] && \
+            [[ ! " ${versions[@]} " =~ " ${nvm_use_v} " ]] && \
+            is_node_version_valid_ "$node_engine" "$nvm_use_v"; \
+        then
+          versions+=("${nvm_use_v}")
+        fi
+
+        # echo "done" > "$pipe_name" &>/dev/null
+        # # kill $spin_pid &>/dev/null
+        # rm "$pipe_name"
+        # wait $spin_pid &>/dev/null
+
+        # setopt notify
+        # setopt monitor
+
+        if (( ${#versions[@]} > 2 )); then
+          version_to_use=$(choose_one_ 0 "Node.js version to use with ${proj_arg}'s engine $node_engine" 20 "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
+        
+        elif (( ${#versions[@]} == 2 )); then
+          confirm_between_ "choose a Node.js version to use with ${proj_arg}'s engine $node_engine:" "${versions[1]}" "${versions[2]}"
+          local _RET=$?
+
+          if (( _RET == 0 )); then
+            version_to_use="${versions[1]}"
+          elif (( _RET == 1 )); then
+            version_to_use="${versions[2]}"
+          fi
+
+        elif (( ${#versions[@]} == 1 )); then
+          version_to_use="${versions[1]}"
+        fi
+      else
+        # echo "done" > "$pipe_name" &>/dev/null
+        # # kill $spin_pid &>/dev/null
+        # rm "$pipe_name"
+        # wait $spin_pid &>/dev/null
+
+        # setopt notify
+        # setopt monitor
+      fi
+    fi
+
+    if [[ -n "$version_to_use" ]]; then
+      if command -v nvm &>/dev/null; then
+        local major_version=$(get_major_version_ "$version_to_use")
+        if nvm use "$major_version" 2>/dev/tty >&2; then
+          update_setting_ $i "PUMP_NVM_USE_V" "$version_to_use" &>/dev/null
+          RET=0
+        fi
+      fi
+    else
+      RET=0
+    fi
+
+    if [[ -n "$pump_pro" ]]; then
+      eval "$pump_pro" 2>/dev/tty >&2;
+    fi
+
+    if (( RET == 0 && pro_is_x )) && [[ -z "$nvm_skip_lookup" && -n "$version_to_use" ]]; then
+      confirm_between_ "skip checking for Node.js versions from now on? you won't be asked again" "skip" "don't skip"
+      local _RET=$?
+
+      if (( _RET == 0 )); then
+        update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
+      elif (( _RET == 1 )); then
+        update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 0 &>/dev/null
+      fi
+    fi
+
+    return $RET;
+  fi
+
+  # pro pwd project based on current working directory
   if [[ "$proj_arg" == "pwd" ]]; then
     proj_arg=$(find_proj_by_pwd_)
 
@@ -7105,25 +7220,38 @@ function pro() {
           save_proj_f_ -a $emptyI "$proj_cmd" "$pkg_name"
         fi
       fi
+
       return $?;
     fi
   fi
 
-  # pro <name>
+  if [[ -z "$proj_arg" ]]; then
+    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+      print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
+      if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
+        print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
+      fi
+      print ""
+    else
+      print " provide a project name" >&2
+    fi
 
-  local found=$(find_proj_index_ "$proj_arg")
-  
-  if (( ! found )); then
+    print "" >&2
+    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
+    pro -l
+    
+    return 1;
+  fi
+
+  # pro <name>
+  local i=$(find_proj_index_ "$proj_arg")
+  if (( ! i )); then
     pro -l
     return 1;
   fi
 
-  # found project ============================================================================
-
   # load the project config settings
-  load_config_entry_ $found
-  
-  local refresh=0
+  load_config_entry_ $i
 
   # if (( pro_is_f )); then
   #   if [[ -f "$PUMP_PRO_PWD_FILE" ]]; then
@@ -7135,63 +7263,18 @@ function pro() {
   #   fi
   # fi
 
-  # print "HEY proj_arg $proj_arg - CURRENT_PUMP_PROJECT $CURRENT_PUMP_PROJECT" >&2
-
   if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
-    refresh=1
-  fi
-
-  set_current_proj_ $found
-
-  if (( refresh )); then
+    set_current_proj_ $i
+    # refresh the current project
     print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
     print ""
 
-    # if (( pro_is_f )); then
-    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_PWD_FILE"
-    # else
-    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_FILE"
-    # fi
+    refresh_curr_proj_ $i
 
-    local node_version=""
-    local RET=1
-
-    if [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]] || (( CURRENT_PUMP_SKIP_NVM_LOOKUP == 0 )); then
-      node_version=$(get_node_version_ "$CURRENT_PUMP_PROJ_FOLDER" 2>/dev/null)
-      
-      if [[ -n "$node_version" ]]; then
-        if command -v nvm &>/dev/null; then
-          nvm use "$node_version"
-          RET=$?
-        fi
-      fi
-    fi
-
-    if [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
-      if (( RET == 0 )); then
-        confirm_between_ "save node \"${node_version}\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
-        RET=$?
-
-        if (( RET == 130 || RET == 2 )); then return 0; fi
-        if (( RET == 0 )); then
-          update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1 &>/dev/null
-          update_setting_ $found "PUMP_PRO" "nvm use $node_version" &>/dev/null
-        else
-          update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0 &>/dev/null
-        fi
-      fi
-    else
-      if [[ -n "$CURRENT_PUMP_PRO" ]]; then
-        if ! eval "$CURRENT_PUMP_PRO"; then
-          print " failed to run PUMP_PRO_${found}" >&2
-        fi
-      fi
-    fi
-
-    refresh_curr_proj_ $found
+    pro -nx "$proj_arg"
   fi
 }
 
@@ -7201,7 +7284,7 @@ function proj_handler() {
   local i="$1"
   shift
 
-  eval "$(parse_flags_ "proj_handler_" "me" "$@")"
+  eval "$(parse_flags_ "proj_handler_" "meincu" "$@")"
   (( proj_handler_is_d )) && set -x
 
   local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
@@ -7223,16 +7306,40 @@ function proj_handler() {
   if (( proj_handler_is_h )); then
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to $proj_cmd and open a folder"
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd -m${reset_cor}: to set project to $proj_cmd and open the default folder"
-    print "  ${yellow_cor}$proj_cmd -e ${reset_cor}: to edit the project"
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd <folder> ${reset_cor}: to set project to $proj_cmd and open the folder"
-
-    (( single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to $proj_cmd"
-    (( single_mode )) && print "  ${yellow_cor}$proj_cmd <folder|branch> ${reset_cor}: to set project to $proj_cmd and cd into folder if exists or switch to branch"
+    (( single_mode )) && print "  ${yellow_cor}$proj_cmd ${reset_cor}: to set project to ${proj_cmd}"
+    (( single_mode )) && print "  ${yellow_cor}$proj_cmd <folder|branch> ${reset_cor}: to set project to $proj_cmd and open folder if exists or switch to branch"
+    print "  --"
+    print "  ${yellow_cor}$proj_cmd -e${reset_cor}: to edit ${proj_cmd}"
+    print "  ${yellow_cor}$proj_cmd -i${reset_cor}: to display ${proj_cmd}'s readme if available"
+    print "  ${yellow_cor}$proj_cmd -n${reset_cor}: to set Node.js version for $proj_cmd"
+    print "  ${yellow_cor}$proj_cmd -c${reset_cor}: to show a ${proj_cmd}'s settings"
+    print "  ${yellow_cor}$proj_cmd -u${reset_cor}: to reset ${proj_cmd}'s \"don't ask again\" settings"
     return 0;
   fi
   
   if (( proj_handler_is_e )); then
     pro -e "$proj_cmd"
+    return $?
+  fi
+  
+  if (( proj_handler_is_i )); then
+    pro -i "$proj_cmd"
+    return $?
+  fi
+
+  if (( proj_handler_is_n )); then
+    pro -n "$proj_cmd"
+    return $?
+  fi
+
+  if (( proj_handler_is_c )); then
+    pro -c "$proj_cmd"
+    return $?
+  fi
+
+  if (( proj_handler_is_u )); then
+    pro -u "$proj_cmd"
     return $?
   fi
 
@@ -7270,7 +7377,7 @@ function proj_handler() {
       local dirs=($(get_folders_ "$proj_folder"))
       
       if (( ${#dirs[@]} )); then
-        local chosen_folder=($(choose_one_ 1 "choose folder to open" 20 "${dirs[@]}"))
+        local chosen_folder=($(choose_one_ 1 "folder to open" 20 "${dirs[@]}"))
         
         if [[ -n "$chosen_folder" ]]; then
           resolved_folder="${proj_folder}/${chosen_folder}"
@@ -7280,10 +7387,11 @@ function proj_handler() {
   fi
 
   mkdir -p $resolved_folder
-  pushd "$resolved_folder" &>/dev/null
+  cd "$resolved_folder"
 
   if [[ -z "$(ls "$resolved_folder")" ]]; then
-    print " now try running: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&2
+    print " project folder is empty" >&1
+    print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
   else
     if [[ -n "$branch_arg" ]]; then
       co "$branch_arg"
@@ -7834,13 +7942,12 @@ function colors() {
   for i in {0..255}; do print -P "%F{$i}Color $i%f"; done
 }
 
+# cd pro
 function chpwd() {
   local proj_arg=$(find_proj_by_pwd_)
 
   if [[ -n "$proj_arg" ]]; then
-    if pro "$proj_arg" 2>/dev/null; then
-      return 0;
-    fi
+    pro "$proj_arg"
   else
     clear_curr_proj_
     refresh_curr_proj_
@@ -7909,7 +8016,8 @@ typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
-typeset -gA PUMP_SKIP_NVM_LOOKUP
+typeset -gA PUMP_NVM_SKIP_LOOKUP
+typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
 
 # ========================================================================
@@ -7943,7 +8051,8 @@ typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
-typeset -g CURRENT_PUMP_SKIP_NVM_LOOKUP=""
+typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
+typeset -g CURRENT_PUMP_NVM_USE_V=""
 typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
 
 typeset -g MULTIPLE_MODE=0
@@ -7952,7 +8061,12 @@ typeset -g SINGLE_MODE=1
 typeset -g PUMP_PAST_FOLDER=""
 typeset -g PUMP_PAST_BRANCH=""
 
+typeset -g TEMP_PUMP_PROJ_FOLDER=""
+typeset -g TEMP_PUMP_PROJ_REPO=""
 typeset -g TEMP_PUMP_PROJ_SHORT_NAME=""
+typeset -g TEMP_SAVE_PROJ_CMD_ATTEMPTS=0
+typeset -g TEMP_SAVE_PROJ_REPO=0
+typeset -g TEMP_SAVE_PROJ_FOLDER=0
 typeset -g SAVE_PROJ_COR=""
 
 # ========================================================================

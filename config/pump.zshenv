@@ -130,7 +130,7 @@ PUMP_CODE_EDITOR_8=
 PUMP_CODE_EDITOR_9=
 
 # optional
-# default: empty
+# default: empty (no ask)
 # script to run after command `clone`
 # example: echo 'Clone completed!'
 PUMP_CLONE_1=
@@ -158,7 +158,7 @@ PUMP_USE_8=
 PUMP_USE_9=
 
 # optional
-# default: empty
+# default: empty (no ask)
 # script to run after `pro` command
 # example: nvm use 18
 PUMP_PRO_1=
@@ -262,7 +262,7 @@ PUMP_E2EUI_8=
 PUMP_E2EUI_9=
 
 # optional
-# default: empty
+# default: empty (no ask)
 # pull request template of each project.
 # example: .github/pull_request_template.md
 PUMP_PR_TEMPLATE_1=
@@ -276,7 +276,7 @@ PUMP_PR_TEMPLATE_8=
 PUMP_PR_TEMPLATE_9=
 
 # optional
-# default: empty
+# default: empty (no ask)
 # text to be matched in the PR template to append commit messages with command: pr
 # example: Description:
 PUMP_PR_REPLACE_1=
@@ -290,8 +290,8 @@ PUMP_PR_REPLACE_8=
 PUMP_PR_REPLACE_9=
 
 # optional
-# default: 0
-# set to 1 to append commit messages after PUMP_PR_REPLACE or 0 to replace it.
+# default 0
+# set to 0 to replace PUMP_PR_REPLACE with PR_BODY (created by the pr function) or 1 to append.
 PUMP_PR_APPEND_1=
 PUMP_PR_APPEND_2=
 PUMP_PR_APPEND_3=
@@ -303,7 +303,7 @@ PUMP_PR_APPEND_8=
 PUMP_PR_APPEND_9=
 
 # optional
-# default: 0
+# default emtpy (will ask)
 # set to 1 to run tests before pushing code and creating a pr or 0 to not run tests. If tests fail, pr is aborted.
 PUMP_PR_RUN_TEST_1=
 PUMP_PR_RUN_TEST_2=
@@ -316,6 +316,7 @@ PUMP_PR_RUN_TEST_8=
 PUMP_PR_RUN_TEST_9=
 
 # optional
+# default emtpy (will ask)
 # set to 1 to automatically add all changes to index before commit and recommit, 0 to not do anything
 PUMP_COMMIT_ADD_1=
 PUMP_COMMIT_ADD_2=
@@ -328,6 +329,7 @@ PUMP_COMMIT_ADD_8=
 PUMP_COMMIT_ADD_9=
 
 # optional
+# default emtpy (will ask)
 # set to 1 to automatically push on refix, 0 to not push
 PUMP_PUSH_ON_REFIX_1=
 PUMP_PUSH_ON_REFIX_2=
@@ -366,7 +368,8 @@ PUMP_GHA_INTERVAL_8=
 PUMP_GHA_INTERVAL_9=
 
 # optional
-# default workflow to check for command 'gha'
+# default emtpy (will ask)
+# workflow to check for command 'gha'
 PUMP_GHA_WORKFLOW_1=
 PUMP_GHA_WORKFLOW_2=
 PUMP_GHA_WORKFLOW_3=
@@ -376,6 +379,48 @@ PUMP_GHA_WORKFLOW_6=
 PUMP_GHA_WORKFLOW_7=
 PUMP_GHA_WORKFLOW_8=
 PUMP_GHA_WORKFLOW_9=
+
+# optional
+# default: empty (will ask)
+# 0 or empty to look for Node.js version in project's engine and nvm list
+# 1 to skip lookup
+# if skipped, you can manually set the version in PUMP_NVM_USE_V or set PUMP_PRO
+PUMP_NVM_SKIP_LOOKUP_1=
+PUMP_NVM_SKIP_LOOKUP_2=
+PUMP_NVM_SKIP_LOOKUP_3=
+PUMP_NVM_SKIP_LOOKUP_4=
+PUMP_NVM_SKIP_LOOKUP_5=
+PUMP_NVM_SKIP_LOOKUP_6=
+PUMP_NVM_SKIP_LOOKUP_7=
+PUMP_NVM_SKIP_LOOKUP_8=
+PUMP_NVM_SKIP_LOOKUP_9=
+
+# optional
+# default: empty (will ask)
+# the Node.js version to use with nvm (requires nvm and the Node.js version pre-installed)
+# example: 18
+PUMP_NVM_USE_V_1=
+PUMP_NVM_USE_V_2=
+PUMP_NVM_USE_V_3=
+PUMP_NVM_USE_V_4=
+PUMP_NVM_USE_V_5=
+PUMP_NVM_USE_V_6=
+PUMP_NVM_USE_V_7=
+PUMP_NVM_USE_V_8=
+PUMP_NVM_USE_V_9=
+
+# optional
+# default: empty (will ask)
+# the default branch when cloning a repository
+PUMP_DEFAULT_BRANCH_1=
+PUMP_DEFAULT_BRANCH_2=
+PUMP_DEFAULT_BRANCH_3=
+PUMP_DEFAULT_BRANCH_4=
+PUMP_DEFAULT_BRANCH_5=
+PUMP_DEFAULT_BRANCH_6=
+PUMP_DEFAULT_BRANCH_7=
+PUMP_DEFAULT_BRANCH_8=
+PUMP_DEFAULT_BRANCH_9=
 
 # optional
 # package.json name
@@ -388,30 +433,3 @@ PUMP_PKG_NAME_6=
 PUMP_PKG_NAME_7=
 PUMP_PKG_NAME_8=
 PUMP_PKG_NAME_9=
-
-# optional
-# default: 0
-# 0 to look for node version and run "nvm use <version>" if found, 1 to skip
-# if skipped, you can manually set PUMP_PRO=nvm use 18 for example to improve on performance
-PUMP_SKIP_NVM_LOOKUP_1=
-PUMP_SKIP_NVM_LOOKUP_2=
-PUMP_SKIP_NVM_LOOKUP_3=
-PUMP_SKIP_NVM_LOOKUP_4=
-PUMP_SKIP_NVM_LOOKUP_5=
-PUMP_SKIP_NVM_LOOKUP_6=
-PUMP_SKIP_NVM_LOOKUP_7=
-PUMP_SKIP_NVM_LOOKUP_8=
-PUMP_SKIP_NVM_LOOKUP_9=
-
-# optional
-# default: empty
-# the default branch when cloning a repository
-PUMP_DEFAULT_BRANCH_1=
-PUMP_DEFAULT_BRANCH_2=
-PUMP_DEFAULT_BRANCH_3=
-PUMP_DEFAULT_BRANCH_4=
-PUMP_DEFAULT_BRANCH_5=
-PUMP_DEFAULT_BRANCH_6=
-PUMP_DEFAULT_BRANCH_7=
-PUMP_DEFAULT_BRANCH_8=
-PUMP_DEFAULT_BRANCH_9=
