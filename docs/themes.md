@@ -2,9 +2,12 @@
 
 ## Themes
 
-1. [pump oh-my-zsh theme]()
-2. [pump-git-prompt oh-my-zsh theme]()
-3. [pump oh-my-posh theme]()
+Options:
+
+1. [pump oh-my-zsh theme](#pump-oh-my-zsh-theme)
+2. [pump-git-prompt oh-my-zsh theme](#pump-git-prompt-oh-my-zsh-theme)
+3. [pump oh-my-posh theme](#pump-oh-my-posh-theme)
+4. [Customize Your Own Theme](#customize-your-own-theme)
 
 ### pump oh-my-zsh theme
 
