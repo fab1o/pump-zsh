@@ -47,11 +47,11 @@ If you prefer to install dependencies manually, refer to the lists below:
 
 * [nvm](https://github.com/nvm-sh/nvm) — allows you to quickly install and use different versions of node.
 * [iTerm2](https://iterm2.com/) — a better Terminal app.
-* [Gruvbox iTerm2 color palette](https://github.com/herrbischoff/iterm2-gruvbox) — for a better terminal appearance.
+* [Gruvbox iTerm2 color palette](https://github.com/herrbischoff/iterm2-gruvbox) — for a better Terminal appearance.
 
 #### Optional (not installed by the script)
 
-* [Oh My Posh](https://ohmyposh.dev/) — works best with a [Nerd Font](https://ohmyposh.dev/docs/installation/fonts)
+* [Oh My Posh](https://ohmyposh.dev/) — works best with [Nerd Fonts](https://ohmyposh.dev/docs/installation/fonts)
 
 ---
 
@@ -59,7 +59,7 @@ If you prefer to install dependencies manually, refer to the lists below:
 
 Refer to the [Pump-zsh Wiki](https://github.com/fab1o/pump-zsh/wiki/Home) for detailed guides, configuration tips, and advanced usage.
 
-To see available commands and help options, run:
+To see available commands and help options, run in your Terminal:
 
 ```sh
 help
