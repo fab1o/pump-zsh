@@ -1,4 +1,5 @@
 typeset -g is_debug=0 # (debug flag) when -d is on, it will be shared across all subsequent function calls
+typeset -g MAX_NAME_COUNT=15
 
 typeset -Ag node_folder node_branch node_project
 typeset -Ag ll_next ll_prev
@@ -182,8 +183,6 @@ function parse_flags_() {
   # fi
 }
 
-
-
 function confirm_between_() {
   local question="$1"
   local option1="$2"
@@ -194,7 +193,9 @@ function confirm_between_() {
   local opt1="${option1[1]}"
   local opt2="${option2[1]}"
 
-  # local chosen_mode=""
+  ##########################################################################
+  # VERY IMPORTANT: 2>/dev/tty to display on VSCode Terminal and on refresh
+  ##########################################################################
 
   local RET=0
 
@@ -210,33 +211,19 @@ function confirm_between_() {
         --no-show-help \
         --default=false \
         --affirmative="$option1" \
-        --negative="$option2"
+        --negative="$option2" 2>/dev/tty
     else
       gum confirm ""confirm:$'\e[0m'" $question" \
         --no-show-help \
         --affirmative="$option1" \
-        --negative="$option2"
+        --negative="$option2" 2>/dev/tty
     fi
     RET=$?
     if (( RET == 130 )); then
-      clear_last_line_
-      clear_last_line_
+      clear_last_line_2_
+      clear_last_line_2_
       return 130;
     fi
-
-    # if (( RET == 0 )); then
-    #   if [[ -n "$default" && "$default" == "$option2" ]]; then
-    #     chosen_mode="$opt2"
-    #   else
-    #     chosen_mode="$opt1"
-    #   fi
-    # else
-    #   if [[ -n "$default" && "$default" == "$option1" ]]; then
-    #     chosen_mode="$opt1"
-    #   else
-    #     chosen_mode="$opt2"
-    #   fi
-    # fi
     return $RET;
   fi
 
@@ -248,19 +235,17 @@ function confirm_between_() {
     echo ""
     case "${mode:l}" in
       ${opt1:l}|${opt2:l}) break ;;
-      *) clear_last_line_;;
+      *) clear_last_line_1_;;
     esac
   done
 
-  clear_last_line_
+  clear_last_line_1_
 
   if [[ "${mode:l}" == "${opt1:l}" ]]; then
-    # chosen_mode="$opt1"      # turn echo back on
     return 0
   fi
   
   if [[ "${mode:l}" == "${opt2:l}" ]]; then
-    # chosen_mode="$opt2"
     return 1
   fi
 
@@ -279,8 +264,8 @@ function confirm_from_() {
     gum confirm ""confirm:$'\e[0m'" $question" --no-show-help 2>/dev/tty
     RET=$?
     if (( RET == 130 )); then
-      clear_last_line_
-      clear_last_line_
+      clear_last_line_2_
+      clear_last_line_2_
       return 130;
     fi
     return $RET;
@@ -472,6 +457,7 @@ function ll_restore_() {
 function input_from_() {
   local header="$1"
   local placeholder="$2"
+  local max="${3:-60}"
 
   local _input=""
 
@@ -479,7 +465,8 @@ function input_from_() {
   print "${purple_cor} ${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
-    _input=$(gum input --placeholder="$placeholder")
+    _input=$(gum input --placeholder="$placeholder" --char-limit=$max)
+    if (( $? == 130 )); then return 130; fi
   else
     # do not return placeholder if not gum input
     # if [[ -n "$placeholder" ]]; then
@@ -493,10 +480,10 @@ function input_from_() {
     stty echoctl
     trap - INT
 
-    clear_last_line_
+    clear_last_line_2_
   fi
   
-  clear_last_line_
+  clear_last_line_2_
 
   # if [[ "$_input" == $'\e' ]]; then # doesn't work
   #   return 130;
@@ -703,7 +690,10 @@ function update_proj_cmd_() {
 function update_setting_() {
   check_config_file_
 
-  if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then return 1; fi
+  if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then
+    # print "  warn: config file $PUMP_CONFIG_FILE does not exist, cannot update setting" >&2
+    return 0;
+  fi
 
   local i="$1"
   local general_key="$2" 
@@ -729,7 +719,9 @@ function update_setting_() {
   fi
 
   if (( $? != 0 )); then
-    print "  warn: failed to update $key in $PUMP_CONFIG_FILE" >&2
+    print "  warn: failed to update $key in config" >&2
+    print "   - check if you have write permissions to the file: $PUMP_CONFIG_FILE" >&2
+    print "   - re-install pump-zsh" >&2
   fi
 
   return 0;
@@ -741,9 +733,10 @@ function input_branch_name_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header")
-    if (( $? != 0 )); then return 1; fi
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
     
-    if git check-ref-format --branch "$typed_value" 1>/dev/null; then
+    if [[ -n "$typed_value" ]] && git check-ref-format --branch "$typed_value" 1>/dev/null; then
       echo "$typed_value"
       return 0;
     fi
@@ -758,14 +751,14 @@ function input_name_() {
 
   while true; do
     local typed_value=""
-    typed_value=$(input_from_ "$header" "$placeholder")
-    if (( $? != 0 )); then return 1; fi
+    typed_value=$(input_from_ "$header" "$placeholder" $MAX_NAME_COUNT)
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
     
-    if [[ -z "$typed_value" ]]; then
-      if [[ -n "$placeholder" ]] && command -v gum &>/dev/null; then
-        typed_value="$placeholder"
-      fi
+    if [[ -z "$typed_value" && -n "$placeholder" ]] && command -v gum &>/dev/null; then
+      typed_value="$placeholder"
     fi
+
     if [[ -n "$typed_value" ]]; then
       echo "$typed_value"
       return 0;
@@ -836,8 +829,8 @@ function file_proj_folder_() {
         done
 
         if (( found == 0 )); then
-          clear_last_line_
-          clear_last_line_
+          clear_last_line_2_
+          clear_last_line_2_
 
           echo "$folder_path"
           return 0;
@@ -871,7 +864,8 @@ function input_path_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header")
-    if (( $? != 0 )); then return 1; fi
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
 
     if [[ -n "$typed_value" && "$typed_value" =~ ^[a-zA-Z0-9/,_.-]+$ ]]; then
       echo "$typed_value"
@@ -991,7 +985,7 @@ function pause_output_() {
       return 1;
   fi
 
-  echo  # move to new line cleanly
+  echo "" # move to new line cleanly
 }
 
 function display_line_() {
@@ -1247,7 +1241,11 @@ function check_proj_pkg_manager_() {
 }
 # end of data checkers
 
-function clear_last_line_() {
+function clear_last_line_1_() {
+  print -n "\033[1A\033[2K" >&1
+}
+
+function clear_last_line_2_() {
   print -n "\033[1A\033[2K" >&2
 }
 
@@ -1314,7 +1312,7 @@ function choose_mode_() {
 
   local i=0
   for i in {1..16}; do
-    clear_last_line_
+    clear_last_line_2_
   done
 
   return $RET;
@@ -1344,7 +1342,7 @@ function print_tree_ascii_() {
 
   local i=0
   for i in {1..$total}; do
-    clear_last_line_
+    clear_last_line_2_
   done
 
   return $RET;
@@ -1646,9 +1644,12 @@ function save_proj_cmd_() {
   local pkg_name="$2"
   local old_proj_cmd="$3"
 
-  local typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name")
+  local typed_proj_cmd=""
+  typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name" 2>/dev/tty)
+  local RET=$?
+  if (( RET == 130 || RET == 2 )); then return 130; fi
   if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
-  
+
   if ! check_proj_cmd_ $i "$typed_proj_cmd" "$pkg_name" "$old_proj_cmd"; then
     if (( save_proj_cmd_is_e )); then
       if save_proj_cmd_ -e $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
@@ -1657,11 +1658,14 @@ function save_proj_cmd_() {
     else
       if save_proj_cmd_ $i "$pkg_name" "$old_proj_cmd"; then return 0; fi
     fi
+    return 1;
   fi
 
   if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
+    clear_last_line_1_
     print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
+    print "" >&1
   fi
 }
 
@@ -1688,13 +1692,15 @@ function save_proj_mode_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode"
+  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
 
+  clear_last_line_1_
   if (( single_mode )); then
     print "  ${SAVE_PROJ_COR}project mode:${reset_cor} single" >&1
   else
     print "  ${SAVE_PROJ_COR}project mode:${reset_cor} multiple" >&1
   fi
+  print "" >&1
 }
 
 function save_proj_folder_() {
@@ -1768,9 +1774,11 @@ function save_proj_folder_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_FOLDER" "$proj_folder"
+  update_setting_ $i "PUMP_PROJ_FOLDER" "$proj_folder" &>/dev/null
   
+  clear_last_line_1_
   print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${proj_folder}" >&1
+  print "" >&1
 }
 
 function save_proj_repo_() {
@@ -1830,9 +1838,11 @@ function save_proj_repo_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo"
+  update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo" &>/dev/null
 
+  clear_last_line_1_
   print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${proj_repo}" >&1
+  print "" >&1
 }
 
 function save_pkg_manager_() {
@@ -1854,13 +1864,13 @@ function save_pkg_manager_() {
   fi
 
   if (( ! save_pkg_manager_is_f )); then
-    clear_last_line_
+    clear_last_line_2_
   fi
 
   local RET=0
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
-    confirm_from_ "confirm package manager: "$'\e[38;5;212m'${pkg_manager}$'\e[0m'" "
+    confirm_from_ "package manager: "$'\e[38;5;212m'${pkg_manager}$'\e[0m'" "
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1875,9 +1885,11 @@ function save_pkg_manager_() {
     if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
   fi
 
-  update_setting_ $i "PUMP_PKG_MANAGER" "$pkg_manager"
+  update_setting_ $i "PUMP_PKG_MANAGER" "$pkg_manager" &>/dev/null
   
+  clear_last_line_1_
   print "  ${SAVE_PROJ_COR}package manager:${reset_cor} ${pkg_manager}" >&1
+  print "" >&1
 }
 
 function save_proj_f_() {
@@ -1901,15 +1913,16 @@ function save_proj_f_() {
   if (( save_proj_f_is_a )); then
     SAVE_PROJ_COR="${bright_green_cor}"
     display_line_ "add new project" "${SAVE_PROJ_COR}"
+    print "" >&1
   fi
 
   # for pro pwd, all the settings come from $PWD
 
   if (( save_proj_f_is_e )); then
-    update_setting_ $i "PUMP_PROJ_FOLDER" $PWD
-    update_setting_ $i "PUMP_PROJ_REPO" $proj_repo
-    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
-    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1
+    update_setting_ $i "PUMP_PROJ_FOLDER" $PWD &>/dev/null
+    update_setting_ $i "PUMP_PROJ_REPO" $proj_repo &>/dev/null
+    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
+    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1 &>/dev/null
 
     # don't edit package manager, not necessary, very rare edge case
     # if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}" 1>/dev/null; then return 1; fi
@@ -1917,8 +1930,8 @@ function save_proj_f_() {
   else
     remove_proj_ $i &>/dev/null
 
-    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
-    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1
+    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
+    update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1 &>/dev/null
 
     if ! save_proj_repo_ -f $i "$PWD" "$proj_cmd" "$proj_repo"; then return 1; fi
     if ! save_proj_folder_ -f $i "$proj_cmd" "$proj_repo" "$PWD"; then return 1; fi
@@ -1926,8 +1939,9 @@ function save_proj_f_() {
     if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_cmd_ -fa $i "$proj_cmd"; then return 1; fi
 
-    update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
+    if ! update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
 
+    clear_last_line_1_
     display_line_ "" "${SAVE_PROJ_COR}"
     print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
     print "" >&1
@@ -1962,20 +1976,28 @@ function save_proj_() {
     display_line_ "add new project" "${SAVE_PROJ_COR}"
   fi
 
-  local old_single_mode=""
+  print "" >&1
+
+  local old_pkg_manager=""
+  local refresh=0
 
   if (( save_proj_is_e )); then
     # editing a project
-    old_single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      refresh=1
+    fi
+
+    old_pkg_manager="${PUMP_PKG_MANAGER[$i]}"
 
     if ! save_proj_repo_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
+  
   else
+    # adding a new project
     remove_proj_ $i &>/dev/null
 
-    # adding a new project
     while [[ -z "${PUMP_PROJ_FOLDER[$i]}" ]]; do
       proj_cmd="${TEMP_PUMP_PROJ_SHORT_NAME:-$proj_cmd}"
 
@@ -1991,7 +2013,7 @@ function save_proj_() {
 
     if ! save_proj_mode_ -a $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
   fi
-  
+
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
 
   if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
@@ -2006,15 +2028,16 @@ function save_proj_() {
   local pkg_name=$(get_pkg_name_ "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}")
   
   if [[ -n "$pkg_name" ]]; then
-    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name"
+    update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
   fi
   
-  update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"
-
+  if ! update_proj_cmd_ $i "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
+  
+  clear_last_line_1_
   display_line_ "" "${SAVE_PROJ_COR}"
   print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
   print "" >&1
-
+  
   load_config_entry_ $i
 
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -2038,11 +2061,31 @@ function save_proj_() {
     # fi
   fi
 
+  if (( refresh )); then
+    set_current_proj_ $i
+    refresh_curr_proj_ $i
+    return 0;
+  fi
+  
+  print "" >&1
   print " now try running command: ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
   # do not automatically switch pro, user should do it manually
   # eval "${PUMP_PROJ_SHORT_NAME[$i]}"
 }
 # end of save project data to config file =========================================
+
+function refresh_curr_proj_() {
+  local i="$1"
+
+  unset_aliases_
+  set_aliases_ $i
+
+  export PUMP_PROJECT="$CURRENT_PUMP_PROJ_SHORT_NAME"
+
+  if [[ -n "$ZSH_THEME" ]]; then
+    source "$ZSH/themes/${ZSH_THEME}.zsh-theme"
+  fi
+}
 
 function unset_aliases_() {
   unalias ncov &>/dev/null
@@ -2077,16 +2120,17 @@ function unset_aliases_() {
   unset -f ig &>/dev/null
   unset -f lint &>/dev/null
   unset -f rdev &>/dev/null
-  unset -f tsc &>/dev/null
   unset -f sb &>/dev/null
   unset -f sbb &>/dev/null
   unset -f start &>/dev/null
+  unset -f tsc &>/dev/null
+  unset -f watch &>/dev/null
 }
 
 function set_aliases_() {
   local i="$1"
 
-  if ! check_proj_pkg_manager_ -s $i "$CURRENT_PUMP_PKG_MANAGER" "$CURRENT_PUMP_PROJ_FOLDER"; then return 1; fi
+  if ! check_proj_pkg_manager_ -s $i "$CURRENT_PUMP_PKG_MANAGER" "$CURRENT_PUMP_PROJ_FOLDER" "$CURRENT_PUMP_PROJ_REPO"; then return 1; fi
 
   if [[ -z "$CURRENT_PUMP_PKG_MANAGER" ]]; then
     CURRENT_PUMP_PKG_MANAGER="${PUMP_PKG_MANAGER[$i]}"
@@ -2103,10 +2147,11 @@ function set_aliases_() {
   alias ig="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")install --global"
   alias lint="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")lint"
   alias rdev="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")dev"
-  alias tsc="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")tsc"
   alias sb="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")storybook"
   alias sbb="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")storybook:build"
   alias start="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")start"
+  alias tsc="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")tsc"
+  alias watch="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")watch"
 
   if [[ "$CURRENT_PUMP_COV" != "$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")test:coverage" ]]; then
     alias ${CURRENT_PUMP_PKG_MANAGER:0:1}cov="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")test:coverage"
@@ -2127,52 +2172,47 @@ function set_aliases_() {
 
 function remove_proj_() {
   local i="$1"
-  local reload_omz="$2"
 
   local proj_name="${PUMP_PROJ_SHORT_NAME[$i]}"
 
   unset_aliases_
-  unset -f "${PUMP_PROJ_SHORT_NAME[$i]}" &>/dev/null
+  unset -f $proj_name &>/dev/null
 
   update_setting_ $i "PUMP_PROJ_SHORT_NAME" "" # let this one
-  update_setting_ $i "PUMP_PROJ_FOLDER" "" 1>/dev/null
-  update_setting_ $i "PUMP_PROJ_REPO" "" 1>/dev/null
-  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "" 1>/dev/null
-  update_setting_ $i "PUMP_PKG_MANAGER" "" 1>/dev/null
-  update_setting_ $i "PUMP_CODE_EDITOR" "" 1>/dev/null
-  update_setting_ $i "PUMP_CLONE" "" 1>/dev/null
-  update_setting_ $i "PUMP_SETUP" "" 1>/dev/null
-  update_setting_ $i "PUMP_RUN" "" 1>/dev/null
-  update_setting_ $i "PUMP_RUN_STAGE" "" 1>/dev/null
-  update_setting_ $i "PUMP_RUN_PROD" "" 1>/dev/null
-  update_setting_ $i "PUMP_PRO" "" 1>/dev/null
-  update_setting_ $i "PUMP_USE" "" 1>/dev/null
-  update_setting_ $i "PUMP_TEST" "" 1>/dev/null
-  update_setting_ $i "PUMP_RETRY_TEST" "" 1>/dev/null
-  update_setting_ $i "PUMP_COV" "" 1>/dev/null
-  update_setting_ $i "PUMP_OPEN_COV" "" 1>/dev/null
-  update_setting_ $i "PUMP_TEST_WATCH" "" 1>/dev/null
-  update_setting_ $i "PUMP_E2E" "" 1>/dev/null
-  update_setting_ $i "PUMP_E2EUI" "" 1>/dev/null
-  update_setting_ $i "PUMP_PR_TEMPLATE" "" 1>/dev/null
-  update_setting_ $i "PUMP_PR_REPLACE" "" 1>/dev/null
-  update_setting_ $i "PUMP_PR_APPEND" "" 1>/dev/null
-  update_setting_ $i "PUMP_PR_RUN_TEST" "" 1>/dev/null
-  update_setting_ $i "PUMP_GHA_INTERVAL" "" 1>/dev/null
-  update_setting_ $i "PUMP_COMMIT_ADD" "" 1>/dev/null
-  update_setting_ $i "PUMP_GHA_WORKFLOW" "" 1>/dev/null
-  update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" 1>/dev/null
-  update_setting_ $i "PUMP_PRINT_README" "" 1>/dev/null
-  update_setting_ $i "PUMP_PKG_NAME" "" 1>/dev/null
-  update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" 1>/dev/null
-  update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 1>/dev/null
+  update_setting_ $i "PUMP_PROJ_FOLDER" "" &>/dev/null
+  update_setting_ $i "PUMP_PROJ_REPO" "" &>/dev/null
+  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "" &>/dev/null
+  update_setting_ $i "PUMP_PKG_MANAGER" "" &>/dev/null
+  update_setting_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
+  update_setting_ $i "PUMP_CLONE" "" &>/dev/null
+  update_setting_ $i "PUMP_SETUP" "" &>/dev/null
+  update_setting_ $i "PUMP_RUN" "" &>/dev/null
+  update_setting_ $i "PUMP_RUN_STAGE" "" &>/dev/null
+  update_setting_ $i "PUMP_RUN_PROD" "" &>/dev/null
+  update_setting_ $i "PUMP_PRO" "" &>/dev/null
+  update_setting_ $i "PUMP_USE" "" &>/dev/null
+  update_setting_ $i "PUMP_TEST" "" &>/dev/null
+  update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
+  update_setting_ $i "PUMP_COV" "" &>/dev/null
+  update_setting_ $i "PUMP_OPEN_COV" "" &>/dev/null
+  update_setting_ $i "PUMP_TEST_WATCH" "" &>/dev/null
+  update_setting_ $i "PUMP_E2E" "" &>/dev/null
+  update_setting_ $i "PUMP_E2EUI" "" &>/dev/null
+  update_setting_ $i "PUMP_PR_TEMPLATE" "" &>/dev/null
+  update_setting_ $i "PUMP_PR_REPLACE" "" &>/dev/null
+  update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
+  update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
+  update_setting_ $i "PUMP_GHA_INTERVAL" "" &>/dev/null
+  update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
+  update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
+  update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" &>/dev/null
+  update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
+  update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
+  update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
+  update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
   
   if [[ -n "$proj_name" ]]; then
     print " project removed: $proj_name"
-  fi
-
-  if (( reload_omz )); then
-    omz reload
   fi
 }
 
@@ -2253,7 +2293,11 @@ function get_node_version_() {
 
   # require 'semver' CLI tool to do semver comparisons
   if ! command -v semver &>/dev/null; then
-    npm install -g semver --yes &>/dev/null
+    if command -v npm &>/dev/null; then
+      npm install -g semver --yes &>/dev/null
+    else
+      return 1;
+    fi
   fi
 
   if ! command -v semver &>/dev/null; then return 1; fi
@@ -2619,7 +2663,7 @@ function get_remote_origin_() {
 
   if [[ ! -d "$proj_folder" ]]; then return 1; fi
 
-  cd "$proj_folder" &>/dev/null
+  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
 
   if [[ -z "$branch" ]]; then
     branch=$(git branch --show-current 2>/dev/null)
@@ -2646,6 +2690,8 @@ function get_remote_branch_() {
   local remote_origin=$(get_remote_origin_ "$branch_to_look_up_origin" "$proj_folder")
   if [[ -z "$remote_origin" ]]; then return 1; fi
 
+  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
+
   local remote_branch=$(git ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
 
   if [[ -n "$remote_branch" ]]; then
@@ -2662,6 +2708,8 @@ function get_repo_() {
 
   local remote_origin=$(get_remote_origin_ "$branch" "$proj_folder")
   if [[ -z "$remote_origin" ]]; then return 1; fi
+
+  if ! cd "$proj_folder" &>/dev/null; then return 1; fi
 
   local remote_repo=$(git remote get-url "$remote_origin" 2>/dev/null)
 
@@ -3203,7 +3251,7 @@ function get_proj_count_() {
 
 function activate_pro_() {
   # pro pwd
-  if [[ "$1" == "pwd" ]] && pro -f "pwd" 2>/dev/null; then
+  if pro -f "pwd" 2>/dev/null; then
     rm -f "$PUMP_PRO_PWD_FILE" &>/dev/null
     return 0;
   fi
@@ -3244,7 +3292,8 @@ function activate_pro_() {
 
   # Loop over the projects to check and execute them
   for project in "${project_names[@]}"; do
-    if pro "$project" 2>/dev/null; then
+    if pro -f "$project" 2>/dev/null; then
+      rm -f "$PUMP_PRO_PWD_FILE" &>/dev/null
       return 0;
     fi
   done
@@ -3302,15 +3351,9 @@ function refresh() {
 }
 
 function upgrade() {
-  if command -v omz &>/dev/null; then
-    if omz update; then
-      if command -v oh-my-posh &>/dev/null; then
-        if oh-my-posh upgrade; then
-          print ""
-          update_ -f
-        fi
-      fi
-    fi
+  if omz update; then
+    print ""
+    update_ -f
   fi
 }
 
@@ -4985,8 +5028,11 @@ function renb() {
   if (( $? == 0 )); then
     git config "branch.${new_name}.gh-merge-base" "$base_branch" &>/dev/null
     git config --remove-section "branch.${current_name}" &>/dev/null
-  fi
 
+    if git push origin :"$current_name" --quiet; then
+      git push --set-upstream origin "$new_name"
+    fi
+  fi
 }
 
 function chp() {
@@ -5209,17 +5255,19 @@ function recommit() {
     return 1;
   fi
 
-  local qty_staged_files=$(git diff --cached --name-only | wc -l)
-  local qty_unstaged_files=$(git diff --name-only | wc -l)
+  local qty_staged_files=0
+  local qty_unstaged_files=0
 
   if (( recommit_is_s )); then
-    if [[ $qty_staged_files -eq 0 ]]; then
+    qty_staged_files=$(git diff --cached --name-only | wc -l)
+    if (( qty_staged_files == 0 )); then
       print " nothing to recommit, no staged changes" >&2
       return 1;
     else
       if ! git reset --quiet --soft HEAD~1 1>/dev/null; then return 1; fi
     fi
   else
+    qty_unstaged_files=$(git diff --name-only | wc -l)
     if (( qty_unstaged_files > 1 )); then
       if [[ -z "$CURRENT_PUMP_COMMIT_ADD" ]]; then
         confirm_from_ "add all unstaged changes to commit \""$'\e[94m'$last_commit_msg$'\e[0m'"\" ?"
@@ -5239,7 +5287,8 @@ function recommit() {
             print ""
           fi
         else
-          if [[ $qty_staged_files -eq 0 ]]; then
+          qty_staged_files=$(git diff --cached --name-only | wc -l)
+          if (( qty_staged_files == 0 )); then
             print " nothing to recommit, no staged changes" >&2
             return 1;
           fi
@@ -6442,18 +6491,21 @@ function dev() {
   (( dev_is_d )) && set -x
 
   if (( dev_is_h )); then
-    print "  ${yellow_cor}dev${reset_cor} : to switch to dev or develop in current project"
+    print "  ${yellow_cor}dev${reset_cor} : to switch to dev branch in current project"
     return 0;
   fi
 
   if ! is_git_repo_; then return 1; fi
 
-  if ! co -e dev &>/dev/null; then
-    if ! co -e develop &>/dev/null; then
-      print " did not match any branch known to git: dev or develop" >&2
-      return 1;
+  for ref in refs/{heads,remotes/{origin,upstream}}/{dev,devel,develop,development}; do
+    if git show-ref -q --verify $ref; then
+      co -e ${ref:t} &>/dev/null
+      return $?;
     fi
-  fi
+  done
+
+  print " did not match any branch known to git" >&2
+  return 1;
 }
 
 function main() {
@@ -6462,18 +6514,21 @@ function main() {
   (( main_is_d )) && set -x
 
   if (( main_is_h )); then
-    print "  ${yellow_cor}main${reset_cor} : to switch to main in current project"
+    print "  ${yellow_cor}main${reset_cor} : to switch to main branch in current project"
     return 0;
   fi
 
   if ! is_git_repo_; then return 1; fi
 
-  if ! co -e main &>/dev/null; then
-    if ! co -e master &>/dev/null; then
-      print " did not match any branch known to git: main" >&2
-      return 1;
+  for ref in refs/{heads,remotes/{origin,upstream}}/{main,trunk,mainline,default,stable,master}; do
+    if git show-ref -q --verify $ref; then
+      co -e ${ref:t} &>/dev/null
+      return $?;
     fi
-  fi
+  done
+
+  print " did not match any branch known to git" >&2
+  return 1;
 }
 
 function prod() {
@@ -6482,18 +6537,21 @@ function prod() {
   (( prod_is_d )) && set -x
 
   if (( prod_is_h )); then
-      print "  ${yellow_cor}prod${reset_cor} : to switch to prod or production in current project"
+      print "  ${yellow_cor}prod${reset_cor} : to switch to production branch in current project"
     return 0;
   fi
 
   if ! is_git_repo_; then return 1; fi
 
-  if ! co -e prod &>/dev/null; then
-    if ! co -e production &>/dev/null; then
-      print " did not match any branch known to git: prod or production" >&2
-      return 1;
+  for ref in refs/{heads,remotes/{origin,upstream}}/{prod,production}; do
+    if git show-ref -q --verify $ref; then
+      co -e ${ref:t} &>/dev/null
+      return $?;
     fi
-  fi
+  done
+
+  print " did not match any branch known to git" >&2
+  return 1;
 }
 
 function stage() {
@@ -6502,18 +6560,21 @@ function stage() {
   (( stage_is_d )) && set -x
 
   if (( stage_is_h )); then
-      print "  ${yellow_cor}stage${reset_cor} : to switch to stage or staging in current project"
+      print "  ${yellow_cor}stage${reset_cor} : to switch to staging branch in current project"
     return 0;
   fi
 
   if ! is_git_repo_; then return 1; fi
 
-  if ! co -e stage &>/dev/null; then
-    if ! co -e staging &>/dev/null; then
-      print " did not match any branch known to git: stage or staging" >&2
-      return 1;
+  for ref in refs/{heads,remotes/{origin,upstream}}/{stage,staging}; do
+    if git show-ref -q --verify $ref; then
+      co -e ${ref:t} &>/dev/null
+      return $?;
     fi
-  fi
+  done
+
+  print " did not match any branch known to git" >&2
+  return 1;
 }
 
 function rebase() {
@@ -6954,18 +7015,17 @@ function pro() {
     local i=0
     for i in {1..9}; do
       if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        update_setting_ $i "PUMP_RETRY_TEST" ""
-        update_setting_ $i "PUMP_PR_APPEND" ""
-        update_setting_ $i "PUMP_PR_RUN_TEST" ""
-        update_setting_ $i "PUMP_COMMIT_ADD" ""
-        update_setting_ $i "PUMP_PUSH_ON_REFIX" ""
-        update_setting_ $i "PUMP_PRINT_README" ""
-        update_setting_ $i "PUMP_GHA_WORKFLOW" ""
-        update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" ""
-        update_setting_ $i "PUMP_DEFAULT_BRANCH" ""
+        update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
+        update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
+        update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
+        update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
+        update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
+        update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
+        update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
+        update_setting_ $i "PUMP_SKIP_NVM_LOOKUP" "" &>/dev/null
+        update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
 
-        print " project settings reset successful: $proj_arg"
-
+        # print " project settings reset successful: $proj_arg"
         return 0;
       fi
     done
@@ -7043,10 +7103,7 @@ function pro() {
     fi
 
     local re_activate=0;
-
-    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
-      re_activate=1
-    fi
+    [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] && re_activate=1;
 
     local i=0
     for i in {1..9}; do
@@ -7054,11 +7111,7 @@ function pro() {
         if remove_proj_ $i; then
           if (( re_activate )); then
             export PUMP_PROJECT=""
-            
-            if activate_pro_; then
-              return 0;
-            fi
-            omz reload
+            activate_pro_
           fi
           return 0;
         fi
@@ -7155,8 +7208,6 @@ function pro() {
     fi
   fi
 
-  # print "proj_arg: [$proj_arg] - current: [$CURRENT_PUMP_PROJ_SHORT_NAME]"
-
   if [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     is_refresh=1
   fi
@@ -7168,9 +7219,8 @@ function pro() {
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
-    print "" # end of line
+    print ""
 
-    # don't save pro in file when terminal is open in pwd (vscode)
     if (( pro_is_f )); then
       echo "$CURRENT_PUMP_PROJ_SHORT_NAME" > "$PUMP_PRO_PWD_FILE"
     else
@@ -7183,8 +7233,23 @@ function pro() {
     
     local RET=1
     if [[ -n "$node_version" ]]; then
-      nvm use "$node_version"
+      if command -v nvm &>/dev/null; then
+        nvm use "$node_version"
+        RET=$?
+      fi
+    fi
+
+    if (( RET == 0 )) && [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
+      confirm_between_ "save \"nvm use $node_version\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
       RET=$?
+
+      if (( RET == 130 || RET == 2 )); then return 0; fi
+      if (( RET == 0 )); then
+        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1 &>/dev/null
+        update_setting_ $found "PUMP_PRO" "nvm use $node_version" &>/dev/null
+      else
+        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0 &>/dev/null
+      fi
     fi
 
     if [[ -n "$CURRENT_PUMP_PRO" ]]; then
@@ -7193,27 +7258,7 @@ function pro() {
       fi
     fi
 
-    if (( RET == 0 )) && [[ -z "$CURRENT_PUMP_SKIP_NVM_LOOKUP" ]]; then
-      confirm_between_ "save \"nvm use $node_version\" in the config for $proj_arg to improve speed by skipping future lookups?" "save" "don't save"
-      RET=$?
-      if (( RET == 130 || RET == 2 )); then return 0; fi
-      if (( RET == 0 )); then
-        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 1
-        update_setting_ $found "PUMP_PRO" "nvm use $node_version"
-      else
-        update_setting_ $found "PUMP_SKIP_NVM_LOOKUP" 0
-      fi
-    fi
-
-    unset_aliases_
-    set_aliases_ $found
-    RET=$?
-
-    if (( ! pro_is_f )); then
-      zsh
-    fi
-
-    return $RET;
+    refresh_curr_proj_ $found
   fi
 }
 
@@ -7384,31 +7429,31 @@ function pop() {
   fi
 }
 
-# # commit functions ====================================================
-# typeset -g COMMIT1=""
-# typeset -g COMMIT2=""
+# commit functions ====================================================
+typeset -g COMMIT1=""
+typeset -g COMMIT2=""
 
-# if command -v c &>/dev/null; then
-#   if (( ${+functions[c]} && -n "${functions[c]}" )); then
-#     unset -f c
-#     COMMIT1="c"
-#     if ! command -v commit &>/dev/null; then
-#       COMMIT2="commit"
-#     fi
-#   else
-#     COMMIT1="commit"
-#   fi
-# else
-#   COMMIT1="c"
-#   if ! command -v commit &>/dev/null; then
-#     COMMIT2="commit"
-#   fi
-# fi
+if command -v c &>/dev/null; then
+  if (( ${+functions[c]} && -n "${functions[c]}" )); then
+    unset -f c
+    COMMIT1="c"
+    if ! command -v commit &>/dev/null; then
+      COMMIT2="commit"
+    fi
+  else
+    COMMIT1="commit"
+  fi
+else
+  COMMIT1="c"
+  if ! command -v commit &>/dev/null; then
+    COMMIT2="commit"
+  fi
+fi
 
-# functions[$COMMIT1]="__commit \"\$@\";"
-# if [[ -n "$COMMIT2" ]]; then
-#   functions[$COMMIT2]="__commit \"\$@\";"
-# fi
+functions[$COMMIT1]="__commit \"\$@\";"
+if [[ -n "$COMMIT2" ]]; then
+  functions[$COMMIT2]="__commit \"\$@\";"
+fi
 
 function __commit() {
   eval "$(parse_flags_ "commit_" "am" "$@")"
@@ -7518,8 +7563,24 @@ function help() {
     pro -a
     return $?;
   fi
-
+  
   print ""
+  display_line_ "general" "${solid_yellow_cor}"
+  print ""
+  print " ${solid_yellow_cor} cl ${reset_cor}\t\t = clear"
+  print " ${solid_yellow_cor} del ${reset_cor}\t\t = delete utility"
+  print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
+  print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
+  print " ${solid_yellow_cor} kill <port> ${reset_cor}\t = kill port"
+  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -laF"
+  print " ${solid_yellow_cor} nver ${reset_cor}\t\t = node version"
+  print " ${solid_yellow_cor} nlist ${reset_cor}\t = npm list global"
+  print " ${solid_yellow_cor} path ${reset_cor}\t\t = print \$PATH"
+  print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
+  print " ${solid_yellow_cor} upgrade ${reset_cor}\t = upgrade pump + zsh + omp"
+
+  if ! pause_output_; then return 0; fi
+
   display_line_ "get started" "${blue_cor}"
   print ""
   print "  1. set a project, type:${solid_blue_cor} pro${reset_cor}"
@@ -7527,7 +7588,8 @@ function help() {
   print "  3. setup project, type:${blue_cor} setup${reset_cor}"
   print "  4. run a project, type:${blue_cor} run${reset_cor}"
 
-  print ""
+  if ! pause_output_; then return 0; fi
+
   display_line_ "project selection" "${solid_blue_cor}"
   print ""
   print " ${solid_blue_cor} pro ${reset_cor}\t\t = project management"
@@ -7544,8 +7606,9 @@ function help() {
     fi
   done
 
-  print ""
-  display_line_ "setup and run" "${blue_cor}"
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "setup & run" "${blue_cor}"
   print ""
   print " ${blue_cor} clone ${reset_cor}\t = clone project or branch"
   
@@ -7574,7 +7637,8 @@ function help() {
     print " ${blue_cor} run prod ${reset_cor}\t = $CURRENT_PUMP_RUN_PROD"
   fi
 
-  print ""
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "code review" "${cyan_cor}"
   print ""
   print " ${cyan_cor} rev ${reset_cor}\t\t = open a pull request for review"
@@ -7597,9 +7661,11 @@ function help() {
   print " ${solid_magenta_cor} sbb ${reset_cor}\t\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")storybook:build"
   print " ${solid_magenta_cor} start ${reset_cor}\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")start"
   print " ${solid_magenta_cor} tsc ${reset_cor}\t\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")tsc"
+  print " ${solid_magenta_cor} watch ${reset_cor}\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")watch"
   
-  print ""
-  display_line_ "test $CURRENT_PUMP_PROJ_SHORT_NAME" "${magenta_cor}"
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "testing" "${magenta_cor}"
   print ""
   if [[ "$CURRENT_PUMP_COV" != "$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")test:coverage" ]]; then
     print " ${solid_magenta_cor} ${CURRENT_PUMP_PKG_MANAGER:0:1}cov ${reset_cor}\t\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")test:coverage"
@@ -7622,7 +7688,8 @@ function help() {
   print " ${magenta_cor} test ${reset_cor}\t\t = $CURRENT_PUMP_TEST"
   print " ${magenta_cor} testw ${reset_cor}\t = $CURRENT_PUMP_TEST_WATCH"
 
-  print ""
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "git" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} gconf ${reset_cor}\t = git config"
@@ -7639,11 +7706,12 @@ function help() {
   print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main branch"
   print " ${solid_cyan_cor} next ${reset_cor}\t\t = go to the next working folder/branch"
   print " ${solid_cyan_cor} prev ${reset_cor}\t\t = go to the previous working folder/branch"
-  print " ${solid_cyan_cor} prod ${reset_cor}\t = switch to prod or production branch"
+  print " ${solid_cyan_cor} prod ${reset_cor}\t\t = switch to prod or production branch"
   print " ${solid_cyan_cor} renb <b>${reset_cor}\t = rename branch"
   print " ${solid_cyan_cor} stage ${reset_cor}\t = switch to stage or staging branch"
 
-  print ""
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "git clean" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} clean${reset_cor}\t\t = clean + restore"
@@ -7658,7 +7726,8 @@ function help() {
   print " ${solid_cyan_cor} reseta ${reset_cor}\t = reset hard $remote_origin + clean"
   print " ${solid_cyan_cor} restore ${reset_cor}\t = undo edits since last commit"
   
-  print ""
+  if ! pause_output_; then return 0; fi
+
   display_line_ "git log" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} glog ${reset_cor}\t\t = git log"
@@ -7667,12 +7736,29 @@ function help() {
 
   if ! pause_output_; then return 0; fi
 
+  display_line_ "git merge" "${solid_cyan_cor}"
+  print ""
+  print " ${solid_cyan_cor} abort${reset_cor}\t\t = abort rebase/merge/chp"
+  print " ${solid_cyan_cor} chc ${reset_cor}\t\t = continue cherry-pick"
+  print " ${solid_cyan_cor} chp ${reset_cor}\t\t = cherry-pick commit"
+  print " ${solid_cyan_cor} cont ${reset_cor}\t\t = continue rebase/merge/chp"
+  print " ${solid_cyan_cor} mc ${reset_cor}\t\t = continue merge"
+  print " ${solid_cyan_cor} merge ${reset_cor}\t = merge from $(git config --get init.defaultBranch)"
+  print " ${solid_cyan_cor} merge <b> ${reset_cor}\t = merge from branch"
+  print " ${solid_cyan_cor} rc ${reset_cor}\t\t = continue rebase"
+  print " ${solid_cyan_cor} rebase ${reset_cor}\t = rebase from $(git config --get init.defaultBranch)"
+  print " ${solid_cyan_cor} rebase <b> ${reset_cor}\t = rebase from branch"
+  
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "git pull" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} fetch ${reset_cor}\t = fetch from $remote_origin"
-  print " ${solid_cyan_cor} pull ${reset_cor}\t\t = pull all branches from $remote_origin"
-
+  print " ${solid_cyan_cor} pull ${reset_cor}\t\t = pull from $remote_origin"
   print ""
+
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "git push" "${solid_cyan_cor}"
   print ""
   print " ${solid_cyan_cor} add ${reset_cor}\t\t = add files to index"
@@ -7686,20 +7772,6 @@ function help() {
   print " ${solid_cyan_cor} pr ${reset_cor}\t\t = create pull request"
   print " ${solid_cyan_cor} push ${reset_cor}\t\t = push all no-verify to $remote_origin"
   print " ${solid_cyan_cor} pushf ${reset_cor}\t = push force all to $remote_origin"
-  
-  print ""
-  display_line_ "git rebase" "${solid_cyan_cor}"
-  print ""
-  print " ${solid_cyan_cor} abort${reset_cor}\t\t = abort rebase/merge/chp"
-  print " ${solid_cyan_cor} chc ${reset_cor}\t\t = continue cherry-pick"
-  print " ${solid_cyan_cor} chp ${reset_cor}\t\t = cherry-pick commit"
-  print " ${solid_cyan_cor} cont ${reset_cor}\t\t = continue rebase/merge/chp"
-  print " ${solid_cyan_cor} mc ${reset_cor}\t\t = continue merge"
-  print " ${solid_cyan_cor} merge ${reset_cor}\t = merge from $(git config --get init.defaultBranch)"
-  print " ${solid_cyan_cor} merge <b> ${reset_cor}\t = merge from branch"
-  print " ${solid_cyan_cor} rc ${reset_cor}\t\t = continue rebase"
-  print " ${solid_cyan_cor} rebase ${reset_cor}\t = rebase from $(git config --get init.defaultBranch)"
-  print " ${solid_cyan_cor} rebase <b> ${reset_cor}\t = rebase from branch"
 
   if ! pause_output_; then return 0; fi
   
@@ -7708,39 +7780,29 @@ function help() {
   print " ${solid_cyan_cor} pop ${reset_cor}\t\t = apply stash then remove from list"
   print " ${solid_cyan_cor} stash ${reset_cor}\t = stash files"
 
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "release" "${yellow_cor}"
   print ""
-  display_line_ "git release" "${solid_cyan_cor}"
-  print ""
-  print " ${solid_cyan_cor} dtag ${reset_cor}\t\t = delete a tag"
-  print " ${solid_cyan_cor} drelease ${reset_cor}\t = delete a release"
-  print " ${solid_cyan_cor} release ${reset_cor}\t = create a release"
-  print " ${solid_cyan_cor} tag ${reset_cor}\t\t = create a tag"
-  print " ${solid_cyan_cor} tags ${reset_cor}\t\t = list latest tags"
-  print " ${solid_cyan_cor} tags 1 ${reset_cor}\t = display latest tag"
-
-  print ""
-  display_line_ "general" "${solid_cyan_cor}"
-  print ""
-  print " ${solid_yellow_cor} cl ${reset_cor}\t\t = clear"
-  print " ${solid_yellow_cor} del ${reset_cor}\t\t = delete utility"
-  print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
-  print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
-  print " ${solid_yellow_cor} kill <port> ${reset_cor}\t = kill port"
-  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -laF"
-  print " ${solid_yellow_cor} nver ${reset_cor}\t\t = node version"
-  print " ${solid_yellow_cor} nlist ${reset_cor}\t = npm list global"
-  print " ${solid_yellow_cor} path ${reset_cor}\t\t = print \$PATH"
-  print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
-  print " ${solid_yellow_cor} upgrade ${reset_cor}\t = upgrade pump + zsh + omp"
-  print ""
+  print " ${yellow_cor} dtag ${reset_cor}\t\t = delete a tag"
+  print " ${yellow_cor} drelease ${reset_cor}\t = delete a release"
+  print " ${yellow_cor} release ${reset_cor}\t = create a release"
+  print " ${yellow_cor} tag ${reset_cor}\t\t = create a tag"
+  print " ${yellow_cor} tags ${reset_cor}\t\t = list latest tags"
+  print " ${yellow_cor} tags 1 ${reset_cor}\t = display latest tag"
+  
+  if ! pause_output_; then return 0; fi
+  
   display_line_ "multi-step task" "${solid_pink_cor}"
   print ""
   print " ${solid_pink_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
-  print " ${solid_pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-commit/push"
-  print " ${solid_pink_cor} recommit ${reset_cor}\t = reset last commit then re-commit changes to index"
-  print " ${solid_pink_cor} release ${reset_cor}\t = bump version and create a release in github"
-  print " ${solid_pink_cor} repush ${reset_cor}\t = reset last commit then re-push changes to index"
-  print " ${solid_pink_cor} rev ${reset_cor}\t\t = open a pull request for review on $CURRENT_PUMP_CODE_EDITOR"
+  print " ${solid_pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-push"
+  print " ${solid_pink_cor} recommit ${reset_cor}\t = reset last commit then commit changes to index again"
+  print " ${solid_pink_cor} release ${reset_cor}\t = bump version and create a release on github"
+  print " ${solid_pink_cor} repush ${reset_cor}\t = reset last commit then push changes again"
+  print " ${solid_pink_cor} rev ${reset_cor}\t\t = open a pull request for review on code editor"
+  
+  print ""
   print ""
   print "  to learn more, visit:${blue_cor} https://github.com/fab1o/pump-zsh/wiki ${reset_cor}"
 }
@@ -7785,7 +7847,7 @@ function validate_proj_cmd_strict_() {
 
 function validate_proj_cmd_() {
   local proj_cmd="$1"
-  local qty=13
+  local qty=$MAX_NAME_COUNT
 
   local error_msg=""
 
@@ -7907,7 +7969,7 @@ for i in {1..9}; do
   fi
 done
 
-activate_pro_ "pwd" # set project
+activate_pro_ # set project
 
 # ==========================================================================
 # 1>/dev/null or >/dev/null	  Hide stdout, show stderr
