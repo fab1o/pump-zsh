@@ -6,14 +6,20 @@
       "segments": [
         {
           "background": "transparent",
-          "foreground": "p:greenbright",
+          "foreground": "green",
+          "foreground_templates": [
+            "{{ if .Error }}red{{ end }}"
+          ],
+          "properties": {
+            "always_enabled": true
+          },
           "style": "plain",
           "template": "➜ ",
-          "type": "text"
+          "type": "status"
         },
         {
           "background": "transparent",
-          "foreground": "p:gruvcyanlight",
+          "foreground": "cyan",
           "properties": {
             "style": "folder"
           },
@@ -33,11 +39,11 @@
         },
         {
           "background": "transparent",
-          "foreground": "p:gruvblue",
+          "foreground": "blue",
           "foreground_templates": [
-            "{{ if and (gt .Behind 0) (gt .Ahead 0) }}p:gruvredlight{{ end }}",
-            "{{ if gt .Ahead 0 }}p:gruvyellow{{ end }}",
-            "{{ if gt .Behind 0 }}p:gruvmagentalight{{ end }}",
+            "{{ if and (gt .Behind 0) (gt .Ahead 0) }}red{{ end }}",
+            "{{ if gt .Ahead 0 }}yellow{{ end }}",
+            "{{ if gt .Behind 0 }}magenta{{ end }}",
             "{{ if or (.Working.Changed) (.Staging.Changed) }}p:orange{{ end }}"
           ],
           "properties": {
@@ -58,20 +64,6 @@
           "style": "plain",
           "template": "<b> {{.FormattedMs}}</b>",
           "type": "executiontime"
-        },
-        {
-          "background": "transparent",
-          "foreground": "p:purple",
-          "foreground_templates": [
-            "{{ if .Error }}p:gruvred{{ end }}"
-          ],
-          "properties": {
-            "always_enabled": true
-          },
-          "style": "plain",
-          // https://jrgraphix.net/r/Unicode/2700-27BF
-          "template": "<b>{{ if gt .Code 0 }}✗{{ else }}✓{{ end }}</b>",
-          "type": "status"
         }
       ],
       "type": "prompt"
