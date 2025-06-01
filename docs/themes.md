@@ -98,18 +98,17 @@ To use Pump with **Oh My Posh**:
 
 ### 4. Customize Your Own Theme
 
-Pump-zsh exports an environment variable called:
+Pump-zsh exports environment variables that can be used in your prompt customization:
 
 ```sh
-PUMP_PROJECT
+CURRENT_PUMP_PROJECT # indicates the current set project
+PUMP_TIME_TOOK # time took to run last command
 ```
-
-This indicates the currently selected project and can be used in your prompt customization.
 
 To build your own theme:
 
-* Explore how Pump's [built-in themes](/lib/themes) use this variable.
-* Adapt their logic to fit your custom style or prompt framework.
+* Explore how Pump's [built-in themes](/lib/themes) use these variables.
+* Adapt the logic to fit your custom style or prompt framework.
 
 Be sure to include `pump` in your plugins list:
 
