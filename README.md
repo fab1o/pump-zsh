@@ -1,14 +1,8 @@
 # Pump-zsh
 
-It's a 3 in 1:
+Pump-zsh is a plugin with a configurable set of aliases and functions to **supercharge your terminal experience**.
 
-- an **Oh My Zsh** plugin & theme
-- and an **Oh My Posh** theme
-
-with a configurable set of aliases and functions to **supercharge your terminal experience**
-
-Oh My Posh screenhsot:
-![screenshot](https://github.com/fab1o/pump-zsh/blob/main/docs/prompt-shot.png?raw=true)
+It also includes a few [themes](docs/themes.md)
 
 ## Install
 
@@ -43,28 +37,6 @@ If you prefer to install dependencies manually, here’s the list:
 - **Recommended (not installed by the script)**:
   - [iTerm2](https://iterm2.com/)
   - [Gruvbox iTerm2 palette](https://github.com/herrbischoff/iterm2-gruvbox) — customize terminal colors
-
----
-
-## Themes
-
-To set **Oh My Zsh** theme to pump, update the following in your `~/.zshrc` file:
-```sh
-ZSH_THEME="pump"
-```
-
-To set **Oh My Posh** theme to pump, add the following to your `~/.zshrc` file:
-```sh
-if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
-   eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
-fi
-```
-
-### Customize Your Own Theme
-
-Pump exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project.
-
-You can use this variable to customize your own theme. To see how this works in practice, take a look at how Pump’s [built-in themes](/lib/themes) implement this feature, you can adapt a similar approach in your own theme.
 
 ---
 
