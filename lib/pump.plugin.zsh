@@ -2421,7 +2421,11 @@ function get_node_versions_() {
     fi
   done
 
-  if (( ${#matching_versions[@]} == 0 )); then return 1; fi
+  if (( ${#matching_versions[@]} == 0 )); then
+    print " no matching node versions found for engine: $node_engine" 2>/dev/tty >&2
+    print " try to install a version with: nvm install" 2>/dev/tty >&2
+    return 1;
+  fi
 
   if [[ "$sort_by" == "latest" ]]; then
     echo "$(printf "%s\n" "${matching_versions[@]}" | sort -V | tail -n 10)"
@@ -2773,23 +2777,44 @@ function get_proj_for_pkg_() {
 
   if [[ ! -d "$folder" ]]; then return 1; fi
 
+  local proj_folder=""
+
   if [[ -e "${folder}/${file}" ]]; then
-    echo "$folder"
-    return 0;
+    proj_folder="${folder}"
   fi
 
-  local pattern=$(printf "%q" "$file")
-  local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 2 -type f -iname "${pattern}*" -print -quit 2>/dev/null)
-  if [[ -z "$found_file" ]]; then
-    found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -type f -iname "${pattern}*" -print -quit 2>/dev/null)
-  fi
-  
-  if [[ -n "$found_file" ]]; then
-    echo "$(dirname "$found_file")"
-    return 0;
+  if [[ -z "$proj_folder" ]]; then
+    local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
+
+    local dir=""
+    for dir in "${dirs[@]}"; do
+      if [[ -f "${folder}/${dir}/${file}" ]]; then
+        proj_folder="${folder}/${dir}"
+        break;
+      fi
+    done
   fi
 
-  return 1;
+  if [[ -z "$proj_folder" ]]; then
+    local pattern="$(printf "%q" "$file")"
+    local found_file="$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 2 -type f -iname "${pattern}*" -print -quit 2>/dev/null)"
+    if [[ -z "$found_file" ]]; then
+      found_file="$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -type f -iname "${pattern}*" -print -quit 2>/dev/null)"
+    fi
+
+    if [[ -n "$found_file" ]]; then
+      local dir="$(dirname "$found_file")"
+      proj_folder="${folder}/${dir}"
+    fi
+  fi
+
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+
+  if is_git_repo_ "${proj_folder}" &>/dev/null; then
+    git -C "${proj_folder}" fetch --quiet --all &>/dev/null
+  fi
+
+  echo "$proj_folder"
 }
 
 function get_proj_for_git_() {
@@ -2800,14 +2825,25 @@ function get_proj_for_git_() {
     return 0;
   fi
 
-  local found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -maxdepth 2 -type d -name ".git" -print -quit 2>/dev/null)
+  local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
+
+  local dir=""
+  for dir in "${dirs[@]}"; do
+    if is_git_repo_ "${folder}/${dir}" &>/dev/null; then
+      echo "${folder}/${dir}"
+      return 0;
+    fi
+  done
+
+  local found_git="$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -maxdepth 2 -type d -name ".git" -print -quit 2>/dev/null)"
   if [[ -z "$found_git" ]]; then
-    found_git=$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -type d -name ".git" -print -quit 2>/dev/null)
+    found_git="$(find "$folder" \( -path "*/.*" -a ! -name ".git" \) -prune -o -type d -name ".git" -print -quit 2>/dev/null)"
   fi
 
   if [[ -n "$found_git" ]]; then
-    if is_git_repo_ "$(dirname "$found_git")" &>/dev/null; then
-      echo "$(dirname "$found_git")"
+    local dir="${folder}/$(dirname "$found_git")"
+    if is_git_repo_ "$dir" &>/dev/null; then
+      echo "$dir"
       return 0;
     fi
   fi
@@ -7107,6 +7143,8 @@ function pro() {
       # gum spin --title="detecting Node.js engine..." -- sh -c "read < $pipe_name" &
       # spin_pid=$!
 
+      proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
+
       local node_engine=$(get_node_engine_ "$proj_folder")
 
       if [[ -n "$node_engine" ]]; then
@@ -7236,7 +7274,6 @@ function pro() {
       print " provide a project name" >&2
     fi
 
-    print "" >&2
     print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     pro -l
     
@@ -7387,7 +7424,7 @@ function proj_handler() {
   fi
 
   mkdir -p $resolved_folder
-  cd "$resolved_folder"
+  pushd "$resolved_folder" &>/dev/null
 
   if [[ -z "$(ls "$resolved_folder")" ]]; then
     print " project folder is empty" >&1
