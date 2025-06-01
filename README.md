@@ -45,8 +45,8 @@ If you prefer to install dependencies manually, refer to the lists below:
 
 #### Recommended (not installed by the script)
 
-* [nvm](https://github.com/nvm-sh/nvm) - allows you to quickly install and use different versions of node.
-* [iTerm2](https://iterm2.com/)
+* [nvm](https://github.com/nvm-sh/nvm) — allows you to quickly install and use different versions of node.
+* [iTerm2](https://iterm2.com/) — a better Terminal app.
 * [Gruvbox iTerm2 color palette](https://github.com/herrbischoff/iterm2-gruvbox) — for a better terminal appearance.
 
 #### Optional (not installed by the script)
