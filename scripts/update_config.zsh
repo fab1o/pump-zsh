@@ -4,7 +4,7 @@
 set -e
 setopt extended_glob
 
-DEST_DIR_CONFIG="$HOME/.oh-my-zsh/plugins/pump/config"
+DEST_DIR_CONFIG="$ZSH/plugins/pump/config"
 DEST_CONFIG="$DEST_DIR_CONFIG/pump.zshenv"
 BACKUP_SUFFIX="bak"
 #$(date +%Y%m%d%H%M%S)"

@@ -16,7 +16,7 @@ fi
 #   if [[ "$(uname)" != "Darwin" ]]; then
 # CONFIG_SNIPPET=$(cat << 'EOF'
 # # pump-zsh config
-# eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
+# eval "$(oh-my-posh init zsh --config $ZSH/plugins/pump/pump.omp.json)"
 # # pump-zsh config
 # EOF
 # )
@@ -24,7 +24,7 @@ fi
 # CONFIG_SNIPPET=$(cat << 'EOF'
 # # pump-zsh config
 # if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
-#   eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
+#   eval "$(oh-my-posh init zsh --config $ZSH/plugins/pump/pump.omp.json)"
 # fi
 # # pump-zsh config
 # EOF

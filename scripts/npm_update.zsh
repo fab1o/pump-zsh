@@ -4,11 +4,11 @@
 set -e # exit immediately if any command returns a non-zero (error) status
 
 SRC_DIR="./lib"
-DEST_DIR="$HOME/.oh-my-zsh/plugins/pump"
+DEST_DIR="$ZSH/plugins/pump"
 THEMES_SRC_DIR="./lib/themes"
-THEMES_DIR="$HOME/.oh-my-zsh/themes"
+THEMES_DIR="$ZSH/themes"
 
-cp -Rf $THEMES_SRC_DIR/pump.zsh-theme "$THEMES_DIR"
+cp -Rf $THEMES_SRC_DIR/*.zsh-theme "$THEMES_DIR"
 
 mkdir -p "$DEST_DIR"
 cp -Rf $THEMES_SRC_DIR/pump.omp.json "$DEST_DIR"

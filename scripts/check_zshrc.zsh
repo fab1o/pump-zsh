@@ -16,7 +16,7 @@ if [ ! -f "$zshrc_file" ] || ! grep -q '^plugins=' "$zshrc_file"; then
   if [[ "$(uname)" == "Darwin" ]]; then
     print 'if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then"' >&2
   fi
-  print '  eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"' >&2
+  print '  eval "$(oh-my-posh init zsh --config $ZSH/plugins/pump/pump.omp.json)"' >&2
   if [[ "$(uname)" == "Darwin" ]]; then
     print "fi" >&2
   fi
