@@ -812,13 +812,13 @@ function file_proj_folder_() {
         cd "$folder_path"
       else
         local found=0
-        local realfolder="$(realpath "$folder_path" 2>/dev/null)"
+        local realfolder="${folder_path:A}"
         if (( ! folder_exists )); then
           realfolder="${realfolder}/$folder_name"
         fi
         for j in {1..10}; do
           if [[ $j -ne $i && -n "$PUMP_PROJ_FOLDER[$j]" && -n "${PUMP_PROJ_SHORT_NAME[$j]}" ]]; then
-            local realfolder_proj="$(realpath "$PUMP_PROJ_FOLDER[$j]" 2>/dev/null)"
+            local realfolder_proj="${PUMP_PROJ_FOLDER[$j]:A}"
 
             if [[ "$realfolder" == "$realfolder_proj" ]]; then
               found=1
@@ -867,9 +867,13 @@ function input_path_() {
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
 
-    if [[ -n "$typed_value" && "$typed_value" =~ ^[a-zA-Z0-9/,_.-]+$ ]]; then
-      echo "$typed_value"
-      break;
+    if [[ -n "$typed_value" ]]; then
+      typed_value="${typed_value:A}" # convert to absolute path
+
+      if [[ "$typed_value" =~ ^[a-zA-Z0-9/,_.-]+$ ]]; then
+        echo "$typed_value"
+        break;
+      fi
     fi
   done
 }
@@ -2447,9 +2451,7 @@ function find_proj_cmd_() {
   local i=0
   for i in {1..9}; do
     if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" && -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-      local proj_path=$(realpath "${PUMP_PROJ_FOLDER[$i]}" 2>/dev/null)
-
-      if [[ -n "$proj_path" && "$folder" == "${proj_path}" ]]; then
+      if [[ "${folder:A}" == "${PUMP_PROJ_FOLDER[$i]:A}" ]]; then
         echo "${PUMP_PROJ_SHORT_NAME[$i]}"
         return 0;
       fi
@@ -2458,9 +2460,7 @@ function find_proj_cmd_() {
 
   for i in {1..9}; do
     if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" && -n "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-      local proj_path=$(realpath "${PUMP_PROJ_FOLDER[$i]}" 2>/dev/null)
-
-      if [[ -n "$proj_path" && "${folder}/" == "${proj_path}/"* ]]; then
+      if [[ "${folder:A}/" == "${PUMP_PROJ_FOLDER[$i]:A}/"* ]]; then
         echo "${PUMP_PROJ_SHORT_NAME[$i]}"
         return 0;
       fi
@@ -7568,6 +7568,7 @@ function help() {
   display_line_ "general" "${solid_yellow_cor}"
   print ""
   print " ${solid_yellow_cor} cl ${reset_cor}\t\t = clear"
+  print " ${solid_yellow_cor} colors ${reset_cor}\t = display colors from 0 to 255"
   print " ${solid_yellow_cor} del ${reset_cor}\t\t = delete utility"
   print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
   print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
@@ -7873,6 +7874,41 @@ function validate_proj_cmd_() {
   fi
 
   return 0;
+}
+
+function colors() {
+  for i in {0..255}; do print -P "%F{$i}Color $i%f"; done
+}
+
+function preexec() {
+  timer=$(print -P %D{%s%3.})
+}
+
+function precmd() {
+  local timeprompt="" 
+  if [ $timer ]; then
+    local now=$(print -P %D{%s%3.})
+    local d_ms=$(($now - $timer))
+    local d_s=$((d_ms / 1000))
+    local ms=$((d_ms % 1000))
+    local s=$((d_s % 60))
+    local m=$(((d_s / 60) % 60))
+    local h=$((d_s / 3600))
+
+    if ((h > 0)); then
+      timeprompt="${h}h${m}m${s}s";
+    elif ((m > 0)); then
+      timeprompt="${m}m${s}.$(printf $(($ms / 100)))s";
+    elif ((s > 9)); then
+      timeprompt="${s}.$(printf %02d $(($ms / 10)))s";
+    elif ((s > 0)); then
+      timeprompt="${s}.$(printf %03d $ms)s";
+    else
+      timeprompt="${ms}ms";
+    fi
+    unset timer
+  fi
+  RPROMPT="%F{99}${timeprompt}%f%b"
 }
 
 typeset -gA PUMP_PROJ_SHORT_NAME
