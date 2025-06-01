@@ -7073,8 +7073,6 @@ function pro() {
     # pro -u <name> reset project settings
     local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
 
-    update_setting_ $i "PUMP_RETRY_TEST" "" &>/dev/null
-    update_setting_ $i "PUMP_PR_APPEND" "" &>/dev/null
     update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
     update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
     update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
