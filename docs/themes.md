@@ -8,8 +8,9 @@ Pump-zsh provides lightweight, customizable themes for Zsh — including options
 
 1. [Pump (Oh My Zsh)](#1-pump-oh-my-zsh-theme)
 2. [Pump Git Prompt (Oh My Zsh)](#2-pump-git-prompt-oh-my-zsh-theme)
-3. [Pump (Oh My Posh)](#3-pump-oh-my-posh-theme)
-4. [Customize Your Own Theme](#4-customize-your-own-theme)
+3. [Pump Hybrid (Oh My Zsh)](#3-pump-hybrid-oh-my-zsh-theme)
+4. [Pump (Oh My Posh)](#4-pump-oh-my-posh-theme)
+5. [Customize Your Own Theme](#5-customize-your-own-theme)
 
 ---
 
@@ -49,7 +50,25 @@ To enable the pump theme with Git prompt enhancements:
 
 ---
 
-### 3. Pump (Oh My Posh Theme)
+### 3. Pump Hybrid (Oh My Zsh Theme)
+
+To enable the pump theme with Git prompt enhancements:
+
+1. Set the theme in your `~/.zshrc`:
+
+   ```zsh
+   ZSH_THEME="pump-hybrid"
+   ```
+
+2. Add `pump` and `git-prompt` to your list of plugins:
+
+   ```zsh
+   plugins=(git-prompt pump)
+   ```
+
+---
+
+### 4. Pump (Oh My Posh Theme)
 
 To use Pump with **Oh My Posh**:
 
