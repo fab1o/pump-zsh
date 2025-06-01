@@ -2,10 +2,6 @@
 
 **Pump-zsh** is an unofficial 'Oh My Zsh' plugin that provides a configurable set of aliases, functions, and themes to supercharge your terminal workflow.
 
-It also exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project. This can be used to customize your prompt dynamically.
-
-In addition, Pump-zsh includes a collection of [built-in themes](docs/themes.md) for immediate use.
-
 ---
 
 ## Installation
@@ -15,6 +11,14 @@ The recommended way to install Pump-zsh is via the provided install script:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh
 ```
+
+---
+
+## Themes
+
+In addition, Pump-zsh includes a collection of [built-in themes](docs/themes.md) for immediate use.
+
+It also exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project. This can be used to customize your own theme.
 
 ---
 
