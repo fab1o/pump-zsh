@@ -1,59 +1,91 @@
 # Pump-zsh
 
-## Themes
+Pump-zsh provides lightweight, customizable themes for Zsh — including options for **Oh My Zsh** and **Oh My Posh**.
 
-Options:
+---
 
-1. [pump oh-my-zsh theme](#1-pump-oh-my-zsh-theme)
-2. [pump-git-prompt oh-my-zsh theme](#2-pump-git-prompt-oh-my-zsh-theme)
-3. [pump oh-my-posh theme](#3-pump-oh-my-posh-theme)
+## Available Themes
+
+1. [Pump (Oh My Zsh)](#1-pump-oh-my-zsh-theme)
+2. [Pump Git Prompt (Oh My Zsh)](#2-pump-git-prompt-oh-my-zsh-theme)
+3. [Pump (Oh My Posh)](#3-pump-oh-my-posh-theme)
 4. [Customize Your Own Theme](#4-customize-your-own-theme)
 
-### 1. pump oh-my-zsh theme
+---
 
-- To set this theme, update the following in your `~/.zshrc` file:
-```sh
-ZSH_THEME="pump"
-```
+### 1. Pump (Oh My Zsh Theme)
 
-- And add pump to the list of plugins in your `~/.zshrc` file:
-```sh
-plugins=(pump)
-```
+To enable this theme:
 
-### 2. pump-git-prompt oh-my-zsh theme
+1. Set the theme in your `~/.zshrc`:
 
-- To set this theme, update the following in your `~/.zshrc` file:
-```sh
-ZSH_THEME="pump"
-```
+   ```zsh
+   ZSH_THEME="pump"
+   ```
 
-- And add git-prompt and pump to the list of plugins in your `~/.zshrc` file:
-```sh
-plugins=(git-prompt pump)
-```
+2. Add `pump` to your list of plugins:
 
-### 3. pump oh-my-posh theme
+   ```zsh
+   plugins=(pump)
+   ```
 
-- To set **Oh My Posh** theme to pump, add the following to your `~/.zshrc` file:
-```sh
-if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
-   eval "$(oh-my-posh init zsh --config $ZSH/plugins/pump/pump.omp.json)"
-fi
-```
+---
 
-- And add pump to the list of plugins in your `~/.zshrc` file:
-```sh
-plugins=(git-prompt pump)
-```
+### 2. Pump Git Prompt (Oh My Zsh Theme)
+
+To enable the pump theme with Git prompt enhancements:
+
+1. Set the theme in your `~/.zshrc`:
+
+   ```zsh
+   ZSH_THEME="pump"
+   ```
+
+2. Add `pump` and `git-prompt` to your list of plugins:
+
+   ```zsh
+   plugins=(git-prompt pump)
+   ```
+
+---
+
+### 3. Pump (Oh My Posh Theme)
+
+To use Pump with **Oh My Posh**:
+
+1. Add the following to your `~/.zshrc`:
+
+   ```zsh
+   if [ "$TERM_PROGRAM" != "Apple_Terminal" ]; then
+     eval "$(oh-my-posh init zsh --config $ZSH/plugins/pump/pump.omp.json)"
+   fi
+   ```
+
+2. Add `pump` (and optionally `git-prompt`) to your plugins:
+
+   ```zsh
+   plugins=(git-prompt pump)
+   ```
+
+---
 
 ### 4. Customize Your Own Theme
 
-Pump-zsh exports an environment variable called `PUMP_PROJECT`, which represents the currently selected project.
+Pump-zsh exports an environment variable called:
 
-You can use this variable to customize your own theme. To see how this works in practice, take a look at how Pump’s [built-in themes](/lib/themes) implement this feature, you can adapt a similar approach in your own theme.
-
-- Make sure pump is added to the list of plugins in your `~/.zshrc` file:
 ```sh
+PUMP_PROJECT
+```
+
+This indicates the currently selected project and can be used in your prompt customization.
+
+To build your own theme:
+
+* Explore how Pump's [built-in themes](/lib/themes) use this variable.
+* Adapt their logic to fit your custom style or prompt framework.
+
+Be sure to include `pump` in your plugins list:
+
+```zsh
 plugins=(git-prompt pump)
 ```
