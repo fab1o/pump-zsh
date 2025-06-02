@@ -1712,7 +1712,7 @@ function save_proj_cmd_() {
 }
 
 function save_proj_mode_() {
-  eval "$(parse_flags_ "save_proj_mode_" "ae" "$@")"
+  eval "$(parse_flags_ "save_proj_mode_" "aeq" "$@")"
   (( save_proj_mode_is_d )) && set -x
 
   local i="$1"
@@ -1735,6 +1735,10 @@ function save_proj_mode_() {
   fi
 
   update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
+
+  if (( save_proj_mode_is_q )); then
+    return 0;
+  fi
 
   clear_last_line_2_
   clear_last_line_1_
@@ -7166,10 +7170,20 @@ function pro() {
     if (( nvm_skip_lookup && pro_is_x )); then
       version_to_use="$nvm_use_v"
     else
-      #  2>/dev/tty &! is for termianl on vscode
-      gum spin --title="detecting Node.js engine..." -- sleep 2 2>/dev/tty &!
+      setopt NO_NOTIFY
+      {
+        # exec
+        gum spin --title="Checking Node.js..." -- bash -c 'sleep 3'
+        # echo -e "\r\033[K"
+        # tput sgr0
+      } 2>/dev/tty
+
+      # gum spin --title="detecting Node.js engine..." -- sleep 2 2>/dev/tty &!
 
       proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
+      if [[ -z "$proj_folder" ]]; then
+        return 1;
+      fi
 
       local node_engine=$(get_node_engine_ "$proj_folder")
 
@@ -7188,7 +7202,7 @@ function pro() {
           version_to_use=$(choose_one_ 0 "Node.js version to use with ${proj_arg}'s engine $node_engine" 20 "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
         
         elif (( ${#versions[@]} == 2 )); then
-          confirm_between_ "choose a Node.js version to use with ${proj_arg}'s engine $node_engine:" "${versions[1]}" "${versions[2]}"
+          confirm_between_ "Node.js version to use with ${proj_arg}'s engine $node_engine:" "${versions[1]}" "${versions[2]}"
           local _RET=$?
 
           if (( _RET == 0 )); then
@@ -7313,11 +7327,11 @@ function pro() {
   if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
     set_current_proj_ $i
     # refresh the current project
-    print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
+    print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}" >/dev/tty
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
-      print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
+      print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}" >/dev/tty
     fi
-    print ""
+    print "" >/dev/tty
 
     refresh_curr_proj_ $i
 
@@ -7346,7 +7360,7 @@ function proj_handler() {
 
   local working="${PUMP_WORKING[$i]}"
 
-  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
+  if ! save_proj_mode_ -q $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
   
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]:-1}"
 
