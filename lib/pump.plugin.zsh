@@ -2083,7 +2083,7 @@ function save_proj_() {
 
     if is_git_repo_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
       PUMP_PROJ_SINGLE_MODE[$i]=1
-    elif get_proj_for_git_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
+    elif get_proj_for_git_ "${PUMP_PROJ_FOLDER[$i]}" "$TEMP_PUMP_PROJ_SHORT_NAME" &>/dev/null; then
       PUMP_PROJ_SINGLE_MODE[$i]=0
     fi
 
@@ -2726,7 +2726,9 @@ function is_proj_folder_() {
 
 function get_default_folder_() {
   local proj_folder="${1:-$PWD}"
-  local git_folder=$(get_proj_for_git_ "$proj_folder")
+  local proj_cmd="$2"
+
+  local git_folder=$(get_proj_for_git_ "$proj_folder" "$proj_cmd" 2>/dev/null)
 
   if [[ -z "$git_folder" ]]; then return 1; fi
 
@@ -2816,31 +2818,32 @@ function get_proj_for_pkg_() {
   echo "$proj_folder"
 }
 
-function open_proj_for_git_() {
-  local folder="$1"
-  local proj_arg="$2"
+# function open_proj_for_git_() {
+#   local folder="$1"
+#   local proj_arg="$2"
 
-  local git_folder=$(get_proj_for_git_ "$folder")
+#   local git_folder=$(get_proj_for_git_ "$folder")
   
-  if [[ -z "$git_folder" ]]; then
-    if [[ -n "$proj_arg" ]]; then
-      print " could not find a cloned project for $proj_arg" >&2
-      print " run ${yellow_cor}clone $proj_arg${reset_cor} to clone project" >&2
-    else
-      print " could not find a cloned project" >&2
-      print " run ${yellow_cor}clone${reset_cor} to clone project" >&2
-    fi
-    return 1;
-  fi
+#   if [[ -z "$git_folder" ]]; then
+#     if [[ -n "$proj_arg" ]]; then
+#       print " could not find a cloned project for $proj_arg" >&2
+#       print " run ${yellow_cor}clone $proj_arg${reset_cor} to clone project" >&2
+#     else
+#       print " could not find a cloned project" >&2
+#       print " run ${yellow_cor}clone${reset_cor} to clone project" >&2
+#     fi
+#     return 1;
+#   fi
 
-  cd "$git_folder" || {
-    print " cannot change directory to: $git_folder" >&2
-    return 1;
-  }
-}
+#   cd "$git_folder" || {
+#     print " cannot change directory to: $git_folder" >&2
+#     return 1;
+#   }
+# }
 
 function get_proj_for_git_() {
   local folder="${1:-$PWD}"
+  local proj_cmd="${2:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
 
   if is_git_repo_ "$folder" &>/dev/null; then
     echo "$folder"
@@ -2870,7 +2873,20 @@ function get_proj_for_git_() {
     fi
   fi
 
+  if [[ -n "$proj_cmd" ]]; then
+    print " could not find a folder with a cloned repository for $proj_cmd" >&2
+    print " run ${yellow_cor}clone $proj_cmd${reset_cor} to clone project" >&2
+  else
+    print " could not find a folder with a cloned project" >&2
+    print " run ${yellow_cor}clone${reset_cor} to clone a project" >&2
+  fi
+
   return 1;
+
+  # cd "$git_folder" || {
+  #   print " cannot change directory to: $git_folder" >&2
+  #   return 1;
+  # }
 }
 
 function is_git_repo_() {
@@ -2922,8 +2938,6 @@ function get_remote_branch_() {
   fi
 
   local remote_origin=$(get_remote_origin_ "$branch_to_look_up_origin" "$proj_folder")
-  if [[ -z "$remote_origin" ]]; then return 1; fi
-
   local remote_branch=$(git -C "$proj_folder" ls-remote --heads "$remote_origin" "$branch" | awk '{print $2}')
 
   if [[ -n "$remote_branch" ]]; then
@@ -2939,8 +2953,6 @@ function get_repo_() {
   local branch="$2"
 
   local remote_origin=$(get_remote_origin_ "$branch" "$proj_folder")
-  if [[ -z "$remote_origin" ]]; then return 1; fi
-
   local remote_repo=$(git -C "$proj_folder" remote get-url "$remote_origin" 2>/dev/null)
 
   if [[ -n "$remote_repo" ]]; then
@@ -2973,9 +2985,10 @@ function select_branch_() {
   local filter="$2"
   local searchText="$3"
   local multiple=${4:-0}
-  local header="" # $5
+  local header="$5"
   local include_special_branches=${6:-1}
   local excluded_branch="$7"
+  local proj_folder="${8:-$PWD}"
 
   local remote_origin=$(get_remote_origin_)
 
@@ -2984,20 +2997,20 @@ function select_branch_() {
   # | sed "s/^${remote_origin}\///" \
 
   if [[ "$filter" == "--all" || "$filter" == "-a" ]]; then
-    branch_choices=("${(@f)$(git branch --all --format="%(refname:short)" \
+    branch_choices=("${(@f)$(git -C "$proj_folder" branch --all --format="%(refname:short)" \
       | grep -v "^${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
       | sort -fu
     )}")
   elif [[ "$filter" == "-r" ]]; then
-    branch_choices=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/remotes \
+    branch_choices=("${(@f)$(git -C "$proj_folder" for-each-ref --format='%(refname:short)' refs/remotes \
       | grep -v "^${remote_origin}/" \
       | grep -i "$searchText" \
       | sort -fu
     )}")
   else
-    branch_choices=("${(@f)$(git branch --list --format="%(refname:short)" \
+    branch_choices=("${(@f)$(git -C "$proj_folder" branch --list --format="%(refname:short)" \
       | grep -v "${remote_origin}/" \
       | grep -v 'detached' \
       | grep -i "$searchText" \
@@ -3068,11 +3081,26 @@ function select_pr_() {
   fi
 
   local search_text="$1"
+  local proj_folder="${2:-$PWD}"
+  local proj_cmd="$3"
+
+  local _pwd="$(pwd)"
+
+  cd "$proj_folder" || {
+    print " cannot change directory to: $proj_folder" >&2
+    return 1;
+  }
 
   local pr_list=$(gh pr list | grep -i "$search_text" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
 
+  cd $_pwd
+
   if [[ -z "$pr_list" ]]; then
-    print " no pull requests found" >&2
+    if [[ -n "$proj_cmd" ]]; then
+      print " no pull requests found for project: $proj_cmd" >&2
+    else
+      print " no pull requests found" >&2
+    fi
     return 1;
   fi
 
@@ -4809,20 +4837,29 @@ function rev() {
 
   # rev -b select branch
   elif (( rev_is_b )); then
-    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
-
-    fetch --quiet
-    branch="$(select_branch_ 1 -r "$branch_arg")"
+    
+    fetch "$proj_folder" --quiet
+    branch="$(select_branch_ 1 -r "$branch_arg" 0 "" "" "" "$proj_folder")"
+    
     if [[ -z "$branch" ]]; then return 1; fi
-  
+
   else
+    # check if branch arg was given and it's a branch
+    local real_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg")
+    if [[ -z "$real_proj_folder" ]]; then return 1; fi
 
+    if [[ -n "$branch_arg" ]]; then
+      branch=$(get_remote_branch_ "$branch_arg" "$real_proj_folder")
+    fi
 
-    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
+    if [[ -z "$branch"  ]]; then
+      local pr=("${(@s:|:)$(select_pr_ "$branch_arg" "$real_proj_folder" "$proj_arg")}")
+      if [[ -z "${pr[2]}" ]]; then return 1; fi
+      
+      branch="${pr[2]}"
+    fi
 
-    local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
-    if [[ -z "$pr" ]]; then return 1; fi
-    branch="${pr[2]}"
+    if [[ -z "$branch" ]]; then return 1; fi
   fi
 
   local branch_folder="${branch//\\/-}";
@@ -4831,19 +4868,43 @@ function rev() {
   local revs_folder="$(get_revs_folder_ "$proj_folder" "$single_mode" 1)"
   local full_rev_folder="${revs_folder}/rev.${branch_folder}"
 
-  if [[ -d "$full_rev_folder" ]]; then
-    print " ${solid_pink_cor}opening review and pulling changes: ${green_cor}$full_rev_folder ${reset_cor}"
-  else
-    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
+  local skip_setup=0
+  local warn_msg=""
 
-    local remote_branch=$(get_remote_branch_ "$branch")
+  if [[ -d "$full_rev_folder" ]]; then
+    print " ${solid_pink_cor}opening review and pulling changes: ${green_cor}$branch ${reset_cor}"
+
+    local git_status=$(git -C "$full_rev_folder" status --porcelain 2>/dev/null)
+    if [[ -n "$git_status" ]]; then
+      skip_setup=1
+      
+      if confirm_from_ "review is not clean, erase your changes and match branch to pull request?"; then
+        if reseta "$full_rev_folder"; then
+          if pull "$full_rev_folder" --quiet; then
+            skip_setup=0
+          else
+            warn_msg=" ${yellow_cor}warning: pull request is already merged${reset_cor} $pr_link"
+          fi
+        else
+          warn_msg=" ${red_cor}failed to reset review folder: $full_rev_folder ${reset_cor}"
+        fi
+      fi
+    else
+      pull "$full_rev_folder" --quiet
+    fi
+
+  else
+    local real_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg")
+    if [[ -z "$real_proj_folder" ]]; then return 1; fi
+
+    local remote_branch=$(get_remote_branch_ "$branch" "$real_proj_folder")
 
     if [[ -z "$remote_branch" ]]; then
       print " remote branch doesn't exist: $branch" >&2
       return 1;
     fi
 
-    print " ${solid_pink_cor}creating review for pull request: ${green_cor}$remote_branch ${reset_cor}"
+    print " ${solid_pink_cor}creating review for pull request: ${green_cor}$branch ${reset_cor}"
 
     if command -v gum &>/dev/null; then
       local output=""
@@ -4853,46 +4914,67 @@ function rev() {
       print " cloning... $proj_repo";
       if ! git clone $proj_repo "$full_rev_folder" --quiet; then return 1; fi
     fi
+
+    git -C "$full_rev_folder" checkout "$remote_branch" --quiet
     # end of cloning
+
+    if ! pull "$full_rev_folder" --quiet; then
+      warn_msg="${yellow_cor} warning: pull request is already merged${reset_cor} $pr_link"
+    fi
   fi
 
   pushd "$full_rev_folder" &>/dev/null
-  
-  local git_status=$(git status --porcelain 2>/dev/null)
-  if [[ -n "$git_status" ]]; then
-    if ! confirm_from_ "uncommitted changes detected, discard all changes and pull?"; then
-      return 1;
-    fi
-    reseta
+
+  local pr_link=""
+
+  if command -v gh &>/dev/null; then
+    pr_link=$(gh pr view $branch --json url -q .url 2>/dev/null)
   fi
 
-  git checkout "$branch" --quiet
-  
-  local warn_msg=""
-  
-  if ! pull --quiet; then
-    warn_msg="${yellow_cor} warning: could not pull latest changes. PR is probably already merged ${reset_cor}"
-  fi
+  if (( ! skip_setup )); then
+    if [[ -n "$_setup" ]]; then
+      print " ${solid_pink_cor}setting up ${gray_cor}$full_rev_folder ${reset_cor}"
+      print " ${solid_pink_cor}$_setup ${reset_cor}"
 
-  if [[ -n "$_setup" ]]; then
-    print " ${solid_pink_cor}setting up ${gray_cor}$full_rev_folder ${reset_cor}"
-    print " ${solid_pink_cor}$_setup ${reset_cor}"
-
-    if ! eval "$_setup"; then
-      print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
-      print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
+      if ! eval "$_setup"; then
+        print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
+        print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
+      fi
     fi
   fi
-
+  
   if [[ -n "$warn_msg" ]]; then
     print ""
     print "$warn_msg"
     print ""
-    return 1;
   fi
 
-  confirm_from_ "open code editor?"
-  if (( $? != 0 )); then return 0; fi
+  if [[ -n "$pr_link" ]]; then
+    print ""
+    print " ${solid_pink_cor}pull request web link: ${blue_cor}$pr_link ${reset_cor}"
+    print ""
+  fi
+
+  if [[ -n "$pr_link" ]] && { command -v open &>/dev/null || command -v xdg-open &>/dev/null || command -v gio &>/dev/null }; then
+    confirm_between_ "open code editor or pull request?" "code editor" "pull request"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 0; fi
+    if (( RET == 1 )); then
+      if [[ "$(uname)" == "Darwin" ]]; then # macOS
+        open "$pr_link" &>/dev/null
+      else # Linux
+        if command -v xdg-open &>/dev/null; then
+          xdg-open "$pr_link" &>/dev/null
+        else
+          gio open "$pr_link" &>/dev/null
+        fi
+      fi
+      return 1;
+    fi
+  else
+    confirm_from_ "open code editor?"
+    if (( $? != 0 )); then return 0; fi
+  fi
   
   local save_to_config=0
 
@@ -5497,43 +5579,53 @@ function fetch() {
   # (( fetch_is_d )) && set -x
 
   if (( fetch_is_h )); then
-    print "  ${yellow_cor}fetch${reset_cor} : to fetch all branches and reachable tags"
-    print "  ${yellow_cor}fetch <branch>${reset_cor} : to fetch a branch"
+    print "  ${yellow_cor}fetch ${solid_yellow_cor}<folder>${reset_cor} : to fetch all branches and reachable tags, current folder if not provided"
+    print "  ${yellow_cor}fetch ${solid_yellow_cor}<branch>${reset_cor} : to fetch a branch"
     print "  ${yellow_cor}fetch -t${reset_cor} : to fetch all tags along with branches"
     print "  ${yellow_cor}fetch -to${reset_cor} : to fetch all tags only"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local folder="$PWD"
+  local branch=""
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      branch=$(get_remote_branch_ "$1")
+      if [[ -z "$branch" ]]; then
+        print " not a valid branch argument: $1" >&2
+        return 1;
+      fi
+    fi
+    shift
+  fi
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
 
   local RET=0
 
   if (( fetch_is_t )); then 
-    git fetch --all --tags --prune-tags --force
+    git -C "$folder" fetch --all --tags --prune-tags --force
     RET=$?
     if (( fetch_is_o )); then
       return $RET;
     fi
   fi
 
-  if [[ -n "$1" && $1 != -* ]]; then
-    local fetch_branch="$1"
-    local remote_origin=$(get_remote_origin_ "$fetch_branch")
+  local remote_origin=$(get_remote_origin_ "$branch" "$folder")
 
-    git fetch "$remote_origin" "$fetch_branch" --prune ${@:2}
-    RET=$?
-  else
-    git fetch --all --prune $@
-    RET=$?
-  fi
+  git -C "$folder" fetch $remote_origin $branch --prune $@
+  RET=$?
 
-  local current_branches=$(git branch --format '%(refname:short)')
+  local current_branches=$(git -C "$folder" branch --format '%(refname:short)')
 
-  for config in $(git config --get-regexp "^branch\." | awk '{print $1}'); do
+  for config in $(git -C "$folder" config --get-regexp "^branch\." | awk '{print $1}'); do
     local branch_name="${config#branch.}"
 
     if ! echo "$current_branches" | grep -q "^${branch_name}$"; then
-      git config --remove-section "branch.${branch_name}" &>/dev/null
+      git -C "$folder" config --remove-section "branch.${branch_name}" &>/dev/null
     fi
   done
 
@@ -5752,39 +5844,55 @@ function pull() {
   (( pull_is_d )) && set -x
 
   if (( pull_is_h )); then
-    print "  ${yellow_cor} pull${reset_cor} : to pull from origin"
+    print "  ${yellow_cor} pull ${solid_yellow_cor}<folder>${reset_cor} : to pull from origin in folder, current folder if not provided"
     print "  ${yellow_cor} pull ${solid_yellow_cor}<branch>${reset_cor} : to pull a branch from origin"
     print "  ${yellow_cor} pull -t${reset_cor} : to pull all tags along with branches"
     print "  ${yellow_cor} pull -to${reset_cor} : to pull all tags only"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local folder="$PWD"
+  local branch=""
 
-  local remote_origin="$(get_remote_origin_)"
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      branch=$(get_remote_branch_ "$1")
+      if [[ -z "$branch" ]]; then
+        print " not a valid branch argument: $1" >&2
+        return 1;
+      fi
+    fi
+    shift
+  fi
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
+
+  local remote_origin="$(get_remote_origin_ "$branch" "$folder")"
 
   local RET=0
 
   if (( pull_is_t )); then
-    git pull "$remote_origin" --tags $@
+    git -C "$folder" pull $remote_origin $branch --tags $@
     RET=$?
     if (( pull_is_o )); then
       return $RET;
     fi
   fi
 
-  git pull "$remote_origin" $@ 2>/dev/null
+  git -C "$folder" pull $remote_origin $branch $@ 2>/dev/null
   if (( $? != 0 )); then
-    git pull "$remote_origin" --rebase $@ 2>/dev/null
+    git -C "$folder" pull $remote_origin $branch --rebase $@ 2>/dev/null
     if (( $? != 0 )); then
-      git pull "$remote_origin" --rebase --autostash $@
+      git -C "$folder" pull $remote_origin $branch --rebase --autostash $@
       RET=$?
     fi
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     print ""
-    git --no-pager log -1 --oneline
+    git -C "$folder" --no-pager log -1 --oneline
     # no pbcopy
   fi
 
@@ -6098,13 +6206,22 @@ function clean() {
   (( clean_is_d )) && set -x
 
   if (( clean_is_h )); then
-    print "  ${yellow_cor}clean${reset_cor} : to delete all untracked files and directories and undo edits in tracked files"
+    print "  ${yellow_cor}clean ${solid_yellow_cor}<folder>${reset_cor} : to delete all untracked files and directories and undo edits in tracked files, current folder if not provided"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local folder="${1:-$PWD}"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    fi
+    shift
+  fi
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
   
-  git clean -fd --quiet
+  git -C "$folder" clean -fd --quiet
 }
 
 function discard() {
@@ -6128,30 +6245,44 @@ function reseta() {
   (( reseta_is_d )) && set -x
 
   if (( reseta_is_h )); then
-    print "  ${yellow_cor}reseta${reset_cor} : to erase everything and match HEAD to origin"
+    print "  ${yellow_cor}reseta ${solid_yellow_cor}<folder>${reset_cor} : to erase everything in folder and match HEAD to origin, current folder if not provided"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local folder="$PWD"
 
-  local my_branch=$(git branch --show-current)
-  local remote_origin=$(get_remote_origin_ "$my_branch")
-  local remote_branch=$(get_remote_branch_ "$my_branch")
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " not a valid folder argument: $1" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
+
+  # local my_branch=$(git -C "$folder" branch --show-current)
+  # local remote_origin=$(get_remote_origin_ "$my_branch" "$folder")
+  # local remote_branch=$(get_remote_branch_ "$my_branch" "$folder")
+
+  local remote_origin=$(get_remote_origin_ "" "$folder")
 
   local RET=0
   
-  fetch --quiet
+  fetch "$folder" --quiet
 
-  if [[ -n "$remote_branch" ]]; then
-    git reset --hard "${remote_origin}/${my_branch}" $@
-    RET=$?
-  else
-    git reset --hard "$remote_origin" $@
-    RET=$?
-  fi
+  # if [[ -n "$remote_branch" ]]; then
+  #   git -C "$folder" reset --hard "${remote_origin}/${my_branch}" $@
+  #   RET=$?
+  # else
+  git -C "$folder" reset --hard "$remote_origin" $@
+  RET=$?
+  # fi
 
   if (( RET == 0 )); then
-    clean
+    clean "$folder"
     RET=$?
   fi
 
@@ -6986,7 +7117,7 @@ function get_pkg_name_() {
   local proj_repo="$2"
 
   if [[ -z "$proj_repo" ]]; then
-    local folder=$(get_proj_for_git_ "$proj_folder")
+    local folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
     if [[ -n "$folder" ]]; then
       proj_repo=$(get_repo_ "$folder")
     fi
@@ -7427,7 +7558,7 @@ function proj_handler() {
 
   elif (( proj_handler_is_m )); then
     if (( ! single_mode )); then
-      folder_arg=$(get_default_folder_ "$proj_folder")
+      folder_arg=$(get_default_folder_ "$proj_folder" "$proj_cmd")
     fi
   fi
 
