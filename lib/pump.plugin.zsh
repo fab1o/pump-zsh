@@ -2147,9 +2147,10 @@ function refresh_curr_proj_() {
 
   set_aliases_ $i
 
-  if [[ -n "$ZSH_THEME" ]]; then
-    source "$ZSH/themes/${ZSH_THEME}.zsh-theme"
-  fi
+  # do not need to refresh because themes were fixed
+  # if [[ -n "$ZSH_THEME" ]]; then
+  #   source "$ZSH/themes/${ZSH_THEME}.zsh-theme"
+  # fi
 }
 
 function unset_aliases_() {
@@ -2815,6 +2816,29 @@ function get_proj_for_pkg_() {
   echo "$proj_folder"
 }
 
+function open_proj_for_git_() {
+  local folder="$1"
+  local proj_arg="$2"
+
+  local git_folder=$(get_proj_for_git_ "$folder")
+  
+  if [[ -z "$git_folder" ]]; then
+    if [[ -n "$proj_arg" ]]; then
+      print " could not find a cloned project for $proj_arg" >&2
+      print " run ${yellow_cor}clone $proj_arg${reset_cor} to clone project" >&2
+    else
+      print " could not find a cloned project" >&2
+      print " run ${yellow_cor}clone${reset_cor} to clone project" >&2
+    fi
+    return 1;
+  fi
+
+  cd "$git_folder" || {
+    print " cannot change directory to: $git_folder" >&2
+    return 1;
+  }
+}
+
 function get_proj_for_git_() {
   local folder="${1:-$PWD}"
 
@@ -2891,6 +2915,11 @@ function get_remote_branch_() {
   local branch="$1"
   local proj_folder="${2-$PWD}"
   local branch_to_look_up_origin="${3:-$branch}"
+
+  if ! is_git_repo_ "$proj_folder" &>/dev/null; then
+    print " get_remote_branch_ not a git repository: $proj_folder" >&2
+    return 1;
+  fi
 
   local remote_origin=$(get_remote_origin_ "$branch_to_look_up_origin" "$proj_folder")
   if [[ -z "$remote_origin" ]]; then return 1; fi
@@ -3038,7 +3067,9 @@ function select_pr_() {
     return 1;
   fi
 
-  local pr_list=$(gh pr list | grep -i "$1" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
+  local search_text="$1"
+
+  local pr_list=$(gh pr list | grep -i "$search_text" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
 
   if [[ -z "$pr_list" ]]; then
     print " no pull requests found" >&2
@@ -4690,8 +4721,8 @@ function rev() {
   (( rev_is_d )) && set -x
 
   if (( rev_is_h )); then
-    print "  ${yellow_cor}rev${reset_cor} : open review by pull requests"
-    print "  ${yellow_cor}rev -b${reset_cor} : open review by branches"
+    print "  ${yellow_cor}rev${reset_cor} : open a review by pull requests"
+    print "  ${yellow_cor}rev -b${reset_cor} : open a review by branches"
     print "  ${yellow_cor}rev -e <branch>${reset_cor} : open review by an exact branch"
     print "  --"
     print "  ${yellow_cor}rev <pro>${reset_cor} : to open a review for a project"
@@ -4767,6 +4798,7 @@ function rev() {
 
   local branch="";
 
+  # rev -e exact branch
   if (( rev_is_e )); then
     branch="$branch_arg"
 
@@ -4774,13 +4806,20 @@ function rev() {
       print " branch argument is required" >&2
       return 1;
     fi
-  
+
+  # rev -b select branch
   elif (( rev_is_b )); then
+    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
+
     fetch --quiet
     branch="$(select_branch_ 1 -r "$branch_arg")"
     if [[ -z "$branch" ]]; then return 1; fi
   
   else
+
+
+    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
+
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
     if [[ -z "$pr" ]]; then return 1; fi
     branch="${pr[2]}"
@@ -4795,6 +4834,8 @@ function rev() {
   if [[ -d "$full_rev_folder" ]]; then
     print " ${solid_pink_cor}opening review and pulling changes: ${green_cor}$full_rev_folder ${reset_cor}"
   else
+    if ! open_proj_for_git_ "$proj_folder" "$proj_arg"; then return 1; fi
+
     local remote_branch=$(get_remote_branch_ "$branch")
 
     if [[ -z "$remote_branch" ]]; then
@@ -6358,8 +6399,8 @@ function co() {
 
   local RET=0
 
-  # co pr
-  if (( co_is_p || co_is_r )); then
+  # co -pr checkout by pull request
+  if (( co_is_p && co_is_r )); then
     local pr=("${(@s:|:)$(select_pr_ "$1")}")
     if [[ -z "$pr" ]]; then return 1; fi
     
@@ -6374,6 +6415,12 @@ function co() {
     fi
 
     return $RET;
+  fi
+
+  if (( co_is_p || co_is_r )); then
+    print " invalid option" >&2
+    print " run ${yellow_cor}co -pr${reset_cor} to checkout pull requests" >&2
+    return 1;
   fi
 
   # co -a all branches
@@ -7003,8 +7050,8 @@ function pro() {
 
   local proj_arg="$1"
 
+  # pro -i [<name>] display project readme
   if (( pro_is_i )); then
-    # pro -i <name> display project readme
     if [[ -z "$proj_arg" ]]; then
       proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
     fi
@@ -7032,8 +7079,8 @@ function pro() {
     return $?;
   fi
 
+  # pro -u [<name>] reset project settings
   if (( pro_is_u )); then
-    # pro -u <name> reset project settings
     local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
 
     update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
@@ -7049,16 +7096,16 @@ function pro() {
     return $?;
   fi
 
+  # pro -c [<name>] show project config
   if (( pro_is_c )); then
-    # pro -c <name> show project config
     local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
     
     print_current_proj_ $i
     return $?;
   fi
 
+  # pro -e <name> edit project
   if (( pro_is_e )); then
-    # pro -e <name> edit project
     local i=$(find_proj_index_ "$proj_arg")
     (( i )) || return 1;
 
@@ -7066,8 +7113,8 @@ function pro() {
     return $?;
   fi
   
+  # pro -a <name> add project
   if (( pro_is_a )); then
-    # pro -a <name> add project
     local i=0
     for i in {1..9}; do
       if [[ -z "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -7083,8 +7130,8 @@ function pro() {
     return 1;
   fi
 
+  # pro -r <name> remove project
   if (( pro_is_r )); then
-    # pro -r <name> remove project
     local i=$(find_proj_index_ "$proj_arg")
     (( i )) || return 1;
 
@@ -7107,8 +7154,8 @@ function pro() {
     return $?;
   fi
 
+  # pro -n <name> set Node.js version for a project
   if (( pro_is_n )); then
-    # pro -n <name> set Node.js version for a project
     local i=$(find_proj_index_ "$proj_arg")
     (( i )) || return 1;
 

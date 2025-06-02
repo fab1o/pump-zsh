@@ -33,7 +33,7 @@
   "watch": {
     "update": [
       "lib/*.*",
-      "themes/*.*"
+      "lib/themes/*.*"
     ],
     "update_config": [
       "config/*.*"

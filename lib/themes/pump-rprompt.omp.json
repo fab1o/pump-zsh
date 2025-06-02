@@ -3,12 +3,31 @@
 // PROMPT=""
 // plugins=(pump)
 // // oh-my-posh theme:
-// eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump.omp.json)"
+// eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump-rprompt.omp.json)"
+
 {
   "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
   "blocks": [
     {
+      "alignment": "right",
+      "newline": false,
+      "segments": [
+        {
+          "background": "transparent",
+          "foreground": "p:gruvblacklight",
+          "properties": {
+            "always_enabled": true
+          },
+          "style": "plain",
+          "template": "<b> {{.FormattedMs}}</b>",
+          "type": "executiontime"
+        }
+      ],
+      "type": "rprompt"
+    },
+    {
       "alignment": "left",
+      "newline": false,
       "segments": [
         {
           "background": "transparent",
@@ -60,16 +79,6 @@
           "style": "plain",
           "template": "<b>{{if .BranchStatus}}{{.BranchStatus}}{{ end }}{{ if or (.Working.Changed) (.Staging.Changed) }}✗{{ else }}:{{ end }}({{.HEAD}})</b>",
           "type": "git"
-        },
-        {
-          "background": "transparent",
-          "foreground": "p:gruvblacklight",
-          "properties": {
-            "always_enabled": true
-          },
-          "style": "plain",
-          "template": "<b> {{.FormattedMs}}</b>",
-          "type": "executiontime"
         }
       ],
       "type": "prompt"
