@@ -736,10 +736,11 @@ function input_branch_name_() {
 function input_name_() {
   local header="$1"
   local placeholder="$2"
+  local max="${3:-$MAX_NAME_COUNT}"
 
   while true; do
     local typed_value=""
-    typed_value=$(input_from_ "$header" "$placeholder" $MAX_NAME_COUNT)
+    typed_value=$(input_from_ "$header" "$placeholder" $max)
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     
@@ -3230,9 +3231,6 @@ function load_config_entry_() {
         PUMP_PKG_MANAGER)
           value="npm"
           ;;
-        PUMP_CODE_EDITOR)
-          value="code"
-          ;;
         PUMP_USE)
           value="node"
           ;;
@@ -4652,21 +4650,22 @@ function revs() {
     return 1;
   fi
 
-  local proj_folder=""
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-      break;
-    fi
-  done
-
-  if [[ -z "$proj_folder" ]]; then
-    print " missing project folder for: $proj_arg" >&2
+  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
+  if (( ! i )); then
+    print " not a valid project or no project is set" >&2
     print " run ${yellow_cor}revs -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
+  fi
+
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
+    return 1;
+  fi
+  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
     return 1;
   fi
 
@@ -4706,8 +4705,6 @@ function rev() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
-
   local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local branch_arg=""
 
@@ -4722,60 +4719,49 @@ function rev() {
     fi
   fi
 
-  if [[ -z "$proj_arg" ]]; then
-    print " no project is set" >&2
-    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
-  fi
-
-  local proj_repo=""
-  local proj_folder=""
-  local _setup=""
-  local _clone=""
-  local code_editor="$CURRENT_PUMP_PROJ_REPO"
-  local single_mode=""
-
-  local found=0
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      found=1
-
-      if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-        return 1;
-      fi
-      proj_repo="${PUMP_PROJ_REPO[$i]}"
-
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
-        return 1;
-      fi
-      proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-      _setup="${PUMP_SETUP[$i]}"
-      _clone="${PUMP_CLONE[$i]}"
-      code_editor="${PUMP_CODE_EDITOR[$i]}"
-
-      if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
-
-      single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-      break;
-    fi
-  done
-
-  if (( found == 0 )); then
+  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
+  if (( ! i )); then
     print " not a valid project or no project is set" >&2
     print " run ${yellow_cor}rev -h${reset_cor} to see usage" >&2
     print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
+  local proj_repo=""
+  local proj_folder=""
+  local single_mode=""
+  local _setup=""
+  local _clone=""
+  local code_editor=""
+
+  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
+    return 1;
+  fi
+  proj_repo="${PUMP_PROJ_REPO[$i]}"
+
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
+    return 1;
+  fi
+  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then
+    return 1;
+  fi
+  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+
+  _setup="${PUMP_SETUP[$i]}"
+  _clone="${PUMP_CLONE[$i]}"
+  code_editor="${PUMP_CODE_EDITOR[$i]}"
+
   if [[ -z "$proj_repo" ]]; then
-    print " missing repository uri for: $proj_arg" >&2
+    print " missing repository uri for $proj_arg" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
     return 1;
   fi
 
-  if [[ -z "$proj_folder" ]]; then
-    print " missing project folder for: $proj_arg" >&2
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
     return 1;
   fi
 
@@ -4785,7 +4771,7 @@ function rev() {
     branch="$branch_arg"
 
     if [[ -z "$branch" ]]; then
-      print " branch is required" >&2
+      print " branch argument is required" >&2
       return 1;
     fi
   
@@ -4807,7 +4793,7 @@ function rev() {
   local full_rev_folder="${revs_folder}/rev.${branch_folder}"
 
   if [[ -d "$full_rev_folder" ]]; then
-    print " opening review and pulling changes: ${green_cor}${pr[3]}${reset_cor}..."
+    print " ${solid_pink_cor}opening review and pulling changes: ${green_cor}$full_rev_folder ${reset_cor}"
   else
     local remote_branch=$(get_remote_branch_ "$branch")
 
@@ -4816,7 +4802,7 @@ function rev() {
       return 1;
     fi
 
-    print " creating review for pull request: ${green_cor}${pr[3]}${reset_cor}..."
+    print " ${solid_pink_cor}creating review for pull request: ${green_cor}$remote_branch ${reset_cor}"
 
     if command -v gum &>/dev/null; then
       local output=""
@@ -4842,19 +4828,18 @@ function rev() {
   git checkout "$branch" --quiet
   
   local warn_msg=""
-  local is_open_editor=1
   
   if ! pull --quiet; then
-    is_open_editor=0
-    warn_msg="${yellow_cor} warn: could not pull latest changes. PR is probably already merged ${reset_cor}"
+    warn_msg="${yellow_cor} warning: could not pull latest changes. PR is probably already merged ${reset_cor}"
   fi
 
   if [[ -n "$_setup" ]]; then
-    print "${solid_pink_cor} $_setup ${reset_cor}"
-    if eval "$_setup"; then
-      if (( is_open_editor )); then
-        eval $code_editor .
-      fi
+    print " ${solid_pink_cor}setting up ${gray_cor}$full_rev_folder ${reset_cor}"
+    print " ${solid_pink_cor}$_setup ${reset_cor}"
+
+    if ! eval "$_setup"; then
+      print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
+      print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
     fi
   fi
 
@@ -4862,6 +4847,27 @@ function rev() {
     print ""
     print "$warn_msg"
     print ""
+    return 1;
+  fi
+
+  confirm_from_ "open code editor?"
+  if (( $? != 0 )); then return 0; fi
+  
+  local save_to_config=0
+
+  if [[ -z "$code_editor" ]]; then
+    code_editor=$(input_name_ "type the command of your code editor" "code" 255)
+    if [[ -z "$code_editor" ]]; then return 1; fi
+
+    save_to_config=1
+  fi
+
+  if [[ -n "$code_editor" ]]; then
+    if eval $code_editor .; then
+      if (( save_to_config )); then
+        update_setting_ $i "PUMP_CODE_EDITOR" $code_editor &>/dev/null
+      fi
+    fi
   fi
 }
 
@@ -7038,6 +7044,7 @@ function pro() {
     update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
     update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
     update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
+    update_setting_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
     
     return $?;
   fi

@@ -117,7 +117,7 @@ PUMP_RUN_PROD_8=
 PUMP_RUN_PROD_9=
 
 # optional
-# default: code
+# default: empty (will ask)
 # code editor for reviews of each project
 PUMP_CODE_EDITOR_1=
 PUMP_CODE_EDITOR_2=
