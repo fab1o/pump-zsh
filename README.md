@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scri
 
 In addition, Pump-zsh includes a collection of [built-in themes](docs/themes.md) for immediate use.
 
-It also exports an environment variable called `CURRENT_PUMP_PROJECT`, which represents the currently selected project. This can be used to customize your own theme.
+It also exports an environment variable called `CURRENT_PUMP_PROJ_SHORT_NAME`, which represents the currently selected project. This can be used to customize your own theme.
 
 ## Dependencies
 

@@ -680,15 +680,15 @@ function update_setting_() {
         unset -f "${PUMP_PROJ_SHORT_NAME[$i]}" &>/dev/null
       fi
     else
-      if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-        unset -f "$CURRENT_PUMP_PROJECT" &>/dev/null
+      if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+        unset -f "$CURRENT_PUMP_PROJ_SHORT_NAME" &>/dev/null
       fi
     fi
     functions[$value]="proj_handler $i \"\$@\";"
   fi
 
   if (( i > 0 )); then
-    if [[ -n "$CURRENT_PUMP_PROJECT" && "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" && "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
       eval "CURRENT_${key}=\"$value\""
     fi
     eval "${key}[$i]=\"$value\""
@@ -2055,7 +2055,7 @@ function save_proj_() {
 
   if (( save_proj_is_e )); then
     # editing a project
-    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]]; then
+    if [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
       refresh=1
     fi
 
@@ -2291,7 +2291,7 @@ function remove_proj_() {
 function set_current_proj_() {
   local i="$1"
 
-  CURRENT_PUMP_PROJECT="${PUMP_PROJ_SHORT_NAME[$i]}"
+  CURRENT_PUMP_PROJ_SHORT_NAME="${PUMP_PROJ_SHORT_NAME[$i]}"
   CURRENT_PUMP_PROJ_FOLDER="${PUMP_PROJ_FOLDER[$i]}"
   CURRENT_PUMP_PROJ_REPO="${PUMP_PROJ_REPO[$i]}"
   CURRENT_PUMP_PROJ_SINGLE_MODE="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -2542,28 +2542,6 @@ function get_node_version_() {
   echo "$best_version"
 }
 
-function get_proj_index_() {
-  local proj_arg="$1"
-
-  if [[ -z "$proj_arg" ]]; then return 1; fi
-
-  local i=0
-  for i in {1..9}; do
-    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      echo "$i"
-      return 0;
-    fi
-  done
-
-  return 1;
-}
-
-function is_project_() {
-  local proj_arg="$1"
-
-  if ! get_proj_index_ "$proj_arg" 1>/dev/null; then return 1; fi
-}
-
 function print_current_proj_() {
   local i="$1"
   
@@ -2607,7 +2585,7 @@ function print_current_proj_() {
     return 0;
   fi
 
-  print " [${solid_pink_cor}CURRENT_PUMP_PROJECT=${reset_cor}$CURRENT_PUMP_PROJECT]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME]"
   print " [${solid_pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER]"
   print " [${solid_pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO]"
   print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE]"
@@ -2657,13 +2635,21 @@ function which_pro_index_pwd_() {
   return 1;
 }
 
+function is_project_() {
+  local proj_arg="$1"
+
+  if ! find_proj_index_ "$proj_arg" &>/dev/null; then
+    return 1;
+  fi
+}
+
 function find_proj_index_() {
   local proj_arg="$1"
   local default_index="$2"
 
   if [[ -z "$proj_arg" ]]; then
     print " no project argument provided" >&2
-    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     
     echo "$default_index"
     return 1;
@@ -2751,30 +2737,6 @@ function get_default_folder_() {
   fi
 
   return 0;
-}
-
-function shorten_path_until_() {
-  local full_path="$1"
-  local base_path="$2"
-
-  # Normalize: remove trailing slashes
-  full_path="${full_path%/}"
-  base_path="${base_path%/}"
-
-  # Check if base_path is a prefix of full_path
-  if [[ "$full_path" == "$base_path" ]]; then
-    echo "..."
-    return 0
-  fi
-  
-  if [[ "$full_path" == "$base_path/"* ]]; then
-    local shortened="${full_path#$base_path/}"
-    echo ".../$shortened"
-    return 0
-  fi
-
-  # base_path not in full_path — fallback to full path
-  echo "$full_path"
 }
 
 function shorten_path_() {
@@ -3283,6 +3245,9 @@ function load_config_entry_() {
         PUMP_RUN_PROD)
           value="${PUMP_PKG_MANAGER[$i]} ${run}prod"
           ;;
+        PUMP_SETUP)
+          value="${PUMP_PKG_MANAGER[$i]} ${run}setup"
+          ;;
         PUMP_TEST)
           value="${PUMP_PKG_MANAGER[$i]} ${run}test"
           ;;
@@ -3425,8 +3390,8 @@ function load_config_() {
     [[ -z "$proj_cmd" ]] && continue;  # skip if not defined
 
     if ! validate_proj_cmd_strict_ "$proj_cmd"; then
-      print "  in config data at PUMP_PROJ_SHORT_NAME_${i}" 2>/dev/tty
-      print "  fix the issue then type ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
+      print "  in config data at PUMP_PROJ_SHORT_NAME_$i" 2>/dev/tty
+      print "  fix the issue then run ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
@@ -3449,7 +3414,7 @@ function load_config_() {
     if [[ -n "$proj_folder" ]]; then
       if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd" "$proj_repo"; then
         print "  error in config data at PUMP_PROJ_FOLDER_${i}" 2>/dev/tty
-        print "  fix the issue then type ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
+        print "  fix the issue then run ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       fi
     fi
 
@@ -3746,7 +3711,7 @@ function refix() {
       if confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
-          if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+          if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_PUSH_ON_REFIX" 1
             break;
           fi
@@ -3778,19 +3743,19 @@ function covc() {
   if ! is_proj_folder_; then return 1; fi
   if ! is_git_repo_; then return 1; fi
 
-  if [[ -z "$CURRENT_PUMP_PROJECT" ]]; then
+  if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print " project is not set, use ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
   local i=0
   for i in {1..9}; do
-    if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJECT" "${PUMP_PROJ_REPO[$i]}"; then
+    if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+      if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}"; then
         return 1;
       fi
 
-      if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJECT"; then
+      if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME"; then
         return 1;
       fi
       break;
@@ -3798,7 +3763,7 @@ function covc() {
   done
 
   if [[ -z "$CURRENT_PUMP_COV" || -z "$CURRENT_PUMP_SETUP" ]]; then
-    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
+    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor} - edit your pump.zshenv then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
@@ -3806,7 +3771,7 @@ function covc() {
 
   if [[ -z "$branch" ]]; then
     print " missing branch name" >&2
-    print " type ${yellow_cor}covc -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}covc -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -4298,7 +4263,7 @@ function pr() {
       if confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
-          if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+          if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_PR_RUN_TEST" 1
             break;
           fi
@@ -4325,8 +4290,8 @@ function pr() {
 
     local i=0
     for i in {1..9}; do
-      if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        if check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJECT"; then
+      if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        if check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME"; then
           proj_repo="${PUMP_PROJ_REPO[$i]}"
         fi
         break;
@@ -4364,9 +4329,9 @@ function run() {
     print "  ${yellow_cor}run stage${reset_cor} : to run stage in current folder"
     print "  ${yellow_cor}run prod${reset_cor} : to run prod in current folder"
     print "  --"
-    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-      print "  ${yellow_cor}run <folder>${reset_cor} : to run a ${CURRENT_PUMP_PROJECT}'s folder on dev environment"
-      print "  ${yellow_cor}run <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_PROJECT}'s folder on given environment"
+    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      print "  ${yellow_cor}run <folder>${reset_cor} : to run a ${CURRENT_PUMP_PROJ_SHORT_NAME}'s folder on dev environment"
+      print "  ${yellow_cor}run <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_PROJ_SHORT_NAME}'s folder on given environment"
       print "  --"
     fi
     print "  ${yellow_cor}run <pro> <folder>${reset_cor} : to run a project's folder on dev environment"
@@ -4383,7 +4348,7 @@ function run() {
     _env="$3"
     folder_arg="$2"
   elif [[ -n "$2" ]]; then
-    local i=$(get_proj_index_ "$1")
+    local i=$(find_proj_index_ "$1" 2>/dev/null)
     if [[ -n "$i" ]]; then
       proj_arg="$1"
       if [[ "$2" == "dev" || "$2" == "stage" || "$2" == "prod" ]]; then
@@ -4412,103 +4377,93 @@ function run() {
       folder_arg="$1"
     fi
   fi
+  
+  local i=$(find_proj_index_ "${proj_arg:-$CURRENT_PUMP_PROJ_SHORT_NAME}" 2>/dev/null)
 
-  # Validate environment
+  if (( ! i )); then
+    print " not a valid project or no project is set" >&2
+    print " run ${yellow_cor}setup -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
+  fi
+
   if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
-    print " env is incorrect, valid options: dev, stage or prod" >&2
-    print " type ${yellow_cor}run -h${reset_cor} to see usage" >&2
+    print " env is incorrect, valid options are: dev, stage or prod" >&2
+    print " run ${yellow_cor}run -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
   local proj_folder=""
-  local _run="$CURRENT_PUMP_RUN"
-  local found=0
+  local _run=""
 
   if [[ "$_env" == "stage" ]]; then
-    _run="$CURRENT_PUMP_RUN_STAGE"
+    _run="${PUMP_RUN_STAGE[$i]}"
   elif [[ "$_env" == "prod" ]]; then
-    _run="$CURRENT_PUMP_RUN_PROD"
+    _run="${PUMP_RUN_PROD[$i]}"
+  else
+    _run="${PUMP_RUN[$i]}"
   fi
 
   if [[ -n "$proj_arg" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        found=$i
+    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
+      return 1;
+    fi
+    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-        if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-        _run="${PUMP_RUN[$i]}"
-
-        if [[ "$_env" == "stage" ]]; then
-          _run="${PUMP_RUN_STAGE[$i]}"
-        elif [[ "$_env" == "prod" ]]; then
-          _run="${PUMP_RUN_PROD[$i]}"
-        fi
-        break;
-      fi
-    done
-  fi
-
-  if (( found == 0 )); then
-    print " not a valid project or no project is set" >&2
-    print " type ${yellow_cor}run -h${reset_cor} to see usage" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
+    if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+      print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+      print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
+      return 1;
+    fi
   fi
 
   if [[ -z "$_run" ]]; then
-    print " missing PUMP_RUN_$found" >&2
-    print " edit your pump.zshenv config, refresh then try again" >&2
+    print " missing PUMP_RUN_$i" >&2
+    print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
-  local folder_to_run=""
+  local folder_to_execute=""
 
-  if [[ -n "$folder_arg" && -n "$proj_folder" ]]; then
-    if ! is_proj_folder_ "${proj_folder}/${folder_arg}"; then return 1; fi
+  if [[ -n "$proj_folder" && -n "$folder_arg" ]]; then
+    folder_to_execute="${proj_folder}/${folder_arg}"
 
-    folder_to_run="${proj_folder}/${folder_arg}"
+    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
+
   elif [[ -n "$proj_folder" ]]; then
-    if is_proj_folder_ "$proj_folder" &>/dev/null; then
-      folder_to_run="$proj_folder"
-    else
+    folder_to_execute="$proj_folder"
+
+    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
       local dirs=($(get_folders_ "$proj_folder"))
+      
       if (( ${#dirs[@]} )); then
-        folder_to_run=($(choose_one_ 1 "folder to run" 20 "${dirs[@]}"))
-        local RET=$?
-        if (( RET == 130 || RET == 2 )); then return 130; fi
-        if [[ -z "$folder_to_run" ]]; then
-          return 1;
-        fi
+        local folder=$(choose_one_ 1 "folder to setup" 20 "${dirs[@]}")
+        if [[ -z "$folder" ]]; then return 1; fi
+        
+        folder_to_execute="${proj_folder}/${folder}"
       fi
     fi
-  elif [[ -n "$folder_arg" ]]; then
-    if ! is_proj_folder_ "$folder_arg"; then return 1; fi
-
-    folder_to_run="$folder_arg"
   else
-    if ! is_proj_folder_; then return 1; fi
-
-    folder_to_run="$PWD"
+    folder_to_execute="$PWD"
   fi
+
+  if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
   # print "folder_arg=$folder_arg"
   # print "_env=$_env"
-  # print "folder_to_run=$folder_to_run"
+  # print "folder_to_execute=$folder_to_execute"
   # print " --------"
 
-  pushd "$folder_to_run" &>/dev/null
+  pushd "$folder_to_execute" &>/dev/null
 
-  print " run $_env on ${gray_cor}$(shorten_path_until_ "$folder_to_run" $HOME) ${reset_cor}:${solid_pink_cor} $_run ${reset_cor}"
+  print " ${solid_pink_cor}running $_env on ${gray_cor}$folder_to_execute ${reset_cor}"
+  print " ${solid_pink_cor}$_run ${reset_cor}"
   
   if ! eval "$_run"; then
-    print " ${red_cor}failed to run PUMP_RUN_${found}${reset_cor}" >&2
+    print " ${red_cor}failed to run PUMP_RUN_$i ${reset_cor}" >&2
+    print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
   fi
 }
 
@@ -4518,8 +4473,8 @@ function setup() {
 
   if (( setup_is_h )); then
       print "  ${yellow_cor}setup${reset_cor} : to setup current folder"
-      if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-        print "  ${yellow_cor}setup <folder>${reset_cor} : to setup a folder for $CURRENT_PUMP_PROJECT"
+      if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+        print "  ${yellow_cor}setup <folder>${reset_cor} : to setup a folder for $CURRENT_PUMP_PROJ_SHORT_NAME"
       fi
       print "  --"
     print "  ${yellow_cor}setup <pro>${reset_cor} : to setup a project"
@@ -4539,90 +4494,81 @@ function setup() {
     else
       folder_arg="$1"
     fi
+  else
+    proj_arg=""
+  fi
+  
+  local i=$(find_proj_index_ "${proj_arg:-$CURRENT_PUMP_PROJ_SHORT_NAME}" 2>/dev/null)
+
+  if (( ! i )); then
+    print " not a valid project or no project is set" >&2
+    print " run ${yellow_cor}setup -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
+    return 1;
   fi
 
-  local proj_folder="$PWD";
-  local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
-  local found=0
+  local proj_folder="";
+  local _setup="${PUMP_SETUP[$i]}"
 
   if [[ -n "$proj_arg" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        found=$i
+    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
+      return 1;
+    fi
+    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-        if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
-          return 1;
-        fi
-        proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-        _setup="${PUMP_SETUP[$i]:-${PUMP_PKG_MANAGER[$i]} $([[ ${PUMP_PKG_MANAGER[$i]} == "yarn" ]] && echo "" || echo "run ")setup}"
-        break;
-      fi
-    done
-  fi
-
-  if (( found == 0 )); then
-    print " not a valid project or no project is set" >&2
-    print " type ${yellow_cor}setup -h${reset_cor} to see usage" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
-  fi
-
-  if [[ -z "$proj_folder" ]]; then
-    print " not a valid project: $proj_arg" >&2
-    print " type ${yellow_cor}setup -h${reset_cor} to see usage" >&2
-    return 1;
+    if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+      print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+      print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
+      return 1;
+    fi
   fi
 
   if [[ -z "$_setup" ]]; then
-    print " missing PUMP_SETUP" >&2
-    print " edit your pump.zshenv config, refresh then try again" >&2
+    print " missing PUMP_SETUP_$i" >&2
+    print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
-  local folder_to_setup=""
+  local folder_to_execute=""
 
-  if [[ -n "$folder_arg" && -n "$proj_folder" ]]; then
-    if ! is_proj_folder_ "$proj_folder/$folder_arg" &>/dev/null; then return 1; fi
+  if [[ -n "$proj_folder" && -n "$folder_arg" ]]; then
+    folder_to_execute="${proj_folder}/${folder_arg}"
 
-    folder_to_setup="$proj_folder/$folder_arg"
+    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
+
   elif [[ -n "$proj_folder" ]]; then
-    if is_proj_folder_ "$proj_folder" &>/dev/null; then
-      folder_to_setup="$proj_folder"
-    else
+    folder_to_execute="$proj_folder"
+
+    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
       local dirs=($(get_folders_ "$proj_folder"))
+      
       if (( ${#dirs[@]} )); then
-        folder_to_setup=($(choose_one_ 1 "folder to setup" 20 "${dirs[@]}"))
-        local RET=$?
-        if (( RET == 130 || RET == 2 )); then return 130; fi
-        if [[ -z "$folder_to_setup" ]]; then
-          return 1;
-        fi
+        local folder=$(choose_one_ 1 "folder to setup" 20 "${dirs[@]}")
+        if [[ -z "$folder" ]]; then return 1; fi
+        
+        folder_to_execute="${proj_folder}/${folder}"
       fi
     fi
-  elif [[ -n "$folder_arg" ]]; then
-    if ! is_proj_folder_ "$folder_arg" &>/dev/null; then return 1; fi
-
-    folder_to_setup="$folder_arg"
   else
-    if ! is_proj_folder_ &>/dev/null; then return 1; fi
-
-    folder_to_setup="."
+    folder_to_execute="$PWD"
   fi
+
+  if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
   # print "folder_arg=$folder_arg"
-  # print "folder_to_setup=$folder_to_setup"
+  # print "folder_to_execute=$folder_to_execute"
   # print " --------"
 
-  pushd "$folder_to_setup" &>/dev/null
+  pushd "$folder_to_execute" &>/dev/null
 
-  print " setup ${gray_cor}$(shorten_path_until_ "$PWD" $HOME) ${reset_cor}:${solid_pink_cor} $_setup ${reset_cor}"
+  print " ${solid_pink_cor}setting up ${gray_cor}$folder_to_execute ${reset_cor}"
+  print " ${solid_pink_cor}$_setup ${reset_cor}"
 
   if ! eval "$_setup"; then
-    print " ${red_cor}failed to run PUMP_SETUP_${found}${reset_cor}" >&2
+    print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
+    print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
   fi
 }
 
@@ -4667,8 +4613,8 @@ function revs() {
   (( revs_is_d )) && set -x
 
   if (( revs_is_h )); then
-    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-      print "  ${yellow_cor}revs${reset_cor} : to list reviews from $CURRENT_PUMP_PROJECT"
+    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      print "  ${yellow_cor}revs${reset_cor} : to list reviews from $CURRENT_PUMP_PROJ_SHORT_NAME"
     fi
     print "  ${yellow_cor}revs <pro>${reset_cor} : to list reviews from project"
     return 0;
@@ -4680,7 +4626,7 @@ function revs() {
     return 1;
   fi
   
-  local proj_arg="$CURRENT_PUMP_PROJECT"
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
 
   if [[ -n "$1" ]]; then
     local valid_project=0
@@ -4695,14 +4641,14 @@ function revs() {
 
     if (( valid_project == 0 )); then
       print " not a valid project: $1" >&2
-      print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
+      print " run ${yellow_cor}revs -h${reset_cor} to see usage" >&2
       return 1;
     fi
   fi
 
   if [[ -z "$proj_arg" ]]; then
     print " no project is set" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
@@ -4720,7 +4666,7 @@ function revs() {
 
   if [[ -z "$proj_folder" ]]; then
     print " missing project folder for: $proj_arg" >&2
-    print " type ${yellow_cor}revs -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}revs -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -4728,7 +4674,7 @@ function revs() {
 
   if [[ -z "$revs_folder" ]]; then
     print " no revs for $proj_arg" >&2
-    print " type ${yellow_cor}rev${reset_cor} to open a review" >&2
+    print " run ${yellow_cor}rev${reset_cor} to open a review" >&2
     return 1; 
   fi
 
@@ -4762,7 +4708,7 @@ function rev() {
 
   if ! is_git_repo_; then return 1; fi
 
-  local proj_arg="$CURRENT_PUMP_PROJECT"
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local branch_arg=""
 
   if [[ -n "$2" ]]; then
@@ -4778,7 +4724,7 @@ function rev() {
 
   if [[ -z "$proj_arg" ]]; then
     print " no project is set" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
@@ -4818,8 +4764,8 @@ function rev() {
 
   if (( found == 0 )); then
     print " not a valid project or no project is set" >&2
-    print " type ${yellow_cor}rev -h${reset_cor} to see usage" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    print " run ${yellow_cor}rev -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
@@ -4925,9 +4871,9 @@ function clone() {
 
   if (( clone_is_h )); then
     print "  ${yellow_cor}clone${reset_cor} : to clone a project"
-    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT}'s branch, only if project is in multiple mode"
-      print "  ${yellow_cor}clone <branch> <default_branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJECT}'s branch with a given default branch, only if project is in multiple mode"
+    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      print "  ${yellow_cor}clone <branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJ_SHORT_NAME}'s branch, only if project is in multiple mode"
+      print "  ${yellow_cor}clone <branch> <default_branch>${reset_cor} : to clone ${CURRENT_PUMP_PROJ_SHORT_NAME}'s branch with a given default branch, only if project is in multiple mode"
     fi
     print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project directly"
     print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch, only if project is in multiple mode"
@@ -4957,40 +4903,40 @@ function clone() {
       fi
     done
     if (( ! valid_project )); then
-      if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+      if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
         branch_arg="$1"
       else
         print " not a valid project or branch: $1" >&2
-        print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
+        print " run ${yellow_cor}clone -h${reset_cor} to see usage" >&2
         return 1;
       fi
     fi
   else
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
       print " no projects found" >&2
-      print " type ${yellow_cor}pro -a${reset_cor} to add a project" >&2
+      print " run ${yellow_cor}pro -a${reset_cor} to add a project" >&2
       return 1;
     fi
 
     proj_arg=$(choose_one_ 1 "project to clone" 20 "${PUMP_PROJ_SHORT_NAME[@]}")
     if [[ -z "$proj_arg" ]]; then return 1; fi
   fi
-
-  local proj_repo=""
-  local proj_folder=""
-  local _clone=""
-  local print_readme=""
-  local pump_default_branch=""
-  local single_mode=""
   
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
 
   if (( ! i )); then
     print " not a valid project or no project is set" >&2
-    print " type ${yellow_cor}clone -h${reset_cor} to see usage" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    print " run ${yellow_cor}clone -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
+
+  local proj_repo=""
+  local proj_folder=""
+  local single_mode=""
+  local _clone=""
+  local print_readme=""
+  local pump_default_branch=""
 
   if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
     return 1;
@@ -5002,28 +4948,32 @@ function clone() {
   fi
   proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
+  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then
+    return 1;
+  fi
+  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   _clone="${PUMP_CLONE[$i]}"
   print_readme="${PUMP_PRINT_README[$i]}"
   pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   if [[ -z "$proj_repo" ]]; then
-    print " missing repository uri for: $proj_arg" >&2
+    print " missing repository uri for $proj_arg" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
     return 1;
   fi
 
-  if [[ -z "$proj_folder" ]]; then
-    print " missing project folder for: $proj_arg" >&2
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} to edit project" >&2
     return 1;
   fi
 
   rm -rf "${proj_folder}/.DS_Store"
 
   if (( single_mode )) && [[ -n "$(ls "$proj_folder" 2>/dev/null)" ]]; then
-    print " ${proj_arg} is in single mode and folder is not empty: $proj_folder" >&2
-    print " to switch to multiple mode: type ${yellow_cor}pro -e ${proj_arg}${reset_cor}" >&2
+    print " cannot clone project $proj_arg because it was set to ${pruple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
+    print " either clean the folder, or run ${yellow_cor}$proj_arg -e${reset_cor} to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
     return 1;
   fi
 
@@ -5046,8 +4996,8 @@ function clone() {
         folder_to_clone="${proj_folder}/${branch_folder}"
 
         if [[ -d "$folder_to_clone" && -n "$(ls "$folder_to_clone" 2>/dev/null)" ]]; then
-          print " fatal: destination path '$folder_to_clone' already exists and is not an empty directory" >&2
-          print " type ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
+          print " destination path already exists and is not empty: $folder_to_clone" >&2
+          print " run ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} to go to that folder" >&2
           return 1;
         fi
       else
@@ -5130,7 +5080,8 @@ function clone() {
   if [[ -n "$_clone" ]]; then
     print " ${solid_pink_cor}$_clone ${reset_cor}"
     if ! eval "$_clone"; then
-      print " ${red_cor}failed to run PUMP_CLONE_${i}${reset_cor}" >&2
+      print " ${red_cor}failed to run PUMP_CLONE_$i ${reset_cor}" >&2
+      print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
     fi
   fi
 
@@ -5195,7 +5146,7 @@ function renb() {
 
   if [[ -z "$new_name" ]]; then
     print " missing branch name" >&2
-    print " type ${yellow_cor}renb -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}renb -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -5227,7 +5178,7 @@ function chp() {
 
   if [[ -z "$1" ]]; then
     print " missing commit hash" >&2
-    print " type ${yellow_cor}chp -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}chp -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -5460,7 +5411,7 @@ function recommit() {
           if git add . && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
             local i=0
             for i in {1..9}; do
-              if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+              if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
                 update_setting_ $i "PUMP_COMMIT_ADD" 1
                 break;
               fi
@@ -6273,10 +6224,10 @@ function gha() {
     done
     if [[ -z "$proj_arg" ]]; then
       workflow_arg="$1"
-      proj_arg="$CURRENT_PUMP_PROJECT"
+      proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
     fi
   else
-    proj_arg="$CURRENT_PUMP_PROJECT"
+    proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   fi
 
   local proj_repo=""
@@ -6284,12 +6235,12 @@ function gha() {
   local gha_workflow=""
   local found=0
 
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
   
   if (( ! i )); then
     print " not a valid project or no project is set" >&2
-    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
-    print " type ${yellow_cor}pro${reset_cor} to set project" >&2
+    print " run ${yellow_cor}gha -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
     return 1;
   fi
 
@@ -6332,7 +6283,7 @@ function gha() {
 
   if [[ -z "$workflow_arg" ]]; then
     print " no workflow name provided" >&2
-    print " type ${yellow_cor}gha -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}gha -h${reset_cor} to see usage" >&2
     return 1;
   fi
 
@@ -6411,9 +6362,9 @@ function co() {
     RET=$?
 
     if (( RET == 0 )); then
-      print " detached pull request: ${green_cor}${pr[3]}${reset_cor}"
+      print " succeed detached pull request: ${green_cor}${pr[3]}${reset_cor}"
       print " HEAD is now at $(git log -1 --pretty=format:'%h %s')"
-      print " branch is detached, type ${yellow_cor}co -b <branch>${reset_cor} to create branch"
+      print " run ${yellow_cor}co -b <branch>${reset_cor} to create branch"
     fi
 
     return $RET;
@@ -7049,7 +7000,7 @@ function pro() {
   if (( pro_is_i )); then
     # pro -i <name> display project readme
     if [[ -z "$proj_arg" ]]; then
-      proj_arg="${CURRENT_PUMP_PROJECT}"
+      proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
     fi
 
     local i=$(find_proj_index_ "$proj_arg")
@@ -7135,7 +7086,7 @@ function pro() {
     if (( RET != 0 )); then return 1; fi
 
     local refresh=0;
-    [[ "$proj_arg" == "$CURRENT_PUMP_PROJECT" ]] && refresh=1;
+    [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] && refresh=1;
 
     if ! remove_proj_ $i; then
       return 1;
@@ -7162,9 +7113,9 @@ function pro() {
     local pump_pro="${PUMP_PRO[$i]}"
 
     # if (( pro_is_f )); then
-    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_PWD_FILE"
+    #   echo "$CURRENT_PUMP_PROJ_SHORT_NAME" > "$PUMP_PRO_PWD_FILE"
     # else
-    #   echo "$CURRENT_PUMP_PROJECT" > "$PUMP_PRO_FILE"
+    #   echo "$CURRENT_PUMP_PROJ_SHORT_NAME" > "$PUMP_PRO_FILE"
     # fi
 
     local version_to_use=""
@@ -7290,8 +7241,8 @@ function pro() {
   fi
 
   if [[ -z "$proj_arg" ]]; then
-    if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
-      print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
+    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}"
       if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
         print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
       fi
@@ -7300,7 +7251,7 @@ function pro() {
       print " provide a project name" >&2
     fi
 
-    print " type ${yellow_cor}pro -h${reset_cor} to see usage" >&2
+    print " run ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     pro -l
     
     return 1;
@@ -7318,18 +7269,18 @@ function pro() {
 
   # if (( pro_is_f )); then
   #   if [[ -f "$PUMP_PRO_PWD_FILE" ]]; then
-  #     CURRENT_PUMP_PROJECT=$(<"$PUMP_PRO_PWD_FILE")
+  #     CURRENT_PUMP_PROJ_SHORT_NAME=$(<"$PUMP_PRO_PWD_FILE")
   #   fi
   # else
   #   if [[ -f "$PUMP_PRO_FILE" ]]; then
-  #     CURRENT_PUMP_PROJECT=$(<"$PUMP_PRO_FILE")
+  #     CURRENT_PUMP_PROJ_SHORT_NAME=$(<"$PUMP_PRO_FILE")
   #   fi
   # fi
 
-  if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJECT" ]]; then
+  if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     set_current_proj_ $i
     # refresh the current project
-    print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}" >/dev/tty
+    print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}" >/dev/tty
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}" >/dev/tty
     fi
@@ -7580,7 +7531,7 @@ function __commit() {
       if git add . && confirm_between_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
         for i in {1..9}; do
-          if [[ "$CURRENT_PUMP_PROJECT" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+          if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
             update_setting_ $i "PUMP_COMMIT_ADD" 1
             break;
           fi
@@ -7658,9 +7609,9 @@ function help() {
 
   local remote_origin=$(get_remote_origin_)
 
-  if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+  if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print ""
-    print -n "  project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJECT}${reset_cor}"
+    print -n "  project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}"
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
@@ -7711,7 +7662,7 @@ function help() {
 
   if ! pause_output_; then return 0; fi
 
-  if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+  if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     display_line_ "project selection" "${solid_blue_cor}"
     print ""
     print " ${solid_blue_cor} pro ${reset_cor}\t\t = project management"
@@ -7720,8 +7671,6 @@ function help() {
     for i in {1..9}; do
       if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
         local short="${PUMP_PROJ_SHORT_NAME[$i]}"
-        # local folder="${PUMP_PROJ_FOLDER[$i]}"
-        # local shortened_path=$(shorten_path_until_ "$folder" $HOME)
         local tab=$([[ ${#short} -lt 5 ]] && echo -e "\t\t" || echo -e "\t")
         
         print " ${solid_blue_cor} $short ${reset_cor}${tab} = set project to $short"
@@ -7730,7 +7679,7 @@ function help() {
     if ! pause_output_; then return 0; fi
   fi
 
-  if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+  if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     display_line_ "setup & run" "${blue_cor}"
     print ""
     print " ${blue_cor} clone ${reset_cor}\t = clone project or branch"
@@ -7771,7 +7720,7 @@ function help() {
 
   if ! pause_output_; then return 0; fi
 
-  if [[ -n "$CURRENT_PUMP_PROJECT" ]]; then
+  if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     display_line_ "$CURRENT_PUMP_PKG_MANAGER" "${solid_magenta_cor}"
     print ""
     print " ${solid_magenta_cor} build ${reset_cor}\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")build"
@@ -8084,7 +8033,7 @@ typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
 
 # ========================================================================
-export CURRENT_PUMP_PROJECT=""
+export CURRENT_PUMP_PROJ_SHORT_NAME=""
 typeset -g CURRENT_PUMP_PROJ_FOLDER=""
 typeset -g CURRENT_PUMP_PROJ_REPO=""
 typeset -g CURRENT_PUMP_PROJ_SINGLE_MODE=""
