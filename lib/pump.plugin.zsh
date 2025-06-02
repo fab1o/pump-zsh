@@ -482,10 +482,10 @@ function input_from_() {
     stty echoctl
     trap - INT
 
-    clear_last_line_2_
+    # clear_last_line_2_
   fi
   
-  clear_last_line_2_
+  # clear_last_line_2_
 
   # if [[ "$_input" == $'\e' ]]; then # doesn't work
   #   return 130;
@@ -1352,7 +1352,7 @@ function choose_mode_() {
   local RET=$?
 
   local i=0
-  for i in {1..15}; do
+  for i in {1..16}; do
     clear_last_line_2_
   done
 
@@ -1842,7 +1842,6 @@ function save_proj_folder_() {
     update_setting_ $i "PUMP_PROJ_FOLDER" "$TEMP_PUMP_PROJ_FOLDER" &>/dev/null
 
     clear_last_line_1_
-
     print "  ${SAVE_PROJ_COR}project folder:${reset_cor} ${TEMP_PUMP_PROJ_FOLDER}" >&1
     print "" >&1
   fi
@@ -1908,7 +1907,6 @@ function save_proj_repo_() {
     update_setting_ $i "PUMP_PROJ_REPO" "$TEMP_PUMP_PROJ_REPO" &>/dev/null
 
     clear_last_line_1_
-
     print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${TEMP_PUMP_PROJ_REPO}" >&1
     print "" >&1
   fi
@@ -1923,7 +1921,7 @@ function save_pkg_manager_() {
   local proj_repo="$3"
 
   if (( ! save_pkg_manager_is_f )); then
-    print " detecting package manager..." >&1
+    print "  detecting package manager..." >&1
   fi
 
   local pkg_manager=$(detect_pkg_manager_ "$proj_folder")
@@ -7177,7 +7175,7 @@ function pro() {
       setopt NO_NOTIFY
       {
         # exec
-        gum spin --title="Checking Node.js..." -- bash -c 'sleep 3'
+        gum spin --title="detecting Node.js..." -- bash -c 'sleep 3'
         # echo -e "\r\033[K"
         # tput sgr0
       } 2>/dev/tty
@@ -7237,7 +7235,7 @@ function pro() {
       eval "$pump_pro" 2>/dev/tty >&2;
     fi
 
-    if (( RET == 0 && pro_is_x )) && [[ -z "$nvm_skip_lookup" && -n "$version_to_use" ]]; then
+    if (( RET == 0 && pro_is_x )) && [[ -z "$nvm_skip_lookup" ]]; then
       confirm_between_ "skip checking for Node.js versions from now on? you won't be asked again" "skip" "don't skip"
       local _RET=$?
 
