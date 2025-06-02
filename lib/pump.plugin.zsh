@@ -40,7 +40,7 @@ typeset -g purple_cor="\e[38;5;99m"
 typeset -g reset_cor="\e[0m"
 
 typeset -g purple_prompt_cor=$'\e[1;38;5;99m'
-typeset -g cyan_prompt_cor=$'\e[38;2;167;139;250m'
+typeset -g lightpurple_prompt_cor=$'\e[38;2;167;139;250m'
 typeset -g reset_prompt_cor=$'\e[0m'
 
 typeset -g PUMP_VERSION="0.0.0"
@@ -464,7 +464,7 @@ function input_from_() {
 
   # >&2 needs to display because this is called from a subshell
   # print " ${header}:" >&2
-  print "${purple_cor} ${header}:${reset_cor}" >&2
+  print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
     _input=$(gum input --placeholder="$placeholder" --char-limit=$max)
@@ -511,9 +511,9 @@ function choose_multiple_() {
   if command -v gum &>/dev/null; then
     local choice=""
     if (( auto )); then
-      choice="$(gum choose --select-if-one --no-limit --header=" choose $header ${cyan_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
+      choice="$(gum choose --select-if-one --no-limit --header=" choose $header ${lightpurple_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
     else
-      choice="$(gum choose --no-limit --header=" choose $header ${cyan_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
+      choice="$(gum choose --no-limit --header=" choose $header ${lightpurple_prompt_cor}(use spacebar)${purple_prompt_cor}:${reset_prompt_cor}" --height="$height" ${@:4})"
     fi
     RET=$?
     
@@ -525,7 +525,7 @@ function choose_multiple_() {
 
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${purple_prompt_cor}$header: ${reset_prompt_cor}"
+  PS3="${lightpurple_prompt_cor}$header: ${reset_prompt_cor}"
 
   select choice in "${@:4}" "quit"; do
     case $choice in
@@ -546,6 +546,7 @@ function filter_one_() {
   local auto="$1"
   local header="$2"
   local height="${3:-20}"
+  local placeholder="$4"
 
   local RET=0
 
@@ -555,9 +556,9 @@ function filter_one_() {
     local choice=""
     
     if (( auto )); then
-      choice="$(gum filter --height="$height" --limit=1 --select-if-one --indicator=">" --placeholder=" $3" ${@:4})"
+      choice="$(gum filter --height="$height" --limit=1 --select-if-one --indicator=">" --placeholder=" $placeholder" ${@:5})"
     else
-      choice="$(gum filter --height="$height" --limit=1 --indicator=">" --placeholder=" $3" ${@:4})"
+      choice="$(gum filter --height="$height" --limit=1 --indicator=">" --placeholder=" $placeholder" ${@:5})"
     fi
     RET=$?
     
@@ -565,7 +566,7 @@ function filter_one_() {
     
     echo "$choice"
   else
-    choose_one_ $auto "$header" "$height" ${@:4}
+    choose_one_ $auto "$header" "$height" ${@:5}
   fi
 }
 
@@ -591,7 +592,7 @@ function choose_one_() {
   
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${purple_prompt_cor}$header: ${reset_prompt_cor}"
+  PS3="${lightpurple_prompt_cor}$header: ${reset_prompt_cor}"
 
   select choice in "${@:4}" "quit"; do
     case $choice in
@@ -775,8 +776,8 @@ function find_proj_folder_() {
   fi
 
   # >&2 needs to display because this is called from a subshell
-  print " ${header}:" >&2
-  # print "${purple_cor} ${header}:${reset_cor}" >&2
+  # print " ${header}:" >&2
+  print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
   print "" >&2
 
   cd "${HOME:-/}" # start from home
@@ -3049,11 +3050,11 @@ function select_branch_() {
     header=${5:-"branch"}
     
     if [[ ${#filtered_branches[@]} -gt 20 ]]; then
-      select_branch_choices=$(filter_one_ $auto "$header" "type to filter" $filtered_branches)
+      select_branch_choices=$(filter_one_ "$auto" "$header" 20 "type to filter" $filtered_branches)
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
     else
-      select_branch_choices=$(choose_one_ $auto "$header" 20 $filtered_branches)
+      select_branch_choices=$(choose_one_ "$auto" "$header" 20 $filtered_branches)
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
     fi
@@ -6924,7 +6925,7 @@ function delb() {
   local deleted_branches=()
 
   local filter=$((( delb_is_r )) && echo "-r" || echo "--list")
-  local selected_branches=($(select_branch_ 0 $filter "$branch_arg" 1 "choose branches" $delb_is_a))
+  local selected_branches=($(select_branch_ 0 $filter "$branch_arg" 1 "branches" $delb_is_a))
   
   if [[ -z "$selected_branches" ]]; then
     return 1;
