@@ -102,6 +102,18 @@ fi
 #   echo "set -- ${(q+)@}"
 # }
 
+function clear_last_line_1_() {
+  print -n "\033[1A\033[2K" >&1
+}
+
+function clear_last_line_2_() {
+  print -n "\033[1A\033[2K" >&2
+}
+
+function clear_last_line_tty_() {
+  print -n "\033[1A\033[2K" 2>/dev/tty
+}
+
 function print_debug_() {
   if (( is_debug )); then
     print "${solid_blue_cor}debug: $1 ${reset_cor}" >&2
@@ -223,8 +235,8 @@ function confirm_between_() {
     fi
     RET=$?
     if (( RET == 130 )); then
-      clear_last_line_2_
-      clear_last_line_2_
+      # clear_last_line_2_
+      # clear_last_line_2_
       return 130;
     fi
     return $RET;
@@ -267,8 +279,8 @@ function confirm_from_() {
     gum confirm ""confirm:$'\e[0m'" $question" --no-show-help 2>/dev/tty
     RET=$?
     if (( RET == 130 )); then
-      clear_last_line_2_
-      clear_last_line_2_
+      # clear_last_line_2_
+      # clear_last_line_2_
       return 130;
     fi
     return $RET;
@@ -1276,18 +1288,6 @@ function check_proj_pkg_manager_() {
   return 0;
 }
 # end of data checkers
-
-function clear_last_line_1_() {
-  print -n "\033[1A\033[2K" >&1
-}
-
-function clear_last_line_2_() {
-  print -n "\033[1A\033[2K" >&2
-}
-
-function clear_last_line_tty_() {
-  print -n "\033[1A\033[2K" 2>/dev/tty
-}
 
 function choose_mode_() {
   local proj_folder="$(basename "$1")"
@@ -4633,11 +4633,12 @@ function get_revs_folder_() {
   local even_if_empty="$3"
 
   local parent_folder="$(dirname "$proj_folder")"
-  local revs_folder_single_mode="${parent_folder}/.${proj_folder}-revs"
+  local folder_name="$(basename "$proj_folder")"
+  local revs_folder_single_mode="${parent_folder}/.${folder_name}-revs"
   local revs_folder_multiple_mode="${proj_folder}/.revs"
 
-  local revs_folder_single_mode_content="$(ls "${revs_folder_single_mode}/rev.*" 2>/dev/null)"
-  local revs_folder_multiple_mode_content="$(ls "${revs_folder_multiple_mode}/rev.*" 2>/dev/null)"
+  local revs_folder_single_mode_content="$(find "$revs_folder_single_mode" -maxdepth 1 -type d -name 'rev.*' 2>/dev/null)"
+  local revs_folder_multiple_mode_content="$(find "$revs_folder_multiple_mode" -maxdepth 1 -type d -name 'rev.*' 2>/dev/null)"
 
   if (( single_mode )); then
     if [[ -n "$revs_folder_single_mode_content" ]]; then
@@ -4737,7 +4738,7 @@ function revs() {
   local rev_choice=$(choose_one_ 0 "review to open" 20 "${(@f)$(printf "%s\n" "${rev_options[@]}" | sed 's|.*/||')}")
   if [[ -z "$rev_choice" ]]; then return 1; fi
 
-  rev "$proj_arg" "${rev_choice//rev./}"
+  rev -e "$proj_arg" "${rev_choice//rev./}"
 }
 
 function rev() {
@@ -4842,10 +4843,12 @@ function rev() {
       print " branch is required" >&2
       return 1;
     fi
+  
   elif (( rev_is_b )); then
     fetch --quiet
     branch="$(select_branch_ 1 -r "$branch_arg")"
     if [[ -z "$branch" ]]; then return 1; fi
+  
   else
     local pr=("${(@s:|:)$(select_pr_ "$branch_arg")}")
     if [[ -z "$pr" ]]; then return 1; fi
@@ -4859,7 +4862,7 @@ function rev() {
   local full_rev_folder="${revs_folder}/rev.${branch_folder}"
 
   if [[ -d "$full_rev_folder" ]]; then
-    print " opening review: ${green_cor}$(basename "$full_rev_folder")${reset_cor} and pulling latest changes..."
+    print " opening review and pulling changes: ${green_cor}${pr[3]}${reset_cor}..."
   else
     local remote_branch=$(get_remote_branch_ "$branch")
 
