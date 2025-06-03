@@ -66,9 +66,9 @@
           "background": "transparent",
           "foreground": "blue",
           "foreground_templates": [
-            "{{ if and (gt .Behind 0) (gt .Ahead 0) }}red{{ end }}",
-            "{{ if gt .Ahead 0 }}yellow{{ end }}",
-            "{{ if gt .Behind 0 }}magenta{{ end }}",
+            "{{ if and (gt .Behind 0) (gt .Ahead 0) }}p:gruvred{{ end }}",
+            "{{ if gt .Ahead 0 }}p:gruvyellow{{ end }}",
+            "{{ if gt .Behind 0 }}p:gruvmagenta{{ end }}",
             "{{ if or (.Working.Changed) (.Staging.Changed) }}p:orange{{ end }}"
           ],
           "properties": {
