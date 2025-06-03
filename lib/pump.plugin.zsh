@@ -781,9 +781,13 @@ function find_proj_folder_() {
   print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
   print "" >&2
 
+  add-zsh-hook -d chpwd pump_chpwd_
+
   cd "${HOME:-/}" # start from home
 
   local RET=0
+
+  local chosen_folder=""
 
   while true; do
     if [[ -n "$folder_path" ]]; then
@@ -814,7 +818,7 @@ function find_proj_folder_() {
               local realfolder_proj="${PUMP_PROJ_FOLDER[$j]:A}"
 
               if [[ "$realfolder" == "$realfolder_proj" ]]; then
-                found=1
+                found=$j
                 print "  ${yellow_cor}in use, please select another folder${reset_cor}" >&2
                 cd "$HOME"
               fi
@@ -822,8 +826,8 @@ function find_proj_folder_() {
           done
 
           if (( found == 0 )); then
-            echo "$folder_path"
-            return 0;
+            chosen_folder="$folder_path"
+            break;
           fi
         fi
       fi
@@ -837,14 +841,21 @@ function find_proj_folder_() {
     local chose_folder=""
     chose_folder="$(gum file --directory --height 14)"
     RET=$?
-    if (( RET == 130 || RET == 2 )); then return 130; fi
+    if (( RET == 130 || RET == 2 )); then break; fi
 
     if [[ -n "$chose_folder" ]]; then
       folder_path="$chose_folder"
     else
-      return 1;
+      break;
     fi
   done
+
+  add-zsh-hook chpwd pump_chpwd_
+
+  if [[ -n "$chosen_folder" ]]; then
+    echo "$chosen_folder"
+    return 0;
+  fi
 
   return 1;
 }
@@ -2818,28 +2829,33 @@ function get_proj_for_pkg_() {
   echo "$proj_folder"
 }
 
-# function open_proj_for_git_() {
-#   local folder="$1"
-#   local proj_arg="$2"
+function open_proj_for_git_() {
+  local folder="$1"
+  local proj_arg="$2"
 
-#   local git_folder=$(get_proj_for_git_ "$folder")
+  local git_folder=$(get_proj_for_git_ "$folder")
   
-#   if [[ -z "$git_folder" ]]; then
-#     if [[ -n "$proj_arg" ]]; then
-#       print " could not find a cloned project for $proj_arg" >&2
-#       print " run ${yellow_cor}clone $proj_arg${reset_cor} to clone project" >&2
-#     else
-#       print " could not find a cloned project" >&2
-#       print " run ${yellow_cor}clone${reset_cor} to clone project" >&2
-#     fi
-#     return 1;
-#   fi
+  if [[ -z "$git_folder" ]]; then
+    if [[ -n "$proj_arg" ]]; then
+      print " could not find a cloned project for $proj_arg" >&2
+      print " run ${yellow_cor}clone $proj_arg${reset_cor} to clone project" >&2
+    else
+      print " could not find a cloned project" >&2
+      print " run ${yellow_cor}clone${reset_cor} to clone project" >&2
+    fi
+    return 1;
+  fi
 
-#   cd "$git_folder" || {
-#     print " cannot change directory to: $git_folder" >&2
-#     return 1;
-#   }
-# }
+  add-zsh-hook -d chpwd pump_chpwd_
+
+  cd "$git_folder" || {
+    print " cannot change directory to: $git_folder" >&2
+    add-zsh-hook chpwd pump_chpwd_
+    return 1;
+  }
+
+  add-zsh-hook chpwd pump_chpwd_
+}
 
 function get_proj_for_git_() {
   local folder="${1:-$PWD}"
@@ -2882,11 +2898,6 @@ function get_proj_for_git_() {
   fi
 
   return 1;
-
-  # cd "$git_folder" || {
-  #   print " cannot change directory to: $git_folder" >&2
-  #   return 1;
-  # }
 }
 
 function is_git_repo_() {
@@ -3086,14 +3097,19 @@ function select_pr_() {
 
   local _pwd="$(pwd)"
 
+  local pr_list=""
+
+  add-zsh-hook -d chpwd pump_chpwd_
   cd "$proj_folder" || {
     print " cannot change directory to: $proj_folder" >&2
+    add-zsh-hook chpwd pump_chpwd_
     return 1;
   }
 
-  local pr_list=$(gh pr list | grep -i "$search_text" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
+  pr_list=$(gh pr list | grep -i "$search_text" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
 
   cd $_pwd
+  add-zsh-hook chpwd pump_chpwd_
 
   if [[ -z "$pr_list" ]]; then
     if [[ -n "$proj_cmd" ]]; then
@@ -4024,7 +4040,7 @@ function test() {
   local RET=$?
   
   if (( RET == 0 )); then
-    print "\033[32m✅ test passed on first run\033[0m"
+    print " ✅ ${green_cor}test passed on first run${reset_cor}"
     return 0
   fi
 
@@ -4033,12 +4049,12 @@ function test() {
     RET=$?
 
     if (( RET == 0 )); then
-      print "\033[32m✅ test passed on second run\033[0m"
+      print " ✅ ${green_cor}test passed on second run${reset_cor}"
       return 0;
     fi
   fi
     
-  print "\033[31m❌ test failed\033[0m"
+  print " ❌ ${red_cor}test failed${reset_cor}"
   
   trap - INT
   
@@ -4070,7 +4086,7 @@ function cov() {
   local RET=$?
   
   if (( RET == 0 )); then
-    print "\033[32m✅ test coverage passed on first run\033[0m"
+    print " ✅ ${green_cor}test coverage passed on first run${reset_cor}"
 
     if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
       eval "$CURRENT_PUMP_OPEN_COV"
@@ -4083,7 +4099,7 @@ function cov() {
     RET=$?
 
     if (( RET == 0 )); then
-      print "\033[32m✅ test coverage passed on second run\033[0m"
+      print " ✅ ${green_cor}test coverage passed on second run${reset_cor}"
       
       if [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
         eval "$CURRENT_PUMP_OPEN_COV"
@@ -4092,7 +4108,7 @@ function cov() {
     fi
   fi
     
-  print "\033[31m❌ test coverage failed\033[0m"
+  print " ❌ ${red_cor}test coverage failed${reset_cor}"
   
   trap - INT
 
@@ -4406,7 +4422,7 @@ function run() {
     folder_arg="$2"
   elif [[ -n "$2" ]]; then
     local i=$(find_proj_index_ "$1" 2>/dev/null)
-    if [[ -n "$i" ]]; then
+    if (( i )); then
       proj_arg="$1"
       if [[ "$2" == "dev" || "$2" == "stage" || "$2" == "prod" ]]; then
         if ! save_proj_mode_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
@@ -4710,6 +4726,7 @@ function revs() {
   fi
 
   local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
+  
   if (( ! i )); then
     print " not a valid project or no project is set" >&2
     print " run ${yellow_cor}revs -h${reset_cor} to see usage" >&2
@@ -4732,6 +4749,9 @@ function revs() {
 
   if [[ -z "$revs_folder" ]]; then
     print " no revs for $proj_arg" >&2
+    if [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+      print -n " run ${yellow_cor}$proj_arg${reset_cor} then" >&2
+    fi
     print " run ${yellow_cor}rev${reset_cor} to open a review" >&2
     return 1; 
   fi
@@ -4764,6 +4784,8 @@ function rev() {
     return 1;
   fi
 
+  if ! is_git_repo_; then return 1; fi
+
   local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local branch_arg=""
 
@@ -4779,6 +4801,7 @@ function rev() {
   fi
 
   local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
+  
   if (( ! i )); then
     print " not a valid project or no project is set" >&2
     print " run ${yellow_cor}rev -h${reset_cor} to see usage" >&2
@@ -4883,7 +4906,7 @@ function rev() {
           if pull "$full_rev_folder" --quiet; then
             skip_setup=0
           else
-            warn_msg=" ${yellow_cor}warning: pull request is already merged${reset_cor} $pr_link"
+            warn_msg=" ${yellow_cor}warning: pull request is already merged${reset_cor}"
           fi
         else
           warn_msg=" ${red_cor}failed to reset review folder: $full_rev_folder ${reset_cor}"
@@ -4919,7 +4942,7 @@ function rev() {
     # end of cloning
 
     if ! pull "$full_rev_folder" --quiet; then
-      warn_msg="${yellow_cor} warning: pull request is already merged${reset_cor} $pr_link"
+      warn_msg="${yellow_cor} warning: pull request is already merged${reset_cor}"
     fi
   fi
 
@@ -6327,26 +6350,23 @@ function gll() {
 
 function gha_() {
   local workflow="$1"
+  local msg="${2:-checking workflow status...}"
 
-  local workflow_id="$(gh run list --workflow="${workflow}" --limit 1 --json databaseId --jq '.[0].databaseId')"
+  local workflow_id="$(gum spin --title="$msg" -- gh run list --workflow="${workflow}" --limit 1 --json databaseId --jq '.[0].databaseId')"
+  if [[ -z "$workflow_id" ]]; then return 1; fi
 
-  if [[ -z "$workflow_id" ]]; then
-    #print "⚠️${yellow_cor} workflow not found ${reset_cor}" >&2
-    return 1;
-  fi
-
-  local workflow_status="$(gh run list --workflow="${workflow}" --limit 1 --json conclusion --jq '.[0].conclusion')"
+  local workflow_status="$(gum spin --title="$msg" -- gh run list --workflow="${workflow}" --limit 1 --json conclusion --jq '.[0].conclusion')"
 
   if [[ -z "$workflow_status" ]]; then
-    print " ⏳\e[90m workflow is still running ${reset_cor}" >&2
+    print " ⏳ ${gray_cor}workflow is running: $workflow ${reset_cor}" >&2
     return 0; # this nust be zero for auto mode
   fi
 
   # Output status with emoji
   if [[ "$workflow_status" == "success" ]]; then
-    print " ✅${green_cor} workflow passed: $workflow ${reset_cor}"
+    print " ✅ ${green_cor}workflow passed: $workflow ${reset_cor}"
   else
-    print "\a ❌${red_cor} workflow failed (status: $workflow_status) ${reset_cor}"
+    print "\a ❌ ${red_cor}workflow failed: $workflow (status: $workflow_status) ${reset_cor}"
 
     local repo=$(get_repo_)
     local repo_name=$(get_repo_name_ "$repo" 2>/dev/null)
@@ -6360,13 +6380,13 @@ function gha_() {
 }
 
 function gha() {
-  eval "$(parse_flags_ "gha_" "" "$@")"
+  eval "$(parse_flags_ "gha_" "a" "$@")"
   (( gha_is_d )) && set -x
 
   if (( gha_is_h )); then
     print "  ${yellow_cor}gha${reset_cor} : to check status of a workflow in current project"
     print "  ${yellow_cor}gha ${solid_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow in current project"
-    print "  ${yellow_cor}gha <pro> ${solid_yellow_cor}[<workflow>]${reset_cor} : to check status of a given workflow for a project"
+    print "  ${yellow_cor}gha <pro> ${solid_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow for a project"
     print "  ${yellow_cor}gha -a${reset_cor} : to run in auto mode"
     return 0;
   fi
@@ -6382,124 +6402,115 @@ function gha() {
 
   # Parse arguments
   if [[ -n "$2" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$1" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        proj_arg="$1"
-        break;
-      fi
-    done
-    if [[ -n "$proj_arg" ]]; then
+    if is_project_ "$1"; then
+      proj_arg="$1"
       workflow_arg="$2"
+    else
+      workflow_arg="$1"
     fi
   elif [[ -n "$1" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$1" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        proj_arg="$1"
-        break;
-      fi
-    done
-    if [[ -z "$proj_arg" ]]; then
+    if is_project_ "$1"; then
+      proj_arg="$1"
+    else
       workflow_arg="$1"
-      proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
     fi
-  else
-    proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   fi
 
+  local proj_folder=""
   local proj_repo=""
   local gha_interval=""
   local gha_workflow=""
   local found=0
 
-  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
-  
-  if (( ! i )); then
-    print " not a valid project or no project is set" >&2
-    print " run ${yellow_cor}gha -h${reset_cor} to see usage" >&2
-    print " run ${yellow_cor}pro${reset_cor} to set project" >&2
-    return 1;
-  fi
+  if [[ -n "$proj_arg" ]]; then
+    local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
 
-  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-    return 1;
-  fi
+    found=$i;
 
-  proj_repo="${PUMP_PROJ_REPO[$i]}"
-  gha_interval="${PUMP_GHA_INTERVAL[$i]}"
-  gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
+    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
+      return 1;
+    fi
+    
+    proj_folder=$(get_proj_for_git_ "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg")
+    if [[ -z "$proj_folder" ]]; then return 1; fi
+
+    if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
+      return 1;
+    fi
+    proj_repo="${PUMP_PROJ_REPO[$i]}"
+
+    gha_interval="${PUMP_GHA_INTERVAL[$i]}"
+    gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
+  else
+    if ! is_git_repo_; then return 1; fi
+
+    proj_folder="$(pwd)"
+    proj_repo=$(git remote get-url origin)
+  fi
 
   local ask_save=0
   local RET=0
+  local _pwd="$(pwd)"
+
+  add-zsh-hook -d chpwd pump_chpwd_
+
+  cd "$proj_folder" || {
+    print " could not change directory to $proj_folder" >&2
+    add-zsh-hook chpwd pump_chpwd_
+    return 1;
+  }
 
   if [[ -z "$workflow_arg" && -z "$gha_workflow" ]]; then
     local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
     local workflow_choices=$(gh workflow list --repo "$repo_name" | cut -f1)
+    
     if [[ -z "$workflow_choices" || "$workflow_choices" == "No workflows found" ]]; then
       print " no workflows found" >&2
+      add-zsh-hook chpwd pump_chpwd_
       return 1;
     fi
     
-    local chosen_workflow=""
-    chosen_workflow=$(gh workflow list | cut -f1 | gum choose --header " choose workflow:")
-    RET=$?
-    if (( RET == 130 || RET == 2 )); then return 130; fi
-    
-    if [[ -z "$chosen_workflow" ]]; then
+    workflow_arg=$(gh workflow list | cut -f1 | gum choose --header " choose workflow:")
+    if [[ -z "$workflow_arg" ]]; then
+      add-zsh-hook chpwd pump_chpwd_
       return 1;
     fi
 
-    workflow_arg="$chosen_workflow"
     ask_save=1
   elif [[ -n "$workflow_arg" ]]; then
-    ask_save=1
+    ask_save=0
   elif [[ -n "$gha_workflow" ]]; then
     workflow_arg="$gha_workflow"
     ask_save=0    
   fi
 
-  if [[ -z "$workflow_arg" ]]; then
-    print " no workflow name provided" >&2
-    print " run ${yellow_cor}gha -h${reset_cor} to see usage" >&2
-    return 1;
+  if [[ -z "$gha_interval" || "$gha_interval" != <-> ]]; then
+    gha_interval=10
   fi
 
-  if (( ! gha_is_a )); then
-    print " checking workflow..."
+  while true; do
     gha_ "$workflow_arg"
     RET=$?
-  else
-    if [[ -z "$gha_interval" ]]; then
-      gha_interval=10
+
+    if (( RET != 0 || gha_is_a == 0 )); then
+      break;
     fi
-
-    print " running every $gha_interval minutes, press cmd+c to stop"
+    
     print ""
+    print " sleeping for $gha_interval minutes..."
+    sleep $(($gha_interval * 60))
+  done
 
-    while true; do
-      print " checking workflow..."
-
-      gha_ "$workflow_arg"
-      RET=$?
-
-      if (( RET != 0 )); then
-        return $RET;
-      fi
-      
-      print ""
-      print " sleeping $gha_interval minutes..."
-      sleep $(($gha_interval * 60))
-    done
-  fi
-
-  if (( RET == 0 && ask_save )); then
+  if (( RET == 0 && found && ask_save && gha_is_a == 0 )); then
     # ask to save the workflow
     if confirm_from_ "would you like to save \"$workflow_arg\" as the default workflow for this project?"; then
       update_setting_ $found "PUMP_GHA_WORKFLOW" "\"$workflow_arg\""
     fi
-    return 0;
   fi
+
+  add-zsh-hook chpwd pump_chpwd_
+
+  return $RET;
 }
 
 function co() {
@@ -8140,7 +8151,7 @@ function colors() {
 }
 
 # cd pro
-function chpwd() {
+function pump_chpwd_() {
   local proj_arg=$(find_proj_by_pwd_)
 
   if [[ -n "$proj_arg" ]]; then
@@ -8346,3 +8357,5 @@ fi
 # 1>/dev/null or >/dev/null	  Hide stdout, show stderr
 # 2>/dev/null                 show stdout, hide stderr
 # &>/dev/null	                Hide both stdout and stderr outputs
+
+add-zsh-hook chpwd pump_chpwd_
