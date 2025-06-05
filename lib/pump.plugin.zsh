@@ -457,7 +457,7 @@ function input_from_() {
   #   return 130;
   # fi
 
-  _input="$(echo "$_input" | xargs)"
+  _input=$(printf '%s' "$_input" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
   if [[ -n "$_input" ]]; then
     echo "$_input"
@@ -549,6 +549,7 @@ function choose_multiple_() {
   (( choose_multiple_is_d )) && set -x
 
   local header="$1"
+
   local RET=0
   local choices
 
@@ -2923,14 +2924,17 @@ function get_local_branch_() {
 function get_remote_origin_() {
   local proj_folder="${1-$PWD}"
 
-  if [[ -z "$proj_folder" ]] || ! git -C "$proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
+
+  if [[ -z "$git_proj_folder" ]] || ! git -C "$git_proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
      echo "origin"
      return 0;
   fi
 
   local ref
   for ref in refs/remotes/{origin,upstream}/{main,master,stage,dev,release,trunk,mainline,default,stable}; do
-    if git -C "$proj_folder" show-ref -q --verify $ref; then
+    if git -C "$git_proj_folder" show-ref -q --verify $ref; then
       echo "${${ref:h}:t}"
       return 0
     fi
@@ -2947,12 +2951,15 @@ function get_remote_branch_() {
   local branch="$1"
   local proj_folder="${2-$PWD}"
 
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
+
   # get_remote_branch_ -r
   # get local name but if branch is not in remote, it fails
   # use it to check if branch exists in remote
   if (( get_remote_branch_is_r )); then
-    local remote_name=$(get_remote_origin_ "$proj_folder")
-    local remote_branch=$(git -C "$proj_folder" ls-remote --heads "$remote_name" "$branch" | awk '{print $2}' 2>/dev/null)
+    local remote_name=$(get_remote_origin_ "$git_proj_folder")
+    local remote_branch=$(git -C "$git_proj_folder" ls-remote --heads "$remote_name" "$branch" | awk '{print $2}' 2>/dev/null)
     if [[ -n "$remote_branch" ]]; then
       if (( get_remote_branch_is_f )); then
         echo "$remote_branch"
@@ -2969,7 +2976,7 @@ function get_remote_branch_() {
   # use it to check if branch exists in remote or local
   local ref
   for ref in refs/{remotes/{origin,upstream},heads}/$branch; do
-    if git -C "$proj_folder" show-ref -q --verify $ref; then
+    if git -C "$git_proj_folder" show-ref -q --verify $ref; then
       if (( get_remote_branch_is_f )); then
         echo "$ref"
       else
@@ -3051,7 +3058,6 @@ function get_default_branch_() {
   (( get_default_branch_is_d )) && set -x
 
   local proj_folder="${1:-$PWD}"
-
   local default_branch=""
 
   if git -C "$proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
@@ -3062,7 +3068,8 @@ function get_default_branch_() {
       default_branch=$(LC_ALL=C git -C "$proj_folder" remote show $remote_name 2>/dev/null | awk '/HEAD branch/ {print $NF}')
     fi
   else
-    default_branch=$(get_remote_branch_ -f "$(git -C "$proj_folder" config --get init.defaultBranch 2>/dev/null)" "$proj_folder")
+    local branch="$(git -C "$proj_folder" config --get init.defaultBranch 2>/dev/null)"
+    default_branch=$(get_remote_branch_ -f "$branch" "$proj_folder")
   fi
 
   if [[ -n "$default_branch" ]]; then
@@ -3082,8 +3089,11 @@ function get_repo_() {
   local proj_folder="${1-$PWD}"
   local branch="$2"
 
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
+
   local remote_name=$(get_remote_origin_ "$proj_folder")
-  local remote_repo=$(git -C "$proj_folder" remote get-url "$remote_name" 2>/dev/null)
+  local remote_repo=$(git -C "$git_proj_folder" remote get-url "$remote_name" 2>/dev/null)
 
   if [[ -n "$remote_repo" ]]; then
     echo "$remote_repo"
@@ -3261,13 +3271,21 @@ function select_pr_() {
 
   local pr_list=""
 
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_cmd")
+  if [[ -z "$git_proj_folder" ]]; then
+    print " fatal: could not locate a git repository folder for project: $proj_cmd" >&2
+    return 1;
+  fi
+
   add-zsh-hook -d chpwd pump_chpwd_
+
+  local _pwd="$(pwd)"
   
-  pushd "$proj_folder" &>/dev/null
+  cd "$git_proj_folder" # use cd here, not pushd
 
   pr_list=$(gh pr list | grep -i "$search_text" | awk -F'\t' '{print $1 "\t" $2 "\t" $3}')
 
-  popd &>/dev/null
+  cd $_pwd
 
   add-zsh-hook chpwd pump_chpwd_
 
@@ -3772,6 +3790,10 @@ function del() {
   if [[ -z "$1" ]]; then
     # capture all files in current folder
     files=(*)
+
+    if (( ${#files[@]} > 1 )); then
+      files=("${(@f)$(choose_multiple_ "files to delete" "${files[@]}")}")
+    fi
   else
     # capture all arguments (quoted or not) as a single pattern
     pattern="$*"
@@ -4965,7 +4987,7 @@ function rev() {
     fi
 
     if [[ -z "$branch" ]]; then
-      branch=$(get_remote_branch_ "$branch_arg" "$real_proj_folder")
+      branch=$(get_remote_branch_ "$branch_arg" "$proj_folder")
     fi
 
     if [[ -z "$branch" ]]; then
@@ -4982,15 +5004,12 @@ function rev() {
 
   else
     # check if branch arg was given and it's a branch
-    local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg")
-    if [[ -z "$git_proj_folder" ]]; then return 1; fi
-
     if [[ -n "$branch_arg" ]]; then
-      branch=$(get_remote_branch_ "$branch_arg" "$git_proj_folder")
+      branch=$(get_remote_branch_ "$branch_arg" "$proj_folder")
     fi
 
     if [[ -z "$branch"  ]]; then
-      local pr=("${(@s:|:)$(select_pr_ "$branch_arg" "$git_proj_folder" "$proj_arg")}")
+      local pr=("${(@s:|:)$(select_pr_ "$branch_arg" "$proj_folder" "$proj_arg")}")
       if [[ -z "${pr[2]}" ]]; then return 1; fi
       
       branch="${pr[2]}"
@@ -5285,7 +5304,8 @@ function clone() {
   if [[ -z "$branch_arg" ]]; then
     branch_arg="$default_branch"
   else
-    remote_branch=$(get_remote_branch_ "$branch_arg" "$folder_to_clone")
+    branch_arg="${${USER:0:1}:l}-$branch_arg"
+    remote_branch=$(get_remote_branch_ "$branch_arg" "$proj_folder")
 
     if [[ -n "$remote_branch" ]]; then
       print " fatal: branch already exists on remote: $branch_arg "
