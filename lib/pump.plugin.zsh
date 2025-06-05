@@ -4362,8 +4362,8 @@ function read_commits_() {
   local default_branch=$(get_default_branch_ -f)
   local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
 
-  print "default_branch $default_branch"
-  print "my_remote_branch $my_remote_branch"
+  # print "default_branch $default_branch"
+  # print "my_remote_branch $my_remote_branch"
 
   ## TODO: Confirm this is working
   # if [[ -n "$my_remote_branch" ]]; then
