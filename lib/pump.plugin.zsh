@@ -2215,6 +2215,7 @@ function set_aliases_() {
   # Reset all aliases
   #unalias -a &>/dev/null
   alias i="$CURRENT_PUMP_PKG_MANAGER install"
+  alias install="$CURRENT_PUMP_PKG_MANAGER install"
   # Package manager aliases =========================================================
   alias build="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")build"
   alias deploy="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")deploy"
@@ -4668,6 +4669,7 @@ function setup() {
 
   local proj_folder="";
   local _setup="${PUMP_SETUP[$i]}"
+  local pkgManager="${PUMP_PKG_MANAGER[$i]}"
 
   if [[ -n "$proj_arg" ]]; then
     if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
@@ -4728,7 +4730,33 @@ function setup() {
   if ! eval "$_setup"; then
     print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
     print " edit your pump.zshenv config, then run ${yellow_cor}refresh${reset_cor}" >&2
+    return 1;
   fi
+
+  print ""
+  print " next thing you may wanna do:"
+
+  local pkg_json="package.json"
+  if [[ -f $pkg_json ]]; then
+    local scripts=$(jq -r '.scripts // {} | to_entries[] | "\(.key)=\(.value)"' "$pkg_json")
+
+    local entry;
+    for entry in ${(f)scripts}; do
+      local name="${entry%%=*}"
+      local cmd="${entry#*=}"
+
+      if [[ "$name" == "build" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}build${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")build\")"; fi
+      if [[ "$name" == "deploy" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}deploy${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")deploy\")"; fi
+      if [[ "$name" == "start" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}start${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")start\")"; fi
+      if [[ "$name" == "dev" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}run${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")dev\")"; fi
+      if [[ "$name" == "stage" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}run stage${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")stage\")"; fi
+      if [[ "$name" == "prod" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}run prod${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")prod\")"; fi
+      if [[ "$name" == "test" && -n "$cmd" ]]; then print "  • run ${solid_magenta_cor}test${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")test\")"; fi
+    done
+    print "  --"
+  fi
+
+  print "  • run ${yellow_cor}help${reset_cor} to see more options"
 }
 
 function get_revs_folder_() {
@@ -5159,9 +5187,10 @@ function clone() {
   local proj_repo=""
   local proj_folder=""
   local single_mode=""
-  local _clone=""
-  local print_readme=""
-  local pump_default_branch=""
+  local _clone="${PUMP_CLONE[$i]}"
+  local print_readme="${PUMP_PRINT_README[$i]}"
+  local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
+  local pkgManager="${PUMP_PKG_MANAGER[$i]}"
 
   if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
     return 1;
@@ -5177,10 +5206,6 @@ function clone() {
     return 1;
   fi
   single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-
-  _clone="${PUMP_CLONE[$i]}"
-  print_readme="${PUMP_PRINT_README[$i]}"
-  pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
 
   if [[ -z "$proj_repo" ]]; then
     print " missing repository uri for $proj_arg" >&2
@@ -5325,13 +5350,31 @@ function clone() {
   print ""
   print " successfully cloned project: ${solid_blue_cor}${proj_arg}${reset_cor}"
   print " default branch is ${green_cor}$(git config --get init.defaultBranch)${reset_cor}"
-
-  # README FUNCTIONALITY AFTER CLONING HAS BEEN DISABLED
+  
   print ""
-  print " next thing you may do:"
-  print " • run ${yellow_cor}${proj_arg} -i${reset_cor} to show the README file"
-  print " • run ${yellow_cor}setup${reset_cor} to setup the project folder"
+  print " next thing you may wanna do:"
+
+  local readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -maxdepth $maxdepth -type f -iname "README.md*" -print -quit 2>/dev/null)
+  if [[ -z "$readme_file" ]]; then
+    readme_file=$(find . \( -path "*/.*" -a ! -iname "README.md*" \) -prune -o -type f -iname "readme.md*" -print -quit 2>/dev/null)
+  fi
+  if [[ -n "$readme_file" ]]; then
+    print " • run ${yellow_cor}${proj_arg} -i${reset_cor} to show the 'readme' file"
+    print " --"
+  fi
+
+  local pkg_json="package.json"
+  if [[ -f $pkg_json ]]; then
+    print " • run ${solid_magenta_cor}setup${reset_cor} (alias for \"$pkgManager $([[ $pkgManager == "yarn" ]] && echo "" || echo "run ")setup\" if you have in your package.json)"
+    print " • run ${solid_magenta_cor}i${reset_cor} or ${solid_magenta_cor}install${reset_cor} (alias for \"$pkgManager i\")"
+    print " --"
+  fi
+
   print " • run ${yellow_cor}rev${reset_cor} to open a review"
+  print " • run ${yellow_cor}help${reset_cor} to see more options"
+  
+  
+  # README FUNCTIONALITY AFTER CLONING HAS BEEN DISABLED
   # if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
   #   local maxdepth=2; (( single_mode )) && maxdepth=1
 
@@ -8691,10 +8734,37 @@ typeset -g SAVE_PROJ_COR=""
 # ========================================================================
 
 # General
-alias hg="history | grep" # $1
-alias ll="ls -lAF"
-alias nver="node -e 'console.log(process.version, process.arch, process.platform)'"
-alias nlist="npm list --global --depth=0"
+function hg() {
+  if (( $# == 0 )); then
+    history | grep -i "$HIST_SEARCH"
+  else
+    history | grep -i "$1"
+  fi
+}
+
+function ll() {
+  if (( $# == 0 )); then
+    ls -laF
+  else
+    ls -laF "$@"
+  fi
+}
+
+function nver() {
+  if (( $# == 0 )); then
+    node -e 'console.log(process.version, process.arch, process.platform)'
+  else
+    node -e "console.log(process.versions['$1'])"
+  fi
+}
+
+function nlist() {
+  if (( $# == 0 )); then
+    npm list --global --depth=0
+  else
+    npm list --global "$@"
+  fi
+}
 
 load_config_
 
