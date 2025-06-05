@@ -4318,9 +4318,9 @@ function read_commit_() {
   local commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
 
   # check if the commit belongs to the current branch
-  if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
-    break;
-  fi
+  # if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
+  #   break;
+  # fi
 
   # add the commit hash and message to the list
   pr_commit_msgs+=("- $commit_hash - $commit_message")
@@ -4348,12 +4348,12 @@ function read_commit_() {
     pr_title="$(echo "$pr_title" | xargs)"
   fi
 
-  local head_commit_hash=$(git rev-parse "${remote_name}/${default_branch}")
+  # local head_commit_hash=$(git rev-parse "${remote_name}/${default_branch}")
 
-  # stop if the commit is the origin/HEAD commit
-  if [[ "$commit_hash" == "$head_commit_hash" ]]; then
-    break;
-  fi
+  # # stop if the commit is the origin/HEAD commit
+  # if [[ "$commit_hash" == "$head_commit_hash" ]]; then
+  #   break;
+  # fi
 }
 
 function read_commits_() {
@@ -4361,6 +4361,9 @@ function read_commits_() {
 
   local default_branch=$(get_default_branch_ -f)
   local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
+
+  print "default_branch $default_branch"
+  print "my_remote_branch $my_remote_branch"
 
   ## TODO: Confirm this is working
   # if [[ -n "$my_remote_branch" ]]; then
