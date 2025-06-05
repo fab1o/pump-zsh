@@ -6506,6 +6506,7 @@ function tags() {
 }
 # end of tagging functions ===============================================
 
+# cleans unstaged only
 function restore() {
   set +x
   eval "$(parse_flags_ "restore_" "" "" "$@")"
@@ -6534,6 +6535,7 @@ function restore() {
   git -C "$folder" restore --quiet .
 }
 
+# cleans almost nothing
 function clean() {
   set +x
   eval "$(parse_flags_ "clean_" "" "" "$@")"
@@ -6562,6 +6564,7 @@ function clean() {
   git -C "$folder" clean -fd --quiet
 }
 
+# cleans staged and unstaged
 function discard() {
   set +x
   eval "$(parse_flags_ "discard_" "" "" "$@")"
