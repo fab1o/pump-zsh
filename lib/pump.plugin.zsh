@@ -7593,7 +7593,7 @@ function delb() {
 
 function st() {
   set +x
-  eval "$(parse_flags_ "st_" "sb" "" "$@")"
+  eval "$(parse_flags_ "st_" "sb" "sb" "$@")"
   (( st_is_d )) && set -x
 
   if (( st_is_h )); then
