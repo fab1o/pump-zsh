@@ -3007,12 +3007,16 @@ function get_clone_default_branch_() {
     if ! git clone "$repo_uri" "${folder}/.temp" --quiet; then return 1; fi
   fi
 
+  add-zsh-hook -d chpwd pump_chpwd_
+
   pushd "${folder}/.temp" &>/dev/null
   
   local default_branch=$(git config --get init.defaultBranch)
   local my_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 
   popd &>/dev/null
+
+  add-zsh-hook chpwd pump_chpwd_
 
   rm -rf "${folder}/.temp" &>/dev/null
 
@@ -5993,20 +5997,20 @@ function push() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  git -C "$folder" push --no-verify --set-upstream $remote_name $my_branch
+  git -C "$folder" push --no-verify --set-upstream $remote_name $branch_arg
   local RET=$?
 
   if (( RET != 0 && quiet == 0 )); then
     if confirm_ "failed, try push force with lease?"; then
-      pushf "$folder" "$branch_arg"
+      pushf "$branch_arg" "$folder"
       return $?;
     fi
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
-    if [[ -n "$my_branch" ]]; then
+    if [[ -n "$branch_arg" ]]; then
       print ""
-      git -C "$folder" --no-pager log --oneline "${remote_name}/${my_branch}@{1}..${remote_name}/${my_branch}"
+      git -C "$folder" --no-pager log --oneline "${remote_name}/${branch_arg}@{1}..${remote_name}/${branch_arg}"
       # no pbcopy
     fi
   fi
