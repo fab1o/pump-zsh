@@ -6441,7 +6441,6 @@ function release() {
   fi
 
   if ! tag "$tag"; then return 1; fi
-  if ! push --quiet; then return 1; fi
   if ! push --tags --quiet; then return 1; fi
 
   gh release create "$tag" --title="$tag" --generate-notes
