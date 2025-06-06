@@ -5356,10 +5356,7 @@ function clone() {
   if [[ "$default_branch" != "$branch_arg" ]]; then
     print " ${solid_pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
     git config init.defaultBranch "$default_branch"
-
-    local remote_branch=$(get_remote_branch_ -f "$default_branch" "$folder_to_clone")
-
-    git config "branch.${branch_arg}.gh-merge-base" "$remote_branch"
+    git config "branch.${branch_arg}.gh-merge-base" "$default_branch"
   fi
 
   if [[ -n "$_clone" ]]; then
@@ -5865,22 +5862,35 @@ function glog() {
   local RET=0
 
   if (( glog_is_c )); then
-    local merge_commits=""
-    merge_commits=($(git -C "$folder" log -100 --pretty=format:"%H %P" | awk '{ if (NF > 2) print $1 }'))
+    local default_branch=$(get_default_branch_ -f)
+  local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
 
-    if [[ -z "$merge_commits" ]]; then
-      print " no merge commits found" >&2
-      return 1;
-    fi
+  # print "default_branch $default_branch"
+  # print "my_remote_branch $my_remote_branch"
 
-    print ""
+  ## TODO: Confirm this is working
+  # if [[ -n "$my_remote_branch" ]]; then
+  git --no-pager log --no-merges --pretty=format:'%H | %s' \
+    "${default_branch}..${my_remote_branch}" | xargs -0 | while IFS= read -r line; do
+    print -- "- $line"
+  done
 
-    local merge_hash="${merge_commits[1]}"
-    local first=$(git -C "$folder" rev-parse "$(git -C "$folder" log -1 --pretty=format:"%H")")
-    local last=$(git -C "$folder" rev-parse "${merge_hash}^2")
+    # local merge_commits=""
+    # merge_commits=($(git -C "$folder" log -100 --pretty=format:"%H %P" | awk '{ if (NF > 2) print $1 }'))
 
-    git -C "$folder" --no-pager log --oneline --graph --date=relative --no-merges --first-parent $first ^$last
-    git -C "$folder" log --no-merges --first-parent $first ^$last --pretty=format:'- %H - %s' | pbcopy
+    # if [[ -z "$merge_commits" ]]; then
+    #   print " no merge commits found" >&2
+    #   return 1;
+    # fi
+
+    # print ""
+
+    # local merge_hash="${merge_commits[1]}"
+    # local first=$(git -C "$folder" rev-parse "$(git -C "$folder" log -1 --pretty=format:"%H")")
+    # local last=$(git -C "$folder" rev-parse "${merge_hash}^2")
+
+    # git -C "$folder" --no-pager log --oneline --graph --date=relative --no-merges --first-parent $first ^$last
+    # git -C "$folder" log --no-merges --first-parent $first ^$last --pretty=format:'- %H - %s' | pbcopy
     RET=$?
   else
     git -C "$folder" --no-pager log main HEAD --oneline --graph --date=relative $@
@@ -7056,10 +7066,8 @@ function co() {
   if ! git checkout -b "$branch" "$base_branch" ${@:3}; then return 1; fi
 
   # ll_add_node_
-  
-  local full_base_branch=$(get_remote_branch_ -f "$base_branch")
 
-  git config "branch.${branch}.gh-merge-base" "$full_base_branch"
+  git config "branch.${branch}.gh-merge-base" "$base_branch"
   
   return 0;
 }
