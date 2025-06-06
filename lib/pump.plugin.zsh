@@ -2882,13 +2882,11 @@ function get_proj_for_git_() {
       return 0;
     fi
   fi
+  
+  print " fatal: could not locate a repository folder: $folder" >&2
 
   if [[ -n "$proj_cmd" ]]; then
-    print " fatal: could not locate a repository folder of $proj_cmd" >&2
     print " run ${yellow_cor}clone $proj_cmd${reset_cor} to clone project" >&2
-  else
-    print " fatal: could not locate a repository folder" >&2
-    print " run ${yellow_cor}clone${reset_cor} to clone a project" >&2
   fi
 
   return 1;
@@ -2925,6 +2923,7 @@ function get_remote_origin_() {
   local proj_folder="${1-$PWD}"
 
   local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   if [[ -z "$git_proj_folder" ]] || ! git -C "$git_proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
@@ -3202,6 +3201,7 @@ function select_branch_() {
   local searchText="$1"
   local header="${2-branch}"
   local proj_folder="${3:-$PWD}"
+  local exclude_branches=(${@:4})
 
   local remote_name=$(get_remote_origin_ "$proj_folder")
 
@@ -3227,7 +3227,19 @@ function select_branch_() {
     )}")
   fi
 
-  if [[ -z "$branch_results" ]]; then
+  local filtered_branches=()
+
+  if [[ -n "$exclude_branches" && -n "$branch_results" ]]; then
+    for branch in "${branch_results[@]}"; do
+      if [[ ! " ${exclude_branches[*]} " == *" $branch "* ]]; then
+        filtered_branches+=("$branch")
+      fi
+    done
+  else
+    filtered_branches=("${branch_results[@]}")
+  fi
+
+  if [[ -z "$filtered_branches" ]]; then
     if [[ -n "$searchText" ]]; then
       print " fatal: did not match any branch known to git: $searchText" >&2
     else
@@ -3238,17 +3250,17 @@ function select_branch_() {
 
   local branch_choice=""
 
-  if [[ ${#branch_results[@]} -gt 20 ]]; then
+  if [[ ${#filtered_branches[@]} -gt 20 ]]; then
     if (( select_branch_is_t )); then
-      branch_choice=$(filter_one_ -a "$header" $branch_results)
+      branch_choice=$(filter_one_ -a "$header" $filtered_branches)
     else
-      branch_choice=$(filter_one_ "$header" $branch_results)
+      branch_choice=$(filter_one_ "$header" $filtered_branches)
     fi
   else
     if (( select_branch_is_t )); then
-      branch_choice=$(choose_one_ -a "$header" $branch_results)
+      branch_choice=$(choose_one_ -a "$header" $filtered_branches)
     else
-      branch_choice=$(choose_one_ "$header" $branch_results)
+      branch_choice=$(choose_one_ "$header" $filtered_branches)
     fi
   fi
   if (( $? == 130 || $? == 2 )); then return 130; fi
@@ -6607,11 +6619,12 @@ function discard() {
 
 function reseta() {
   set +x
-  eval "$(parse_flags_ "reseta_" "" "" "$@")"
+  eval "$(parse_flags_ "reseta_" "o" "" "$@")"
   (( reseta_is_d )) && set -x
 
   if (( reseta_is_h )); then
-    print "  ${yellow_cor}reseta ${solid_yellow_cor}[<folder>]${reset_cor} : to erase everything in folder and match HEAD to origin"
+    print "  ${yellow_cor}reseta ${solid_yellow_cor}[<folder>]${reset_cor} : to erase everything and match latest commit of current branch"
+    print "  ${yellow_cor}reseta -o${solid_yellow_cor}[<folder>]${reset_cor} : to erase everything and match HEAD to origin"
     return 0;
   fi
 
@@ -6630,11 +6643,13 @@ function reseta() {
 
   if ! is_git_repo_ "$folder"; then return 1; fi
 
-  # fetch "$folder" --quiet
+  fetch "$folder" --quiet
 
   local remote_name=$(get_remote_origin_ "$folder")
+  local remote_name=$(get_remote_branch_ "$folder")
+  local my_branch=$(git -C "$folder" branch --show-current)
   
-  git -C "$folder" reset --hard "$remote_name" $@
+  git -C "$folder" reset --hard "${remote_name}/${my_branch}" $@
   local RET=$?
 
   if (( RET == 0 )); then
@@ -6965,7 +6980,7 @@ function co() {
 
   # co -a all branches
   if (( co_is_a )); then
-    local branch_choice="$(select_branch_ -at "$1")"
+    local branch_choice="$(select_branch_ -at "$1" "branch" "$PWD" "$(git branch --show-current)")"
     
     if [[ -z "$branch_choice" ]]; then return 1; fi
 
@@ -6980,7 +6995,7 @@ function co() {
   # co -l local branches
   if (( co_is_l )); then
     local branch_choice=""
-    branch_choice="$(select_branch_ -lt "$1" 2>/dev/null)"
+    branch_choice="$(select_branch_ -lt "$1" "branch" "$PWD" "$(git branch --show-current)" 2>/dev/null)"
     if (( $? == 130 )); then return 1; fi
     
     if [[ -z "$branch_choice" ]]; then
