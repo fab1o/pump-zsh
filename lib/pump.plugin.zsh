@@ -7552,14 +7552,12 @@ function delb() {
   local deleted_branches=()
 
   if (( delb_is_r )); then
-    selected_branches=($(select_branches_ -r "$branch_arg" "$PWD" $delb_is_a))
+    selected_branches=($(select_branches_ -r "$branch_arg" "$PWD" "$delb_is_a"))
   else
-    selected_branches=($(select_branches_ -l "$branch_arg" "$PWD"))
+    selected_branches=($(select_branches_ -l "$branch_arg" "$PWD" 1))
   fi
   
-  if [[ -z "$selected_branches" ]]; then
-    return 1;
-  fi
+  if [[ -z "$selected_branches" ]]; then return 1; fi
 
   local RET=0
 
@@ -7571,8 +7569,8 @@ function delb() {
       if (( RET == 130 || RET == 2 )); then break; fi
       if (( RET == 1 )); then continue; fi
     fi
-
-    git config --remove-section "branch.${branch}" &>/dev/null
+    # git already does that
+    # git config --remove-section "branch.${branch}" &>/dev/null
 
     if (( delb_is_r )); then
       local remote_name=$(get_remote_origin_)
