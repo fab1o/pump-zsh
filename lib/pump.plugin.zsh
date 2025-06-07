@@ -6941,7 +6941,7 @@ function co() {
     print "  --"
     print "  ${yellow_cor}co -a${reset_cor} : to list all branches (default)"
     print "  ${yellow_cor}co -l${reset_cor} : to list only local branches"
-    print "  ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
+    print "  ${yellow_cor}co -pr${reset_cor} : to list pull requests instead (for quick code reviews)"
     print "  --"
     print "  ${yellow_cor}co -e <branch>${reset_cor} : to switch to an exact branch, no lookup"
     print "  ${yellow_cor}co -b <branch> ${reset_cor} : to create branch off of current branch"
