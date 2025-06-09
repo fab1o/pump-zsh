@@ -3777,23 +3777,29 @@ function del_files_() {
 }
 
 function del() {
-  eval "$(parse_flags_ "del_" "s" "" "$@")"
+  eval "$(parse_flags_ "del_" "sa" "" "$@")"
   (( del_is_d )) && set -x
 
   if (( del_is_h )); then
-    print "  ${yellow_cor}del${reset_cor} : to delete in current directory"
-    print "  ${yellow_cor}del <glob>${reset_cor} : to delete certain files"
+    print "  ${yellow_cor}del ${solid_yellow_cor}<glob>${reset_cor} : to delete files"
+    print "  ${yellow_cor}del -a${reset_cor} : to include hidden files"
     print "  ${yellow_cor}del -s${reset_cor} : to skip confirmation"
     return 0;
   fi
 
-  setopt dot_glob null_glob
+  setopt null_glob
+  if (( del_is_a )); then
+    setopt dot_glob
+  else
+    setopt no_dot_glob
+  fi
 
   local files=()
   local pattern=""
 
   if [[ -z "$1" ]]; then
     # capture all files in current folder
+    rm -rf -- .DS_Store &>/dev/null
     files=(*)
 
     if (( ${#files[@]} > 1 )); then
@@ -3806,7 +3812,12 @@ function del() {
     files=(${(z)~pattern})
   fi
 
-  unsetopt dot_glob null_glob
+  unsetopt null_glob
+    if (( del_is_a )); then
+    unsetopt dot_glob
+  else
+    unsetopt no_dot_glob
+  fi
 
   # print "files[1] = ${files[1]}"
   # print "pattern $pattern"
@@ -5257,7 +5268,7 @@ function clone() {
   local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
 
   if (( single_mode )); then
-    rm -rf "${proj_folder}/.DS_Store"
+    rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
     if [[ -n "$working_proj_folder" || -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
       print " cannot clone project $proj_arg because it was set to ${pruple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
       print " either clean the folder, or  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
@@ -5277,7 +5288,7 @@ function clone() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
 
-      rm -rf "${folder_to_clone}/.DS_Store"
+      rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
       if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
         print " destination path already exists and is not empty: $folder_to_clone" >&2
         print "  ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} : to go to that folder" >&2
@@ -7518,7 +7529,7 @@ function delb() {
 
   if (( delb_is_h )); then
     print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>]${reset_cor} : to delete a branch locally "
-    print "  ${yellow_cor}delb -r ${solid_yellow_cor}[<branch>]${reset_cor} : to delete a branch remotely (excludes main branches)"
+    print "  ${yellow_cor}delb -r ${solid_yellow_cor}[<branch>]${reset_cor} : to also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : to include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation (cannot use with -r)"
     return 0;
@@ -8357,7 +8368,7 @@ function help() {
   print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
   print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
   print " ${solid_yellow_cor} kill <port> ${reset_cor}\t = kill port"
-  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -laF"
+  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -la"
   print " ${solid_yellow_cor} nver ${reset_cor}\t\t = node version"
   print " ${solid_yellow_cor} nlist ${reset_cor}\t = npm list global"
   print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
@@ -8797,19 +8808,13 @@ typeset -g SAVE_PROJ_COR=""
 # ========================================================================
 
 # General
+alias ll="ls -la"
+
 function hg() {
   if (( $# == 0 )); then
     history | grep -i "$HIST_SEARCH"
   else
     history | grep -i "$1"
-  fi
-}
-
-function ll() {
-  if (( $# == 0 )); then
-    ls -laF
-  else
-    ls -laF "$@"
   fi
 }
 
