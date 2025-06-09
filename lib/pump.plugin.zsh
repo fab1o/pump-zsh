@@ -705,7 +705,7 @@ function input_branch_name_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header" "$placeholder")
-    if (( $? != 0 )); then return 1; fi
+    if (( $? == 130 || $? == 2 )); then return 130; fi
     
     if [[ -n "$typed_value" ]] && git check-ref-format --branch "$typed_value" 1>/dev/null; then
       echo "$typed_value"
@@ -724,7 +724,7 @@ function input_name_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header" "$placeholder" "$max")
-    if (( $? != 0 )); then return 1; fi
+    if (( $? == 130 || $? == 2 )); then return 130; fi
     
     if [[ -z "$typed_value" && -n "$placeholder" ]] && command -v gum &>/dev/null; then
       typed_value="$placeholder"
@@ -848,7 +848,7 @@ function input_path_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header")
-    if (( $? != 0 )); then return 1; fi
+    if (( $? == 130 || $? == 2 )); then return 130; fi
 
     if [[ -n "$typed_value" ]]; then
       typed_value="${typed_value:A}" # convert to absolute path
@@ -876,20 +876,16 @@ function find_repo_() {
   local header="$1"
   local placeholder="$2"
 
-  local RET=0
-
   if command -v gh &>/dev/null; then
     ############################################
     # VERY IMPORTANT to display the prompt: >&2
     ############################################
-    confirm_ "would you like to access your Github account to choose from a list of repositories?" >&2
-    RET=$?
-    if (( RET == 130 || RET == 2 )); then return 130; fi
-
-    if (( RET == 0 )); then
+    confirm_ "is there a repository for this project in Github?"
+    if (( $? == 130 || $? == 2 )); then return 130; fi
+    if (( $? == 0 )); then
       local gh_owner=""
-      gh_owner=$(input_from_ "type the github owner account (username or organization)")
-      if (( $? != 0 )); then return 1; fi
+      gh_owner=$(input_from_ "type the Github owner account (username or organization)")
+      if (( $? == 130 || $? == 2 )); then return 130; fi
 
       if [[ -n "$gh_owner" ]]; then
         local list_repos=$(gh repo list $gh_owner --limit 100 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null)
@@ -899,15 +895,13 @@ function find_repo_() {
           local selected_repo=""
           selected_repo=$(choose_one_ "repository" "${repos[@]}")
           if (( $? != 0 )); then return 1; fi
-  
+
           if [[ -n "$selected_repo" ]]; then
             local repo_uri=""
             
             confirm_ "ssh or https?" "ssh" "https"
-            RET=$?
-            if (( RET == 130 || RET == 2 )); then return 130; fi
-            
-            if (( RET == 0 )); then
+            if (( $? == 130 || $? == 2 )); then return 130; fi
+            if (( $? == 0 )); then
               repo_uri="git@github.com:${selected_repo}.git"
             else
               repo_uri="https://github.com/${selected_repo}.git"
@@ -1689,7 +1683,7 @@ function save_proj_cmd_() {
 
   local typed_proj_cmd=""
   typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name" 2>/dev/tty)
-  if (( $? != 0 )); then return 1; fi
+  if (( $? == 130 || $? == 2 )); then return 130; fi
   if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
 
   if ! check_proj_cmd_ $i "$typed_proj_cmd" "$pkg_name" "$old_proj_cmd"; then
@@ -1871,17 +1865,12 @@ function save_proj_repo_() {
         proj_repo=""
       fi
     elif (( save_proj_repo_is_a )) && [[ -z "$proj_repo" ]]; then
-      confirm_ "are you adding an existing cloned project?"
+      confirm_ "are you adding an existing cloned project folder?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
         if ! save_proj_folder_ -r $i "$proj_cmd"; then return 1; fi
         proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-      else
-        confirm_ "is there a repository for this project?"
-        RET=$?
-        if (( RET == 130 || RET == 2 )); then return 130; fi
-        if (( RET == 1 )); then return 0; fi # if no, skip adding repository and it's fine
       fi
     fi
   fi
@@ -1892,7 +1881,7 @@ function save_proj_repo_() {
 
   if (( ! save_proj_repo_is_f )); then
     if [[ -z "$proj_repo" ]]; then
-      proj_repo="$(find_repo_ "type the repository uri (ssh or https)" "$proj_repo")"
+      proj_repo="$(find_repo_ "type the git repository uri (ssh or https)" "$proj_repo")"
       # if proj_repo is not typed, it's fine to skip
       if [[ -z "$proj_repo" ]]; then return 0; fi
     fi
@@ -4435,7 +4424,7 @@ function pr() {
 
   local new_pr_title="" # must declare before input_from_ so the cancel (ctrl+c) works
   new_pr_title=$(input_from_ "Pull Request Title" "$pr_title")
-  if (( $? != 0 )); then return 1; fi
+  if (( $? == 130 )); then return 130; fi
 
   if [[ -n "$new_pr_title" ]]; then
     pr_title="$new_pr_title"
