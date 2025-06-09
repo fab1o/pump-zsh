@@ -8,7 +8,7 @@
   },
   "description": "An Oh My Zsh plugin with a configurable set of aliases and functions to supercharge your terminal experience — plus a custom Oh My Posh theme for added style and clarity.",
   "engines": {
-    "node": ">=14.0.0 <23",
+    "node": ">=14.0.0 <25",
     "zsh": ">=5.0.0"
   },
   "homepage": "https://github.com/fab1o/pump-zsh#readme",

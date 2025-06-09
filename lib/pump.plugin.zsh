@@ -7865,14 +7865,14 @@ function pro() {
 
         if (( ${#versions[@]} > 2 )); then
           version_to_use=$(choose_one_ "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
-        
+          RET=$?
+
         elif (( ${#versions[@]} == 2 )); then
           confirm_ "Node.js version to use with ${proj_arg}'s engine $node_engine:" "${versions[1]}" "${versions[2]}"
-          local _RET=$?
-
-          if (( _RET == 0 )); then
+          RET=$?
+          if (( RET == 0 )); then
             version_to_use="${versions[1]}"
-          elif (( _RET == 1 )); then
+          elif (( RET == 1 )); then
             version_to_use="${versions[2]}"
           fi
 
@@ -7890,12 +7890,10 @@ function pro() {
           RET=0
         fi
       fi
-    else
-      RET=0
     fi
 
     if [[ -n "$pump_pro" ]]; then
-      eval "$pump_pro" 2>/dev/tty >&2;
+      eval "$pump_pro"
     fi
 
     if (( RET == 0 && pro_is_x )) && [[ -z "$nvm_skip_lookup" ]]; then
