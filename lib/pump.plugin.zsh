@@ -424,7 +424,8 @@ function ll_restore_() {
 function input_from_() {
   local header="$1"
   local placeholder="$2"
-  local max="${3:-60}"
+  local max="${3:-50}"
+  local value="$4"
 
   local _input=""
 
@@ -433,7 +434,7 @@ function input_from_() {
   print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
-    _input=$(gum input --placeholder="$placeholder" --char-limit=$max)
+    _input=$(gum input --placeholder="$placeholder" --char-limit="$max" --value="$value")
     if (( $? == 130 )); then return 130; fi
   else
     # do not return placeholder if not gum input
@@ -704,7 +705,7 @@ function input_branch_name_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header" "$placeholder")
-    if (( $? == 130 || $? == 2 )); then return 130; fi
+    if (( $? != 0 )); then return 1; fi
     
     if [[ -n "$typed_value" ]] && git check-ref-format --branch "$typed_value" 1>/dev/null; then
       echo "$typed_value"
@@ -722,8 +723,8 @@ function input_name_() {
 
   while true; do
     local typed_value=""
-    typed_value=$(input_from_ "$header" "$placeholder" $max)
-    if (( $? == 130 || $? == 2 )); then return 130; fi
+    typed_value=$(input_from_ "$header" "$placeholder" "$max")
+    if (( $? != 0 )); then return 1; fi
     
     if [[ -z "$typed_value" && -n "$placeholder" ]] && command -v gum &>/dev/null; then
       typed_value="$placeholder"
@@ -847,7 +848,7 @@ function input_path_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header")
-    if (( $? == 130 || $? == 2 )); then return 130; fi
+    if (( $? != 0 )); then return 1; fi
 
     if [[ -n "$typed_value" ]]; then
       typed_value="${typed_value:A}" # convert to absolute path
@@ -925,9 +926,7 @@ function find_repo_() {
   while true; do
     local typed_value=""
     typed_value=$(input_from_ "$header" "$placeholder")
-    if (( $? != 0 )); then
-      return 1;
-    fi
+    if (( $? != 0 )); then return 1; fi
     
     if [[ -z "$typed_value" ]]; then
       if [[ -n "$placeholder" ]] && command -v gum &>/dev/null; then
@@ -1690,7 +1689,7 @@ function save_proj_cmd_() {
 
   local typed_proj_cmd=""
   typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name" 2>/dev/tty)
-  if (( $? == 130 || $? == 2 )); then return 130; fi
+  if (( $? != 0 )); then return 1; fi
   if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
 
   if ! check_proj_cmd_ $i "$typed_proj_cmd" "$pkg_name" "$old_proj_cmd"; then
@@ -4321,79 +4320,61 @@ function add() {
     git add . $@
   fi
 }
-  
-local pr_commit_msgs=()
-local pr_title=""
-
-function read_commit_() {
-  local line="$1"
-  local my_branch="$2"
-  local default_branch="$3"
-  local remote_name="$4"
-
-  local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs)
-  local commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
-
-  # check if the commit belongs to the current branch
-  # if ! git branch --contains "$commit_hash" | grep -q "\b${my_branch}\b"; then
-  #   break;
-  # fi
-
-  # add the commit hash and message to the list
-  pr_commit_msgs+=("- $commit_hash - $commit_message")
-
-  local ticket=""
-  local rest="$commit_message"
-
-  if [[ $rest =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
-    ticket="${match[1]}"
-    ticket="$(echo "$ticket" | xargs)"
-
-    if [[ $rest =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
-      rest="${match[1]}"
-      rest="$(echo "$rest" | xargs)"
-    fi
-  fi
-
-  local types="fix|feat|docs|refactor|test|chore|style|revert"
-  if [[ $rest =~ "^[[:space:]]*(${(j:|:)${(s:|:)types}}):[[:space:]]*(.*)" ]]; then
-    rest="${match[2]}"
-  fi
-
-  if [[ -n "$ticket" ]]; then
-    pr_title="${ticket} ${rest}"
-    pr_title="$(echo "$pr_title" | xargs)"
-  fi
-
-  # local head_commit_hash=$(git rev-parse "${remote_name}/${default_branch}")
-
-  # # stop if the commit is the origin/HEAD commit
-  # if [[ "$commit_hash" == "$head_commit_hash" ]]; then
-  #   break;
-  # fi
-}
 
 function read_commits_() {
+  set +x
+  eval "$(parse_flags_ "read_commits_" "tc" "" "$@")"
+  (( read_commits_is_d )) && set -x
+  
   local my_branch="$1"
+  local default_branch="$2"
 
-  local default_branch=$(get_default_branch_ -f)
-  local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
+  local pr_title=""
+  
+  git --no-pager log --no-merges --pretty=format:'%H | %s' \
+    "${default_branch}..${my_remote_branch}" | xargs -0 | while IFS= read -r line; do
+    
+    local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs)
+    local commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
 
-  # print "default_branch $default_branch"
-  # print "my_remote_branch $my_remote_branch"
+    commit_message="- $commit_hash - $commit_message"
 
-  ## TODO: Confirm this is working
-  # if [[ -n "$my_remote_branch" ]]; then
-    git --no-pager log --no-merges --pretty=format:'%H | %s' \
-      "${default_branch}..${my_remote_branch}" | xargs -0 | while IFS= read -r line; do
-      read_commit_ "$line" "$my_remote_branch" "$default_branch"
-    done
-  # else
-  #   git --no-pager log --no-merges --pretty=format:'%H | %s' \
-  #     $(LC_ALL=C git merge-base HEAD "$default_branch")..HEAD | xargs -0 | while IFS= read -r line; do
-  #     read_commit_ "$line" "$my_branch" "$default_branch"
-  #   done
-  # fi
+    if (( read_commits_is_c )); then
+      echo "$commit_message"
+    fi
+    
+    if (( read_commits_is_t )); then
+      local ticket=""
+      local rest="$commit_message"
+
+      if [[ $rest =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+        ticket="${match[1]}"
+        ticket="$(echo "$ticket" | xargs)"
+
+        if [[ $rest =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
+          rest="${match[1]}"
+          rest="$(echo "$rest" | xargs)"
+        fi
+      fi
+
+      local types="fix|feat|docs|refactor|test|chore|style|revert"
+      if [[ $rest =~ "^[[:space:]]*(${(j:|:)${(s:|:)types}}):[[:space:]]*(.*)" ]]; then
+        rest="${match[2]}"
+      fi
+
+      if [[ -n "$ticket" ]]; then
+        pr_title="${ticket} ${rest}"
+      else
+        pr_title="$rest"
+      fi
+      
+      pr_title="$(echo "$pr_title" | xargs)"
+    fi
+  done
+
+  if (( read_commits_is_t )); then
+    echo "$pr_title"
+  fi
 }
 
 function pr() {
@@ -4402,7 +4383,7 @@ function pr() {
   (( pr_is_d )) && set -x
 
   if (( pr_is_h )); then
-    print "  ${yellow_cor}pr${reset_cor} : to create a pull request"
+    print "  ${yellow_cor}pr ${solid_yellow_cor}<title>${reset_cor} : to create a pull request"
     print "  ${yellow_cor}pr -l${reset_cor} : to create a pull request and select labels if any"
     print "  ${yellow_cor}pr -t${reset_cor} : to create a pull request only if tests pass"
     return 0;
@@ -4420,36 +4401,51 @@ function pr() {
     return 0;
   fi
 
-  local git_status=$(git status --porcelain 2>/dev/null)
-  if [[ -n "$git_status" ]]; then
-    print " uncommitted changes detected, cannot create pull request" >&2;
-    return 1;
-  fi
+  # local git_status=$(git status --porcelain 2>/dev/null)
+  # if [[ -n "$git_status" ]]; then
+  #   print " uncommitted changes detected, cannot create pull request" >&2;
+  #   return 1;
+  # fi
 
   local my_branch=$(git branch --show-current)
 
   if [[ -z "$my_branch" ]]; then
-    print " branch is detached, cannot create pull request" >&2
+    print " fatal: branch is detached, cannot create pull request" >&2
     return 1;
   fi
 
   fetch --quiet
 
-  pr_commit_msgs=()
-  pr_title=""
+  local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
+  local default_branch=$(get_default_branch_ -f)
 
-  read_commits_ "$my_branch"
-
-  if [[ -z "$pr_commit_msgs" || -z "$pr_title" ]]; then
-    print " no commits found, cannot create pull request" >&2
+  if [[ -z "$my_remote_branch" || -z "$default_branch" ]]; then
+    print " fatal: cannot determine remote or default branch" >&2
+    print " make sure the branch is pushed and a default branch is set" >&2
     return 1;
   fi
 
-  local PR_BODY=""
+  local pr_commit_msgs=("${(@f)$(read_commits_ -c "$my_remote_branch" "$default_branch")}")
+  local pr_title=$(read_commits_ -t "$my_remote_branch" "$default_branch")
 
-  for commit in "${pr_commit_msgs[@]}"; do
-    PR_BODY+="${commit}\n"
-  done
+  if [[ -z "$pr_commit_msgs" || -z "$pr_title" ]]; then
+    print " fatal: no commits found, cannot create pull request" >&2
+    return 1;
+  fi
+
+  local new_pr_title="" # must declare before input_from_ so the cancel (ctrl+c) works
+  new_pr_title=$(input_from_ "Pull Request Title" "$pr_title")
+  if (( $? != 0 )); then return 1; fi
+
+  if [[ -n "$new_pr_title" ]]; then
+    pr_title="$new_pr_title"
+  fi
+
+  local PR_BODY="${(F)pr_commit_msgs}"
+
+  # for commit in "${pr_commit_msgs[@]}"; do
+  #   PR_BODY+="${commit}\n"
+  # done
 
   if [[ -n "$CURRENT_PUMP_PR_REPLACE" && -f "$CURRENT_PUMP_PR_TEMPLATE" ]]; then
     local pr_template="$(cat $CURRENT_PUMP_PR_TEMPLATE)"
@@ -4489,13 +4485,12 @@ function pr() {
     test || return 1;
   fi
 
-  ## debugging purposes
-  # print " pr_title:$pr_title"
-  # print ""
-  # print "$PR_BODY"
-  # return 0;
+  # debugging purposes
+  # print -- "${magenta_cor}Title:${reset_cor} $pr_title"
+  # print -- "${magenta_cor}Body:${reset_cor}"
+  # print -- "$PR_BODY"
 
-  push || return 1;
+  # push || return 1;
 
   if (( pr_is_l )); then
     local proj_repo=""
