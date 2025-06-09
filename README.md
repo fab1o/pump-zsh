@@ -36,16 +36,16 @@ If you prefer to install dependencies manually, refer to the lists below:
 
 #### Required
 
-* [jq](https://jqlang.org/) — used for configuration management.
-* [gum](https://github.com/charmbracelet/gum) — improves interactive user experience.
-* [glow](https://github.com/charmbracelet/glow) — for Markdown rendering.
-* [GitHub CLI](https://cli.github.com/) — used in commands like `pr`, `release`, `co`, `delb`, and others.
+* [jq](https://jqlang.org/) — used for configuration management
+* [gum](https://github.com/charmbracelet/gum) — improves interactive user experience
+* [glow](https://github.com/charmbracelet/glow) — for Markdown rendering
+* [GitHub CLI](https://cli.github.com/) — used in commands like `pr`, `release`, `co`, `delb`, and others
 
 #### Recommended (not installed by the script)
 
-* [nvm](https://github.com/nvm-sh/nvm) — allows you to quickly install and use different versions of node.
-* [iTerm2](https://iterm2.com/) — a better Terminal app.
-* [Gruvbox iTerm2 color palette](https://github.com/herrbischoff/iterm2-gruvbox) — for a better Terminal appearance.
+* [nvm](https://github.com/nvm-sh/nvm) — allows you to quickly install and use different versions of Node.js
+* [iTerm2](https://iterm2.com/) — a better Terminal app
+* [Gruvbox iTerm2 color palette](https://github.com/herrbischoff/iterm2-gruvbox) — for a better Terminal appearance
 
 #### Optional (not installed by the script)
 
