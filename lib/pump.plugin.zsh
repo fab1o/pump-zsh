@@ -2365,37 +2365,37 @@ function get_major_version_() {
   echo "$major_version"
 }
 
-function get_unpadded_version_() {
-  local version="$1"
+# function get_unpadded_version_() {
+#   local version="$1"
 
-  local parts=("${(s:.:)version}")
-  local result=()
+#   local parts=("${(s:.:)version}")
+#   local result=()
 
-  for part in $parts; do
-    [[ "$part" == "x" ]] && break
-    result+=("$part")
-  done
+#   for part in $parts; do
+#     [[ "$part" == "x" ]] && break
+#     result+=("$part")
+#   done
 
-  echo "${(j:.:)result}"
-}
+#   echo "${(j:.:)result}"
+# }
 
-function get_display_version_() {
-  local version="$1"
+# function get_display_version_() {
+#   local version="$1"
    
-  local padded_version=$(get_padded_version_ "$version" 0)
-  local major_version=$(get_major_version_ "$padded_version")
+#   local padded_version=$(get_padded_version_ "$version" 0)
+#   local major_version=$(get_major_version_ "$padded_version")
 
-  echo $(get_padded_version_ "$major_version")
-}
+#   echo $(get_padded_version_ "$major_version")
+# }
 
-function get_padded_version_() {
-  local version="$1"
-  local replacer="${2:-x}"
+# function get_padded_version_() {
+#   local version="$1"
+#   local replacer="${2:-x}"
   
-  local parts=("${(s:.:)version}")
+#   local parts=("${(s:.:)version}")
   
-  echo "${parts[1]:-$replacer}.${parts[2]:-$replacer}.${parts[3]:-$replacer}"
-}
+#   echo "${parts[1]:-$replacer}.${parts[2]:-$replacer}.${parts[3]:-$replacer}"
+# }
 
 function is_node_version_valid_() {
   local node_engine="$1"
@@ -4658,10 +4658,10 @@ function run() {
   # print "folder_to_execute=$folder_to_execute"
   # print " --------"
 
-  pushd "$folder_to_execute" &>/dev/null
+  cd "$folder_to_execute"
 
-  print " running $_env on ${gray_cor}$folder_to_execute ${reset_cor}"
-  print " ${solid_pink_cor}$_run ${reset_cor}"
+  print " running $_env on ${gray_cor}${folder_to_execute}${reset_cor}"
+  print " ${solid_pink_cor}${_run}${reset_cor}"
   
   if ! eval "$_run"; then
     print " ${red_cor}failed to run PUMP_RUN_$i ${reset_cor}" >&2
@@ -4759,10 +4759,10 @@ function setup() {
   # print "folder_to_execute=$folder_to_execute"
   # print " --------"
 
-  pushd "$folder_to_execute" &>/dev/null
+  cd "$folder_to_execute"
 
-  print " setting up ${gray_cor}$folder_to_execute ${reset_cor}"
-  print " ${solid_pink_cor}$_setup ${reset_cor}"
+  print " setting up ${gray_cor}${folder_to_execute}${reset_cor}"
+  print " ${solid_pink_cor}${_setup}${reset_cor}"
 
   if ! eval "$_setup"; then
     print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
@@ -5052,7 +5052,7 @@ function rev() {
       fi
     fi
     
-    pushd "$full_rev_folder" &>/dev/null
+    cd "$full_rev_folder"
 
     if (( ! skip_setup )); then
       local git_status=$(git -C "$full_rev_folder" status --porcelain 2>/dev/null)
@@ -5102,7 +5102,7 @@ function rev() {
       already_merged=1
     fi
 
-    pushd "$full_rev_folder" &>/dev/null
+    cd "$full_rev_folder"
   fi
 
   local pr_link=""
@@ -5113,8 +5113,8 @@ function rev() {
 
   if (( ! skip_setup )); then
     if [[ -n "$_setup" ]]; then
-      print " setting up ${gray_cor}$full_rev_folder ${reset_cor}"
-      print " ${solid_pink_cor}$_setup ${reset_cor}"
+      print " setting up ${gray_cor}${full_rev_folder}${reset_cor}"
+      print " ${solid_pink_cor}${_setup}${reset_cor}"
 
       if ! eval "$_setup"; then
         print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
@@ -5353,7 +5353,7 @@ function clone() {
 
   # local past_folder="$PWD"
 
-  pushd "$folder_to_clone" &>/dev/null
+  cd "$folder_to_clone"
 
   # if (( $? == 0 )); then
   #   save_pump_working_ "$proj_arg"
@@ -6854,7 +6854,7 @@ function gha() {
   local ask_save=0
   local RET=0
 
-  pushd "$proj_folder" &>/dev/null
+  cd "$proj_folder"
 
   if [[ -z "$workflow_arg" && -z "$gha_workflow" ]]; then
     local repo_name="$(get_repo_name_ "$proj_repo" 2>/dev/null)"
@@ -7817,10 +7817,7 @@ function pro() {
     local i=$(find_proj_index_ "$proj_arg")
     (( i )) || return 1;
 
-    local RET=1;
-
     local nvm_skip_lookup="${PUMP_NVM_SKIP_LOOKUP[$i]}"
-    local nvm_use_v="${PUMP_NVM_USE_V[$i]}"
     local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
     local pump_pro="${PUMP_PRO[$i]}"
 
@@ -7831,9 +7828,16 @@ function pro() {
     # fi
 
     local version_to_use=""
+    local RET=1;
 
     if (( nvm_skip_lookup && pro_is_x )); then
+      local nvm_use_v="${PUMP_NVM_USE_V[$i]}"
       version_to_use="$nvm_use_v"
+
+      if [[ -n "$version_to_use" ]] && command -v nvm &>/dev/null; then
+        nvm use "$version_to_use"
+        RET=$?
+      fi
     else
       setopt NO_NOTIFY
       {
@@ -7856,12 +7860,12 @@ function pro() {
         local versions=()
         versions=("${(@f)$(get_node_versions_ "$proj_folder" "oldest" "$node_engine")}")
           
-        if [[ -n "$nvm_use_v" ]] && \
-            [[ ! " ${versions[@]} " =~ " ${nvm_use_v} " ]] && \
-            is_node_version_valid_ "$node_engine" "$nvm_use_v"; \
-        then
-          versions+=("${nvm_use_v}")
-        fi
+        # if [[ -n "$nvm_use_v" ]] && \
+        #     [[ ! " ${versions[@]} " =~ " ${nvm_use_v} " ]] && \
+        #     is_node_version_valid_ "$node_engine" "$nvm_use_v"; \
+        # then
+        #   versions+=("${nvm_use_v}")
+        # fi
 
         if (( ${#versions[@]} > 2 )); then
           version_to_use=$(choose_one_ "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
@@ -7880,14 +7884,15 @@ function pro() {
           version_to_use="${versions[1]}"
         fi
       fi
-    fi
 
-    if [[ -n "$version_to_use" ]]; then
-      if command -v nvm &>/dev/null; then
-        local major_version=$(get_major_version_ "$version_to_use")
-        if nvm use "$major_version" 2>/dev/tty >&2; then
-          update_setting_ $i "PUMP_NVM_USE_V" "$version_to_use" &>/dev/null
-          RET=0
+      if [[ -n "$version_to_use" ]]; then
+        if command -v nvm &>/dev/null; then
+          local major_version=$(get_major_version_ "$version_to_use")
+          if [[ -z "$major_version" ]]; then major_version="$version_to_use"; fi
+          if nvm use "$major_version"; then
+            update_setting_ $i "PUMP_NVM_USE_V" "$major_version" &>/dev/null
+            RET=0
+          fi
         fi
       fi
     fi
@@ -8119,7 +8124,7 @@ function proj_handler() {
   fi
 
   mkdir -p $resolved_folder
-  pushd "$resolved_folder" &>/dev/null
+  cd "$resolved_folder"
 
   if [[ -z "$(ls "$resolved_folder")" ]]; then
     print " project folder is empty" >&1
