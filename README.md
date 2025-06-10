@@ -39,7 +39,7 @@ If you prefer to install dependencies manually, refer to the lists below:
 * [jq](https://jqlang.org/) — used for configuration management
 * [gum](https://github.com/charmbracelet/gum) — improves interactive user experience
 * [glow](https://github.com/charmbracelet/glow) — for Markdown rendering
-* [GitHub CLI](https://cli.github.com/) — used in commands like `pr`, `release`, `co`, `delb`, and others
+* [GitHub CLI](https://cli.github.com/) — used in commands like `co -pr`, `gha`, `pr`, `release`, `rev`, and others
 
 #### Recommended (not installed by the script)
 
