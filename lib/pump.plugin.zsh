@@ -5897,71 +5897,79 @@ function gconf() {
 
 function glog() {
   set +x
-  eval "$(parse_flags_ "glog_" "c" "" "$@")"
+  eval "$(parse_flags_ "glog_" "ac" "" "$@")"
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
     print "  ${yellow_cor}glog ${solid_yellow_cor}[<folder>]${reset_cor} : to log all commits"
-    print "  ${yellow_cor}glog -n${reset_cor} : to log n commits"
-    print "  ${yellow_cor}glog -c${reset_cor} : to log commits from current branch for posting in comments (and to clipboard)"
+    print "  ${yellow_cor}glog -c ${solid_yellow_cor}[<branch>]${reset_cor} : to log branch's commits since default branch"
+    print "  ${yellow_cor}glog -a ${solid_yellow_cor}[<branch>]${reset_cor} : to log all commits (default)"
+    print "  ${yellow_cor}glog -n ${solid_yellow_cor}[<folder>]${reset_cor} : to log n commits, where n is a number"
     return 0;
   fi
 
   local folder="$PWD"
+  local branch_arg=""
 
-  if [[ -n "$1" && $1 != -* ]]; then
+  local base_branch=""
+  local arg_count=0
+
+  if [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+    else
+      print " fatal: not a valid folder argument: $2" >&2
+      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    
+    if [[ -n "$1" && $1 != -* ]]; then
+      if [[ ! $1 =~ '^[0-9]+$' ]]; then
+        branch_arg="$1"
+      fi
+    else
+      print " fatal: not a valid branch argument" >&2
+      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    
+    arg_count=2
+  
+  elif [[ -n "$1" && $1 != -* ]] && [[ ! $1 =~ '^[0-9]+$' ]]; then
     if [[ -d "$1" ]]; then
       folder="$1"
     else
-      print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}glog -h${reset_cor} : to see usage" >&2
-      return 1;
+      branch_arg="$1"
     fi
-    shift
+    
+    arg_count=1
   fi
+
+  shift $arg_count
 
   if ! is_git_repo_ "$folder"; then return 1; fi
-  
-  local RET=0
 
-  if (( glog_is_c )); then
-    local default_branch=$(get_default_branch_ -f)
-  local my_remote_branch=$(get_remote_branch_ -f "$my_branch")
-
-  # print "default_branch $default_branch"
-  # print "my_remote_branch $my_remote_branch"
-
-  ## TODO: Confirm this is working
-  # if [[ -n "$my_remote_branch" ]]; then
-  git --no-pager log --no-merges --pretty=format:'%H | %s' \
-    "${default_branch}..${my_remote_branch}" | xargs -0 | while IFS= read -r line; do
-    print -- "- $line"
-  done
-
-    # local merge_commits=""
-    # merge_commits=($(git -C "$folder" log -100 --pretty=format:"%H %P" | awk '{ if (NF > 2) print $1 }'))
-
-    # if [[ -z "$merge_commits" ]]; then
-    #   print " no merge commits found" >&2
-    #   return 1;
-    # fi
-
-    # print ""
-
-    # local merge_hash="${merge_commits[1]}"
-    # local first=$(git -C "$folder" rev-parse "$(git -C "$folder" log -1 --pretty=format:"%H")")
-    # local last=$(git -C "$folder" rev-parse "${merge_hash}^2")
-
-    # git -C "$folder" --no-pager log --oneline --graph --date=relative --no-merges --first-parent $first ^$last
-    # git -C "$folder" log --no-merges --first-parent $first ^$last --pretty=format:'- %H - %s' | pbcopy
-    RET=$?
-  else
-    git -C "$folder" --no-pager log main HEAD --oneline --graph --date=relative $@
-    RET=$?
+  if [[ -z "$branch_arg" ]]; then
+    branch_arg=$(git -C "$folder" branch --show-current)
+    if [[ -z "$branch_arg" ]]; then
+      print " current branch is detached, cannot push" >&2
+      return 1;
+    fi
   fi
 
-  print ""
-  return $RET;
+  local default_branch=$(get_default_branch_ "$folder")
+  local remote_name=$(get_remote_origin_ "$folder")
+
+  if (( glog_is_c )); then
+    if [[ "$default_branch" != "$branch_arg" ]] || (( ! glog_is_a )); then
+      git --no-pager log --no-merges --oneline "${default_branch}..${branch_arg}" --no-decorate $@
+    elif (( glog_is_a )); then
+      git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative --no-decorate $@
+    fi
+    return $?;
+  fi
+
+  git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative $@
 }
 
 function push() {
@@ -6054,11 +6062,9 @@ function push() {
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
-    if [[ -n "$branch_arg" ]]; then
-      print ""
-      git -C "$folder" --no-pager log --oneline "${remote_name}/${branch_arg}@{1}..${remote_name}/${branch_arg}"
-      # no pbcopy
-    fi
+    print ""
+    glog -ca "$branch_arg" "$folder" -1
+    # no pbcopy
   fi
 
   return $RET;
@@ -6149,11 +6155,9 @@ function pushf() {
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
-    if [[ -n "$branch_arg" ]]; then
-      print ""
-      git -C "$folder" --no-pager log "${remote_name}/${branch_arg}@{1}..${remote_name}/${branch_arg}" --oneline
-      # no pbcopy
-    fi
+    print ""
+    glog -ca "$branch_arg" "$folder" -1
+    # no pbcopy
   fi
 
   return $RET;
@@ -6259,6 +6263,7 @@ function pull() {
     fi
   fi
 
+  local default_branch=$(get_default_branch_ "$folder")
   local remote_name=$(get_remote_origin_ "$folder")
 
   if ! git -C "$folder" fetch $remote_name $branch_arg $@; then return 1; fi
@@ -6282,7 +6287,7 @@ function pull() {
 
   if (( ! ${argv[(Ie)--quiet]} )); then
     print ""
-    git -C "$folder" --no-pager log -1 --oneline
+    glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
 }
