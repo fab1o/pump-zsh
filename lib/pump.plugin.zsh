@@ -880,11 +880,13 @@ function find_repo_() {
     ############################################
     # VERY IMPORTANT to display the prompt: >&2
     ############################################
-    confirm_ "is there a repository for this project in Github?"
-    if (( $? == 130 || $? == 2 )); then return 130; fi
-    if (( $? == 0 )); then
+    confirm_ "is there a git repository for this project somewhere?"
+    local RET=$?
+    if (( RET == 1 )); then return 1; fi
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+    if (( RET == 0 )); then
       local gh_owner=""
-      gh_owner=$(input_from_ "type the Github owner account (username or organization)")
+      gh_owner=$(input_from_ "type the Github owner account (username or organization) skip if not on Github")
       if (( $? == 130 || $? == 2 )); then return 130; fi
 
       if [[ -n "$gh_owner" ]]; then
@@ -987,7 +989,6 @@ function display_double_line_() {
   else
     total_width1=$(( total_width / 2 - factor ))
   fi
-
 
   local padding=$(( total_width1 - factor ))
   local line="$(printf '%*s' "$padding" '' | tr ' ' '─')"
@@ -1286,54 +1287,40 @@ function check_proj_pkg_manager_() {
 # end of data checkers
 
 function choose_mode_() {
-  local proj_folder="$(basename "$1")"
-  local mode="$2"
+  local mode="$1"
+  local proj_folder="$2"
 
-  local multiple_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=25 --foreground 212 "multiple mode")
-  local single_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=25 --foreground 99 "single mode")
+  local parent_folder_name="$(basename $(dirname "$proj_folder"))"
+  parent_folder_name="${parent_folder_name[1,46]}"
+  local folder_name="$(basename "$proj_folder")"
+  folder_name="${folder_name[1,46]}"
 
-  local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
+  if [[ -n "$proj_folder" ]]; then
+    local multiple_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=30 --foreground 212 "multiple mode")
+    local single_title=$(gum style --align=center --margin="0" --padding="0" --border=none --width=30 --foreground 99 "single mode")
 
-  local multiple=$'  '/"$(basename $(dirname "$1"))"'/
-   └── '"${proj_folder}"'/
-       ├── main/
-       ├── feature-1/
-       └── feature-2/'
+    local titles=$(gum join --align=center --horizontal "$multiple_title" "$single_title")
 
-  local single=$'  '/"$(basename $(dirname "$1"))"'/
-   └── '"${proj_folder}"'/
+    local multiple=$'  '/"$parent_folder_name"'/
+   └─ '"$folder_name"'/
+      ├─ main/
+      ├─ feature-1/
+      └─ feature-2/'
+
+    local single=$'  '/"$parent_folder_name"'/
+   └─ '"$folder_name"'/
 
 
-  '
-  # local multiple=$'
-  # '/"$(basename $(dirname "$1"))"'/
-  #  └── '"${proj_folder}"'/
-  #      ├── main/
-  #      ├── feature-1/
-  #      ├── feature-2/
-  #      └── .revs/
-  #          ├── rev.pr-1/
-  #          └── rev.pr-2/'
+    '
 
-  # local single=$'
-  # '/"$(basename $(dirname "$1"))"'/
-  #  ├── '"${proj_folder}"'/ 
-  #  └── '.".${proj_folder}"'-revs/
-  #      ├── rev.pr-1/
-  #      └── rev.pr-2/
-  
+    multiple=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=30 --border-foreground 212 "$multiple")
+    single=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=30 --border-foreground 99 "$single")
 
-  # '
-
-  multiple=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=25 --border-foreground 212 "$multiple")
-  single=$(gum style --align=left --margin="0" --padding="0" --border=normal --width=25 --border-foreground 99 "$single")
-
-  local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
-  
-  print "" >&2
-  gum join --align=center --vertical "$titles" "$examples"
-
-  local default=$((( mode )) && echo "single" || echo "multiple")
+    local examples=$(gum join  --align=center --horizontal "$multiple" "$single")
+    
+    print "" >&2
+    gum join --align=center --vertical "$titles" "$examples"
+  fi
 
   print " • ${pink_cor}multiple mode${reset_cor}:" >&2
   print "   manages branches in separate folders" >&2
@@ -1342,6 +1329,8 @@ function choose_mode_() {
   print "   manages branches within a single folder" >&2
   print "   ideal for small projects with a limited number of branches" >&2
   print "" >&2
+
+  local default=$((( mode )) && echo "single" || echo "multiple")
 
   confirm_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode?" "multiple" "single" "$default"
   local RET=$?
@@ -1713,13 +1702,13 @@ function save_proj_mode_() {
   (( save_proj_mode_is_d )) && set -x
 
   local i="$1"
-  local proj_folder="$2"
-  local single_mode="$3"
+  local single_mode="$2"
+  local proj_folder="$3"
 
   local RET=0
 
   if (( save_proj_mode_is_e || save_proj_mode_is_a )) || [[ -z "$single_mode" ]]; then
-    choose_mode_ "$proj_folder" "$single_mode"
+    choose_mode_ "$single_mode" "$proj_folder"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     single_mode=$RET
@@ -2060,7 +2049,7 @@ function save_proj_() {
     if ! save_proj_repo_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
 
-    if ! save_proj_mode_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
+    if ! save_proj_mode_ -e $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
   
     if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
   else
@@ -2082,7 +2071,7 @@ function save_proj_() {
       PUMP_PROJ_SINGLE_MODE[$i]=0
     fi
 
-    if ! save_proj_mode_ -a $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
+    if ! save_proj_mode_ -a $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
@@ -4566,7 +4555,7 @@ function run() {
     if (( i )); then
       proj_arg="$1"
       if [[ "$2" == "dev" || "$2" == "stage" || "$2" == "prod" ]]; then
-        if ! save_proj_mode_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then return 1; fi
+        if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}" 1>/dev/null; then return 1; fi
 
         local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
@@ -4891,7 +4880,7 @@ function revs() {
   fi
   proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
     return 1;
   fi
   single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -4976,7 +4965,7 @@ function rev() {
   fi
   proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
     return 1;
   fi
   single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -5242,7 +5231,7 @@ function clone() {
   fi
   proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if ! save_proj_mode_ $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}" 1>/dev/null; then
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
     return 1;
   fi
   single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -8008,11 +7997,20 @@ function proj_handler() {
   local i="$1"
   shift
 
-  set +x
-  eval "$(parse_flags_ "proj_handler_" "meincu" "" "$@")"
-  (( proj_handler_is_d )) && set -x
-
   local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
+  local working="${PUMP_WORKING[$i]}"
+
+  if ! save_proj_mode_ -q $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
+  
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]:-1}"
+
+  set +x
+  if (( single_mode)); then
+    eval "$(parse_flags_ "proj_handler_" "eincu" "" "$@")"
+  else
+    eval "$(parse_flags_ "proj_handler_" "meincu" "" "$@")"
+  fi
+  (( proj_handler_is_d )) && set -x
 
   if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_cmd" "${PUMP_PROJ_REPO[$i]}"; then
     return 1;
@@ -8022,11 +8020,6 @@ function proj_handler() {
 
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  local working="${PUMP_WORKING[$i]}"
-
-  if ! save_proj_mode_ -q $i "$proj_folder" "${PUMP_PROJ_SINGLE_MODE[$i]}"; then return 1; fi
-  
-  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]:-1}"
 
   if (( proj_handler_is_h )); then
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd${reset_cor} : to open a $proj_cmd folder"
