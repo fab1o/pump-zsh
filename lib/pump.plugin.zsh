@@ -609,7 +609,7 @@ function get_folders_() {
     [[ $name != "revs" ]] && filtered+=("$name")
   done
 
-  local priorities=(dev develop release main master production stage staging)
+  local priorities=(dev develop release main master production stage staging trunk mainline default stable)
   local ordered=()
 
   for name in "${priorities[@]}"; do
@@ -2749,16 +2749,26 @@ function is_proj_folder_() {
 
 function get_default_folder_() {
   local proj_folder="${1:-$PWD}"
-  local proj_cmd="$2"
 
-  local default_folder=$(get_default_branch_ "$proj_folder")
+  local folder=""
 
-  if [[ -z "$default_folder" ]]; then
-    default_folder=$(get_proj_for_git_ "$proj_folder")
+  local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop" "trunk" "mainline" "default" "stable")
+  local dir=""
+  for dir in "${dirs[@]}"; do
+    folder="${proj_folder}/${dir}"
+    if [[ -d "$folder" ]]; then
+      if is_git_repo_ "$folder" &>/dev/null; then
+        break;
+      fi
+    fi
+  done
+
+  if [[ -z "$folder" ]]; then
+    folder=$(get_proj_for_git_ "$proj_folder")
   fi
 
-  if [[ -n "$default_folder" ]]; then
-    echo "$(basename "$default_folder")"
+  if [[ -n "$folder" ]]; then
+    echo "$(basename "$folder")"
     return 0;
   fi
 
@@ -2807,8 +2817,7 @@ function get_proj_for_pkg_() {
   fi
 
   if [[ -z "$proj_folder" ]]; then
-    local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
-
+    local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop" "trunk" "mainline" "default" "stable")
     local dir=""
     for dir in "${dirs[@]}"; do
       if [[ -f "${folder}/${dir}/${file}" ]]; then
@@ -2818,7 +2827,7 @@ function get_proj_for_pkg_() {
     done
   fi
 
-  if [[ -z "$proj_folder" ]]; then
+  if [[ -z "$proj_folder" && -n "$file" ]]; then
     local pattern="$(printf "%q" "$file")"
     local found_file="$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 2 -type f -iname "${pattern}*" -print -quit 2>/dev/null)"
     if [[ -z "$found_file" ]]; then
@@ -2848,8 +2857,7 @@ function get_proj_for_git_() {
     return 0;
   fi
 
-  local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop")
-
+  local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop" "trunk" "mainline" "default" "stable")
   local dir=""
   for dir in "${dirs[@]}"; do
     if is_git_repo_ "${folder}/${dir}" &>/dev/null; then
@@ -2919,7 +2927,7 @@ function get_remote_origin_() {
   fi
 
   local ref
-  for ref in refs/remotes/{origin,upstream}/{main,master,stage,dev,release,trunk,mainline,default,stable}; do
+  for ref in refs/remotes/{origin,upstream}/{main,master,stage,staging,prod,production,release,dev,develop,trunk,mainline,default,stable}; do
     if git -C "$git_proj_folder" show-ref -q --verify $ref; then
       echo "${${ref:h}:t}"
       return 0
@@ -8083,7 +8091,7 @@ function proj_handler() {
 
   elif (( proj_handler_is_m )); then
     if (( ! single_mode )); then
-      folder_arg=$(get_default_folder_ "$proj_folder" "$proj_cmd" 2>/dev/null)
+      folder_arg=$(get_default_folder_ "$proj_folder" 2>/dev/null)
     fi
   fi
 
