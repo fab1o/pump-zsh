@@ -6277,7 +6277,7 @@ function drelease() {
         print " deleting release: $tag"
         if ! gh release delete "$tag" --cleanup-tag -y; then continue; fi
       fi
-      print " deleted release: $tag"
+      print " ${magenta_cor}deleted${reset_cor} $tag"
     done
 
     return 0;

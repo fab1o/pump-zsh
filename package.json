@@ -32,7 +32,7 @@
     "update_config": "zsh ./scripts/update_config.zsh",
     "watch": "npm-watch"
   },
-  "version": "0.1.13",
+  "version": "0.1.14",
   "watch": {
     "update": [
       "lib/*.*",
