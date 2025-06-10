@@ -6272,9 +6272,9 @@ function drelease() {
 
     for tag in $selected_tags; do
       if command -v gum &>/dev/null; then
-        if ! gum spin --title="deleting release: $tag" -- gh release delete "$tag" --cleanup-tag -y; then continue; fi
+        if ! gum spin --title="deleting... $tag" -- gh release delete "$tag" --cleanup-tag -y; then continue; fi
       else
-        print " deleting release: $tag"
+        print " deleting... $tag"
         if ! gh release delete "$tag" --cleanup-tag -y; then continue; fi
       fi
       print " ${magenta_cor}deleted${reset_cor} $tag"
