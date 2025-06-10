@@ -2831,7 +2831,7 @@ function get_proj_for_pkg_() {
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
   if is_git_repo_ "${proj_folder}" &>/dev/null; then
-    pull "${proj_folder}" --quiet
+    pull "${proj_folder}" --quiet &>/dev/null
   fi
 
   echo "$proj_folder"
@@ -4370,6 +4370,62 @@ function read_commits_() {
   if (( read_commits_is_t )); then
     echo "$pr_title"
   fi
+}
+
+function pra() {
+  set +x
+  eval "$(parse_flags_ "pra_" "" "" "$@")"
+  (( pra_is_d )) && set -x
+
+  if (( pra_is_h )); then
+    print "  ${yellow_cor}pra${reset_cor} : to set assignee as the author of Pull Requests"
+    return 0;
+  fi
+
+  if ! command -v gh &>/dev/null; then
+    print " fatal: pra requires gh" >&2
+    print " install gh:${blue_cor} https://github.com/cli/cli ${reset_cor}" >&2
+    return 1;
+  fi
+
+  if ! command -v jq &>/dev/null; then
+    print " fatal: pra requires jq" >&2
+    print " install jq:${blue_cor} https://jqlang.org/download/ ${reset_cor}" >&2
+    return 1;
+  fi
+
+  if ! is_git_repo_; then return 1; fi
+
+  local prs=""
+  if command -v gum &>/dev/null; then
+    prs=$(gum spin --title="fetching pull requests..." -- gh pr list --limit 100 --json number,author,assignees --jq '.[] | {number, author: .author.login, assignees}')
+  else
+    print " fetching pull requests..."
+    prs=$(gh pr list --limit 100 --json number,author,assignees --jq '.[] | {number, author: .author.login, assignees}')
+  fi
+  if (( $? != 0 )); then return 1; fi
+
+  echo $prs | jq -c '.' | while read -r pr; do
+    pr_number=$(echo $pr | jq -r '.number')
+    author=$(echo $pr | jq -r '.author')
+    assignees=$(echo $pr | jq -r '.assignees | length')
+
+    if [[ "$author" == "app/dependabot" ]]; then
+      print " ${yellow_cor}PR #$pr_number is from Dependabot, skipping${reset_cor}"
+      continue;
+    fi
+
+    if [[ "$assignees" -eq 0 ]]; then
+      if gh pr edit "$pr_number" --add-assignee "$author"; then
+        print " ${green_cor}PR #$pr_number set to $author${reset_cor}"
+      else
+        print " ${red_cor}PR #$pr_number not set to $author${reset_cor}"
+      fi
+    else
+      print " ${green_cor}PR #$pr_number already has assignees${reset_cor}"
+    fi
+  done
+
 }
 
 function pr() {
@@ -6085,17 +6141,17 @@ function pushf() {
   local remote_name=$(get_remote_origin_ "$folder")
 
   if (( pushf_is_f )); then
-    git -C "$folder" push --no-verify --force $remote_name $my_branch $@
+    git -C "$folder" push --no-verify --force $remote_name $branch_arg $@
     RET=$?
   else
-    git -C "$folder" push --no-verify --force-with-lease $remote_name $my_branch $@
+    git -C "$folder" push --no-verify --force-with-lease $remote_name $branch_arg $@
     RET=$?
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
-    if [[ -n "$my_branch" ]]; then
+    if [[ -n "$branch_arg" ]]; then
       print ""
-      git -C "$folder" --no-pager log "${remote_name}/${my_branch}@{1}..${remote_name}/${my_branch}" --oneline
+      git -C "$folder" --no-pager log "${remote_name}/${branch_arg}@{1}..${remote_name}/${branch_arg}" --oneline
       # no pbcopy
     fi
   fi
@@ -6205,7 +6261,7 @@ function pull() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  if ! git -C "$folder" fetch $remote_name $branch_arg; then return 1; fi
+  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then return 1; fi
 
   local RET=0
 
@@ -8585,6 +8641,7 @@ function help() {
   display_line_ "multi-step task" "${solid_pink_cor}"
   print ""
   print " ${solid_pink_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
+  print " ${solid_pink_cor} pra ${reset_cor}\t\t = set assignee to all pull requests"
   print " ${solid_pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-push"
   print " ${solid_pink_cor} recommit ${reset_cor}\t = reset last commit then commit changes to index again"
   print " ${solid_pink_cor} release ${reset_cor}\t = bump version and create a release on github"
