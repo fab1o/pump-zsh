@@ -2911,7 +2911,6 @@ function get_remote_origin_() {
   local proj_folder="${1-$PWD}"
 
   local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
-
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   if [[ -z "$git_proj_folder" ]] || ! git -C "$git_proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
@@ -3196,25 +3195,27 @@ function select_branch_() {
   local proj_folder="${3:-$PWD}"
   local exclude_branches=(${@:4})
 
-  local remote_name=$(get_remote_origin_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
+  local remote_name=$(get_remote_origin_ "$git_proj_folder")
   local branch_results=()
 
   if (( select_branch_is_a )); then
-    fetch "$proj_folder" --quiet
-    branch_results=("${(@f)$(git -C "$proj_folder" branch --all --list "*$searchText*" --format="%(refname:short)" \
+    fetch "$git_proj_folder" --quiet
+    branch_results=("${(@f)$(git -C "$git_proj_folder" branch --all --list "*$searchText*" --format="%(refname:short)" \
       | sed "s#^$remote_name/##" \
       | grep -v 'detached' \
       | sort -fu
     )}")
   elif (( select_branch_is_r )); then
-    fetch "$proj_folder" --quiet
-    branch_results=("${(@f)$(git -C "$proj_folder" for-each-ref --format='%(refname:short)' refs/remotes \
+    fetch "$git_proj_folder" --quiet
+    branch_results=("${(@f)$(git -C "$git_proj_folder" for-each-ref --format='%(refname:short)' refs/remotes \
       | grep -i "$searchText" \
       | sort -fu
     )}")
   else
-    branch_results=("${(@f)$(git -C "$proj_folder" branch --list "*$searchText*" --format="%(refname:short)" \
+    branch_results=("${(@f)$(git -C "$git_proj_folder" branch --list "*$searchText*" --format="%(refname:short)" \
       | grep -v 'detached' \
       | sort -fu
     )}")
@@ -3277,10 +3278,7 @@ function select_pr_() {
   local pr_list=""
 
   local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_cmd")
-  if [[ -z "$git_proj_folder" ]]; then
-    print " fatal: could not locate a git repository folder for project: $proj_cmd" >&2
-    return 1;
-  fi
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   add-zsh-hook -d chpwd pump_chpwd_
 
@@ -3296,9 +3294,9 @@ function select_pr_() {
 
   if [[ -z "$pr_list" ]]; then
     if [[ -n "$proj_cmd" ]]; then
-      print " fatal: no pull requests found for project: $proj_cmd" >&2
+      print " no pull requests found for $proj_cmd" >&2
     else
-      print " fatal: no pull requests found" >&2
+      print " no pull requests found" >&2
     fi
     return 1;
   fi
@@ -6950,27 +6948,16 @@ function co() {
     return 1;
   fi
 
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local proj_folder="$PWD"
 
-  if ! is_git_repo_; then;
-    if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then return 1; fi
-
-    local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
-    (( i )) || return 1;
-    
-    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}"; then
-      return 1;
-    fi
-    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-    proj_folder="$(get_proj_for_git_ "$proj_folder" "$CURRENT_PUMP_PROJ_SHORT_NAME")"
-  fi
+  if ! is_git_repo_; then; return 1; fi
 
   local RET=0
 
   # co -pr checkout by pull request
   if (( co_is_p && co_is_r )); then
-    local pr=("${(@s:|:)$(select_pr_ "$1")}")
+    local pr=("${(@s:|:)$(select_pr_ "$1" "$proj_folder" "$proj_arg")}")
     if [[ -z "$pr" ]]; then return 1; fi
     
     gum spin --title="detaching pull request: ${pr[3]}" -- \
