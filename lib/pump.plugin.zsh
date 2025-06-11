@@ -628,7 +628,7 @@ function get_folders_() {
     fi
   done
 
-  echo "${ordered[@]}"
+  printf '%s\n' "${ordered[@]}"
 }
 
 function check_config_file_() {
@@ -819,8 +819,8 @@ function find_proj_folder_() {
       fi
     fi
     
-    local dirs=($(get_folders_ "$folder_path"))
-    if [[ -z "$dirs" ]]; then
+    local dirs=("${(@f)$(get_folders_ "$folder_path")}")
+    if (( ${#dirs[@]} == 0 )); then
       cd "${HOME:-/}"
     fi
 
@@ -1931,7 +1931,7 @@ function save_jira_() {
     local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
     if [[ -z "$projects" ]]; then
       print " no JIRA projects found" >&2
-      print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+      print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
       return 1;
     fi
 
@@ -2322,6 +2322,7 @@ function remove_proj_() {
   update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_PROJ" "" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
   update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
@@ -2361,6 +2362,7 @@ function set_current_proj_() {
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
   CURRENT_PUMP_JIRA_PROJ="${PUMP_JIRA_PROJ[$i]}"
+  CURRENT_PUMP_JIRA_IN_PROGRESS="${PUMP_JIRA_IN_PROGRESS[$i]}"
   CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
   CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
@@ -2619,6 +2621,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${PUMP_JIRA_IN_PROGRESS[$i]}]"
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
     print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
     print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
@@ -2657,6 +2660,7 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_PROJ=${reset_cor}$CURRENT_PUMP_JIRA_PROJ]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}$CURRENT_PUMP_NVM_USE_V]"
   print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
@@ -3075,7 +3079,7 @@ function get_clone_default_branch_() {
 
   if [[ -n "$default_branch" && -n "$my_branch" && "$default_branch" != "$my_branch" ]]; then
     local default_branch_choice=""
-    default_branch_choice=$(choose_one_ 1 "default branch" 5 "$default_branch" "$my_branch")
+    default_branch_choice=$(choose_one_ -a "default branch" "$default_branch" "$my_branch")
     if (( $? == 130 || $? == 2 )); then return 130; fi
 
     selected_default_branch="$default_branch_choice"
@@ -3448,6 +3452,7 @@ function load_config_entry_() {
     PUMP_PRINT_README
     PUMP_PKG_NAME
     PUMP_JIRA_PROJ
+    PUMP_JIRA_IN_PROGRESS
     PUMP_NVM_SKIP_LOOKUP
     PUMP_NVM_USE_V
     PUMP_DEFAULT_BRANCH
@@ -3598,6 +3603,9 @@ function load_config_entry_() {
         ;;
       PUMP_JIRA_PROJ)
         PUMP_JIRA_PROJ[$i]="$value"
+        ;;
+      PUMP_JIRA_IN_PROGRESS)
+        PUMP_JIRA_IN_PROGRESS[$i]="$value"
         ;;
       PUMP_NVM_SKIP_LOOKUP)
         PUMP_NVM_SKIP_LOOKUP[$i]="$value"
@@ -4695,7 +4703,7 @@ function run() {
     return 0;
   fi
 
-  local proj_arg=""
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local folder_arg=""
   local _env="dev"
 
@@ -4734,7 +4742,7 @@ function run() {
     fi
   fi
   
-  local i=$(find_proj_index_ "${proj_arg:-$CURRENT_PUMP_PROJ_SHORT_NAME}" 2>/dev/null)
+  local i=$(find_proj_index_ "$proj_arg")
   (( i )) || return 1;
 
   if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
@@ -4784,10 +4792,10 @@ function run() {
     folder_to_execute="$proj_folder"
 
     if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
-      local dirs=($(get_folders_ "$proj_folder"))
+      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
       
       if (( ${#dirs[@]} )); then
-        local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
+        local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
         if [[ -z "$folder" ]]; then return 1; fi
         
         folder_to_execute="${proj_folder}/${folder}"
@@ -4797,7 +4805,7 @@ function run() {
     folder_to_execute="$PWD"
   fi
 
-  if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
+  if ! is_proj_folder_ "$folder_to_execute"; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
@@ -4833,7 +4841,7 @@ function setup() {
     return 0;
   fi
 
-  local proj_arg=""
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local folder_arg=""
 
   if [[ -n "$2" ]]; then
@@ -4845,11 +4853,9 @@ function setup() {
     else
       folder_arg="$1"
     fi
-  else
-    proj_arg=""
   fi
   
-  local i=$(find_proj_index_ "${proj_arg:-$CURRENT_PUMP_PROJ_SHORT_NAME}" 2>/dev/null)
+  local i=$(find_proj_index_ "$proj_arg")
   (( i )) || return 1;
 
   local proj_folder="";
@@ -4885,7 +4891,7 @@ function setup() {
     folder_to_execute="$proj_folder"
 
     if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
-      local dirs=($(get_folders_ "$proj_folder"))
+      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
       
       if (( ${#dirs[@]} )); then
         local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
@@ -5023,7 +5029,7 @@ function revs() {
     return 1;
   fi
 
-  local i=$(find_proj_index_ "$proj_arg" 2>/dev/null)
+  local i=$(find_proj_index_ "$proj_arg")
   (( i )) || return 1;
 
   local proj_folder=""
@@ -5608,6 +5614,7 @@ function jira() {
   if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
 
   local jira_proj="${PUMP_JIRA_PROJ[$i]}"
+  local jira_status="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
 
   if ! command -v acli &>/dev/null; then
     print "${yellow_cor}  acli is not installed, please install it to use JIRA integration${reset_cor}" >&2
@@ -5616,7 +5623,7 @@ function jira() {
   fi
   
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
-    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='In Development' OR status='In Progress'))) AND \
+    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='Build' OR status='In Development' OR status='In Progress'))) AND \
     Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
     print " no JIRA projects found" >&2
@@ -5631,7 +5638,16 @@ function jira() {
   local key=${ticket%% *}
 
   acli jira workitem assign --key="$key" --assignee="@me" --yes
-  acli jira workitem transition --key="$key" --status="In Progress" --yes
+
+  local output=$(acli jira workitem transition --key="$key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
+  
+  if echo "$output" | grep -qE "Failure"; then
+    jira_status=$(input_from_ "Enter the name of the column on your JIRA board that corresponds to 'In Progress'")
+    if [[ -n "$jira_status" ]] && ; then
+      acli jira workitem transition --key="$key" --status="$jira_status" --yes
+      update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "$jira_status" &>/dev/null
+    fi
+  fi
 
   print ""
   clone "$proj_arg" "$key"
@@ -7911,7 +7927,7 @@ function pro() {
 
   # pro -u [<name>] reset project settings
   if (( pro_is_u )); then
-    local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
+    local i=$(find_proj_index_ "$proj_arg" 0)
 
     update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
     update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
@@ -7928,7 +7944,7 @@ function pro() {
 
   # pro -c [<name>] show project config
   if (( pro_is_c )); then
-    local i=$(find_proj_index_ "$proj_arg" 0 2>/dev/null)
+    local i=$(find_proj_index_ "$proj_arg" 0)
     
     print_current_proj_ $i
     return $?;
@@ -8297,7 +8313,7 @@ function proj_handler() {
     if [[ -n "$folder_arg" ]]; then
       resolved_folder="${proj_folder}/${folder_arg}"
     else  
-      local dirs=($(get_folders_ "$proj_folder"))
+      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
       
       if (( ${#dirs[@]} )); then
         local chosen_folder=($(choose_one_ -a "folder to open" "${dirs[@]}"))
@@ -8945,6 +8961,7 @@ typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
 typeset -gA PUMP_JIRA_PROJ
+typeset -gA PUMP_JIRA_IN_PROGRESS
 typeset -gA PUMP_NVM_SKIP_LOOKUP
 typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
@@ -8981,6 +8998,7 @@ typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
 typeset -g CURRENT_PUMP_JIRA_PROJ=""
+typeset -g CURRENT_PUMP_JIRA_IN_PROGRESS=""
 typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
 typeset -g CURRENT_PUMP_NVM_USE_V=""
 typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
