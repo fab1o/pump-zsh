@@ -303,7 +303,7 @@ PUMP_PR_APPEND_8=
 PUMP_PR_APPEND_9=
 
 # optional
-# default emtpy (will ask)
+# default empty (will ask)
 # set to 1 to run tests before pushing code and creating a pr or 0 to not run tests. If tests fail, pr is aborted.
 PUMP_PR_RUN_TEST_1=
 PUMP_PR_RUN_TEST_2=
@@ -316,7 +316,7 @@ PUMP_PR_RUN_TEST_8=
 PUMP_PR_RUN_TEST_9=
 
 # optional
-# default emtpy (will ask)
+# default empty (will ask)
 # set to 1 to automatically add all changes to index before commit and recommit, 0 to not do anything
 PUMP_COMMIT_ADD_1=
 PUMP_COMMIT_ADD_2=
@@ -329,7 +329,7 @@ PUMP_COMMIT_ADD_8=
 PUMP_COMMIT_ADD_9=
 
 # optional
-# default emtpy (will ask)
+# default empty (will ask)
 # set to 1 to automatically push on refix, 0 to not push
 PUMP_PUSH_ON_REFIX_1=
 PUMP_PUSH_ON_REFIX_2=
@@ -368,7 +368,7 @@ PUMP_GHA_INTERVAL_8=
 PUMP_GHA_INTERVAL_9=
 
 # optional
-# default emtpy (will ask)
+# default empty (will ask)
 # workflow to check for command 'gha'
 PUMP_GHA_WORKFLOW_1=
 PUMP_GHA_WORKFLOW_2=
@@ -433,3 +433,16 @@ PUMP_PKG_NAME_6=
 PUMP_PKG_NAME_7=
 PUMP_PKG_NAME_8=
 PUMP_PKG_NAME_9=
+
+# optional
+# default empty (will ask)
+# jira project code
+PUMP_JIRA_PROJ_1=
+PUMP_JIRA_PROJ_2=
+PUMP_JIRA_PROJ_3=
+PUMP_JIRA_PROJ_4=
+PUMP_JIRA_PROJ_5=
+PUMP_JIRA_PROJ_6=
+PUMP_JIRA_PROJ_7=
+PUMP_JIRA_PROJ_8=
+PUMP_JIRA_PROJ_9=

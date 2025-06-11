@@ -266,7 +266,7 @@ function update_() {
     print " new version available for pump-zsh: ${magenta_cor}${PUMP_VERSION}${reset_cor} -> ${purple_cor}${latest_version}${reset_cor}"
     
     if (( ! update_is_f )); then
-      if ! confirm_ "would you like to install new version?"; then
+      if ! confirm_ "install new version?"; then
         return 0;
       fi
     fi
@@ -1332,7 +1332,7 @@ function choose_mode_() {
 
   local default=$((( mode )) && echo "single" || echo "multiple")
 
-  confirm_ "how do you prefer to manage the project: "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode?" "multiple" "single" "$default"
+  confirm_ "manage the project with "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode?" "multiple" "single" "$default"
   local RET=$?
 
   local i=0
@@ -1362,7 +1362,7 @@ function print_tree_ascii_() {
 
   ((total++))
 
-  confirm_ "would you like to move the contents to a new folder and re-clone the project?"
+  confirm_ "move the contents to a new folder and re-clone the project?"
   local RET=$?
 
   local i=0
@@ -1663,7 +1663,7 @@ function detect_pkg_manager_() {
 
 function save_proj_cmd_() {
   set +x
-  eval "$(parse_flags_ "save_proj_cmd_" "" "" "$@")"
+  eval "$(parse_flags_ "save_proj_cmd_" "fae" "" "$@")"
   (( save_proj_cmd_is_d )) && set -x
 
   local i="$1"
@@ -1690,7 +1690,12 @@ function save_proj_cmd_() {
       TEMP_SAVE_PROJ_CMD_ATTEMPTS=0
     fi
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
-    clear_last_line_1_
+    if (( save_proj_cmd_is_e )); then
+      clear_last_line_1_
+      clear_last_line_1_
+    elif (( save_proj_cmd_is_a )); then
+      clear_last_line_1_
+    fi
     print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
     print "" >&1
   fi
@@ -1754,7 +1759,7 @@ function save_proj_folder_() {
     fi
     if (( save_proj_folder_is_a )); then
       # ask to use pwd
-      confirm_ "would you like to use as project folder: "$'\e[94m'$PWD$'\e[0m'"?"
+      confirm_ "use as project folder: "$'\e[94m'$PWD$'\e[0m'"?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
@@ -1767,7 +1772,7 @@ function save_proj_folder_() {
   local RET=0
   
   if (( save_proj_folder_is_e )) && [[ -n "$proj_folder" ]]; then
-    confirm_ "would you like to keep using project folder: "$'\e[94m'$proj_folder$'\e[0m'"?"
+    confirm_ "keep using project folder: "$'\e[94m'$proj_folder$'\e[0m'"?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1847,7 +1852,7 @@ function save_proj_repo_() {
 
   if (( ! save_proj_repo_is_f )); then
     if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
-      confirm_ "would you like to keep using repository: "$'\e[94m'$proj_repo$'\e[0m'"?"
+      confirm_ "keep using repository: "$'\e[94m'$proj_repo$'\e[0m'"?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 1 )); then
@@ -1894,6 +1899,47 @@ function save_proj_repo_() {
   fi
 }
 
+function save_jira_() {
+  set +x
+  eval "$(parse_flags_ "save_jira_" "fea" "" "$@")"
+  (( save_jira_is_d )) && set -x
+
+  local i="$1"
+  local jira_proj="$2"
+
+  if [[ -z "$jira_proj" ]]; then
+    confirm_ "set a JIRA project for this project?"
+  else
+    confirm_ "set another JIRA project to replace current one: $jira_proj ?"
+  fi
+  local RET=$?
+  if (( RET == 130 || RET == 2 )); then return 130; fi
+  if (( RET == 0 )); then
+    if ! command -v acli &>/dev/null; then
+      print "${yellow_cor}  acli is not installed, please install it to use JIRA integration${reset_cor}" >&2
+      print "  install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+      return 1;
+    fi
+    local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
+    if [[ -z "$projects" ]]; then
+      print " no JIRA projects found" >&2
+      print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+      return 1;
+    fi
+
+    jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+    if [[ -z "$jira_proj" ]]; then return 1; fi
+  
+    update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+  fi
+  
+  if [[ -z "$jira_proj" ]]; then return 1; fi
+  
+  clear_last_line_1_
+  print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
+  print "" >&1
+}
+
 function save_pkg_manager_() {
   set +x
   eval "$(parse_flags_ "save_pkg_manager_" "f" "" "$@")"
@@ -1920,7 +1966,7 @@ function save_pkg_manager_() {
   local RET=0
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
-    confirm_ "package manager "$'\e[38;5;212m'${pkg_manager}$'\e[0m'"?"
+    confirm_ "set package manager "$'\e[38;5;212m'${pkg_manager}$'\e[0m'"?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1980,9 +2026,10 @@ function save_proj_f_() {
     update_setting_ $i "PUMP_PROJ_REPO" $proj_repo &>/dev/null
 
     if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-    if ! save_proj_cmd_ $i "$proj_cmd" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+    if ! save_proj_cmd_ -fe $i "$proj_cmd" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+    if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
   else
-    remove_proj_ $i &>/dev/null
+    remove_proj_ $i
 
     update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
     update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1 &>/dev/null
@@ -1991,7 +2038,8 @@ function save_proj_f_() {
     if ! save_proj_folder_ -f $i "$proj_cmd" "$proj_repo" "$PWD"; then return 1; fi
 
     if ! save_pkg_manager_ -f $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-    if ! save_proj_cmd_ $i "$proj_cmd"; then return 1; fi
+    if ! save_proj_cmd_ -fa $i "$proj_cmd"; then return 1; fi
+    if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
     if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
 
@@ -2051,16 +2099,14 @@ function save_proj_() {
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
   
-    if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+    if ! save_proj_cmd_ -e $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
   else
     # adding a new project
-    remove_proj_ $i &>/dev/null
+    remove_proj_ $i
 
-    if ! save_proj_cmd_ $i "$proj_name"; then return 1; fi
+    if ! save_proj_cmd_ -a $i "$proj_name"; then return 1; fi
 
     while [[ -z "${PUMP_PROJ_FOLDER[$i]}" ]]; do
-      proj_cmd="${TEMP_PUMP_PROJ_SHORT_NAME:-$proj_cmd}"
-
       if ! save_proj_repo_ -a $i "${PUMP_PROJ_FOLDER[$i]}" "$TEMP_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
       if ! save_proj_folder_ -a $i "$TEMP_PUMP_PROJ_SHORT_NAME" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
     done
@@ -2075,6 +2121,7 @@ function save_proj_() {
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+  if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
   # if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
   #   if (( save_proj_is_e )); then
@@ -2266,13 +2313,10 @@ function remove_proj_() {
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" &>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_PROJ" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
   update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
-  
-  if [[ -n "$proj_name" ]]; then
-    print " project removed: $proj_name"
-  fi
 }
 
 function set_current_proj_() {
@@ -2308,6 +2352,7 @@ function set_current_proj_() {
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
+  CURRENT_PUMP_JIRA_PROJ="${PUMP_JIRA_PROJ[$i]}"
   CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
   CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
@@ -2565,6 +2610,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
     print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
     print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
@@ -2602,6 +2648,7 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_PROJ=${reset_cor}$CURRENT_PUMP_JIRA_PROJ]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}$CURRENT_PUMP_NVM_USE_V]"
   print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
@@ -2641,7 +2688,6 @@ function find_proj_index_() {
     fi
 
     print " fatal: no project argument provided" >&2
-    print "  ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -2659,7 +2705,6 @@ function find_proj_index_() {
   fi
 
   print " fatal: not a valid project argument: $proj_arg" >&2
-  print "  ${yellow_cor}pro${reset_cor} : to set project" >&2
   return 1;
 }
 
@@ -3394,6 +3439,7 @@ function load_config_entry_() {
     PUMP_PUSH_ON_REFIX
     PUMP_PRINT_README
     PUMP_PKG_NAME
+    PUMP_JIRA_PROJ
     PUMP_NVM_SKIP_LOOKUP
     PUMP_NVM_USE_V
     PUMP_DEFAULT_BRANCH
@@ -3541,6 +3587,9 @@ function load_config_entry_() {
         ;;
       PUMP_PKG_NAME)
         PUMP_PKG_NAME[$i]="$value"
+        ;;
+      PUMP_JIRA_PROJ)
+        PUMP_JIRA_PROJ[$i]="$value"
         ;;
       PUMP_NVM_SKIP_LOOKUP)
         PUMP_NVM_SKIP_LOOKUP[$i]="$value"
@@ -6995,7 +7044,7 @@ function gha() {
 
   if (( RET == 0 && found && ask_save && gha_is_a == 0 )); then
     # ask to save the workflow
-    if confirm_ "would you like to save \"$workflow_arg\" as the default workflow for this project?"; then
+    if confirm_ "save \"$workflow_arg\" as the default workflow for this project?"; then
       update_setting_ $found "PUMP_GHA_WORKFLOW" "\"$workflow_arg\""
     fi
   fi
@@ -7859,9 +7908,7 @@ function pro() {
 
   # pro -r <name> remove project
   if (( pro_is_r )); then
-    local i=$(find_proj_index_ "$proj_arg")
-
-    if (( ! i )); then
+    if [[ -z "$proj_arg" ]]; then
       local projects=()
       for i in {1..9}; do
         if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -7874,29 +7921,35 @@ function pro() {
         return 1;
       fi
       
-      local selected_projects=$(choose_multiple_ "project to remove" "${(@f)$(printf "%s\n" "${projects[@]}")}")
+      local selected_projects=($(choose_multiple_ "project to remove" "${(@f)$(printf "%s\n" "${projects[@]}")}"))
       if [[ -z "$selected_projects" ]]; then return 1; fi
 
       local proj=""
       for proj in ${selected_projects[@]}; do
-        local refresh=0;
-        [[ "$proj" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] && refresh=1;
-
-        if ! remove_proj_ $i; then
-          return 1;
-        fi
-
-        print " removed: ${solid_blue_cor}${proj}${reset_cor}"
-
-        if (( refresh )); then
-          clear_curr_proj_
-          refresh_curr_proj_ $i
-        fi
+        pro -r "$proj"
       done
       return $?;
     fi
 
-    return 1;
+    local i=$(find_proj_index_ "$proj_arg")
+    if (( ! i )); then return 1; fi
+
+    local refresh=0;
+    [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] && refresh=1;
+
+    if ! remove_proj_ $i; then
+      print " failed to remove: ${proj_arg}" >&2
+      return 1;
+    fi
+
+    print " removed: ${proj_arg}"
+
+    if (( refresh )); then
+      clear_curr_proj_
+      refresh_curr_proj_ $i
+    fi
+
+    return $?;
   fi
 
   # pro -n <name> set Node.js version for a project
@@ -7945,7 +7998,7 @@ function pro() {
 
       if [[ -n "$node_engine" ]]; then
         local versions=()
-        versions=("${(@f)$(get_node_versions_ "$proj_folder" "oldest" "$node_engine")}")
+        versions=$(get_node_versions_ "$proj_folder" "oldest" "$node_engine")
           
         # if [[ -n "$nvm_use_v" ]] && \
         #     [[ ! " ${versions[@]} " =~ " ${nvm_use_v} " ]] && \
@@ -7953,22 +8006,9 @@ function pro() {
         # then
         #   versions+=("${nvm_use_v}")
         # fi
-
-        if (( ${#versions[@]} > 2 )); then
-          version_to_use=$(choose_one_ "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "${versions[@]}" | sort -V)}")
+        if [[ -n "$versions" ]]; then
+          version_to_use=$(choose_one_ -a "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
           RET=$?
-
-        elif (( ${#versions[@]} == 2 )); then
-          confirm_ "Node.js version to use with ${proj_arg}'s engine $node_engine:" "${versions[1]}" "${versions[2]}"
-          RET=$?
-          if (( RET == 0 )); then
-            version_to_use="${versions[1]}"
-          elif (( RET == 1 )); then
-            version_to_use="${versions[2]}"
-          fi
-
-        elif (( ${#versions[@]} == 1 )); then
-          version_to_use="${versions[1]}"
         fi
       fi
 
@@ -8033,7 +8073,7 @@ function pro() {
       if (( foundI )); then
         save_proj_f_ -e $foundI "$proj_cmd" "$pkg_name"
       else
-        if confirm_ "would you like to add project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
+        if confirm_ "add project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
           save_proj_f_ -a $emptyI "$proj_cmd" "$pkg_name"
         fi
       fi
@@ -8847,6 +8887,7 @@ typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
+typeset -gA PUMP_JIRA_PROJ
 typeset -gA PUMP_NVM_SKIP_LOOKUP
 typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
@@ -8882,6 +8923,7 @@ typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
+typeset -g CURRENT_PUMP_JIRA_PROJ=""
 typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
 typeset -g CURRENT_PUMP_NVM_USE_V=""
 typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
