@@ -4752,27 +4752,29 @@ function run() {
   fi
 
   local proj_folder=""
-  local _run=""
+  local single_mode=""
+  local _run="${PUMP_RUN[$i]}"
 
   if [[ "$_env" == "stage" ]]; then
     _run="${PUMP_RUN_STAGE[$i]}"
   elif [[ "$_env" == "prod" ]]; then
     _run="${PUMP_RUN_PROD[$i]}"
-  else
-    _run="${PUMP_RUN[$i]}"
   fi
 
-  if [[ -n "$proj_arg" ]]; then
-    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
-      return 1;
-    fi
-    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
+    return 1;
+  fi
+  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-    if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-      print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-      print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-      return 1;
-    fi
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
+    return 1;
+  fi
+  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    return 1;
   fi
 
   if [[ -z "$_run" ]]; then
@@ -4781,28 +4783,25 @@ function run() {
     return 1;
   fi
 
-  local folder_to_execute=""
+  local folder_to_execute="$PWD"
 
-  if [[ -n "$proj_folder" && -n "$folder_arg" ]]; then
+  if [[ -n "$folder_arg" ]]; then
     folder_to_execute="${proj_folder}/${folder_arg}"
-
-    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
-
-  elif [[ -n "$proj_folder" ]]; then
-    folder_to_execute="$proj_folder"
-
-    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
-      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
-      
-      if (( ${#dirs[@]} )); then
-        local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
-        if [[ -z "$folder" ]]; then return 1; fi
-        
-        folder_to_execute="${proj_folder}/${folder}"
+  else
+    if [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] || ! is_proj_folder_ "$PWD" &>/dev/null; then
+      if (( single_mode )); then
+        folder_to_execute="$proj_folder"
+      else
+        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+          
+        if (( ${#dirs[@]} )); then
+          local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
+          if [[ -z "$folder" ]]; then return 1; fi
+          
+          folder_to_execute="${proj_folder}/${folder}"
+        fi
       fi
     fi
-  else
-    folder_to_execute="$PWD"
   fi
 
   if ! is_proj_folder_ "$folder_to_execute"; then return 1; fi
@@ -4859,19 +4858,23 @@ function setup() {
   (( i )) || return 1;
 
   local proj_folder="";
+  local single_mode=""
   local _setup="${PUMP_SETUP[$i]}"
 
-  if [[ -n "$proj_arg" ]]; then
-    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
-      return 1;
-    fi
-    proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
+    return 1;
+  fi
+  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-    if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-      print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-      print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-      return 1;
-    fi
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
+    return 1;
+  fi
+  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+
+  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
+    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
+    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    return 1;
   fi
 
   if [[ -z "$_setup" ]]; then
@@ -4880,31 +4883,28 @@ function setup() {
     return 1;
   fi
 
-  local folder_to_execute=""
+  local folder_to_execute="$PWD"
 
-  if [[ -n "$proj_folder" && -n "$folder_arg" ]]; then
+  if [[ -n "$folder_arg" ]]; then
     folder_to_execute="${proj_folder}/${folder_arg}"
-
-    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
-
-  elif [[ -n "$proj_folder" ]]; then
-    folder_to_execute="$proj_folder"
-
-    if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then
-      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
-      
-      if (( ${#dirs[@]} )); then
-        local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
-        if [[ -z "$folder" ]]; then return 1; fi
-        
-        folder_to_execute="${proj_folder}/${folder}"
+  else
+    if [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] || ! is_proj_folder_ "$PWD" &>/dev/null; then
+      if (( single_mode )); then
+        folder_to_execute="$proj_folder"
+      else
+        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+          
+        if (( ${#dirs[@]} )); then
+          local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
+          if [[ -z "$folder" ]]; then return 1; fi
+          
+          folder_to_execute="${proj_folder}/${folder}"
+        fi
       fi
     fi
-  else
-    folder_to_execute="$PWD"
   fi
 
-  if ! is_proj_folder_ "$folder_to_execute" &>/dev/null; then return 1; fi
+  if ! is_proj_folder_ "$folder_to_execute"; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
