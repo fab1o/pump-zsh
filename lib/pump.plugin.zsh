@@ -4743,7 +4743,10 @@ function run() {
   fi
   
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
+  if (( ! i )); then
+    print "  ${yellow_cor}run -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
   if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
     print " env is incorrect, valid options are: dev, stage or prod" >&2
@@ -4855,7 +4858,10 @@ function setup() {
   fi
   
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
+  if (( ! i )); then
+    print "  ${yellow_cor}setup -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
   local proj_folder="";
   local single_mode=""
@@ -5371,7 +5377,10 @@ function clone() {
   fi
   
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
+  if (( ! i )); then
+    print "  ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
   local proj_repo=""
   local proj_folder=""
@@ -5609,7 +5618,10 @@ function jira() {
   local proj_arg="${1:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
   
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
+  if (( ! i )); then
+    print "  ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
   if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
 
@@ -7043,7 +7055,10 @@ function gha() {
 
   if [[ -n "$proj_arg" ]]; then
     local i=$(find_proj_index_ "$proj_arg")
-    (( i )) || return 1;
+    if (( ! i )); then
+      print "  ${yellow_cor}gha -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
 
     found=$i;
 
