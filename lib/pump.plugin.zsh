@@ -3856,36 +3856,76 @@ function refix() {
   if ! is_git_repo_ "$folder"; then return 1; fi
   if ! is_proj_folder_ "$folder"; then return 1; fi
 
-  last_commit_msg=$(git -C "$folder" --no-pager log -1 --pretty=format:'%s' | xargs -0)
+  if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
+    print " fatal: project is not set" >&2
+    print "  ${yellow_cor}pro${reset_cor} : to set project" >&2
+    return 1;
+  fi
+
+  if [[ -z "$CURRENT_PUMP_PKG_MANAGER" ]]; then
+    print " fatal: project's package manager is not set" >&2
+    return 1;
+  fi
+
+  local last_commit_msg=$(git -C "$folder" --no-pager log -1 --pretty=format:'%s' | xargs -0)
   
   if [[ "$last_commit_msg" == Merge* ]]; then
     print " fatal: last commit is a merge commit, create a new commit instead" >&2 
     return 1;
   fi
   
-  if ! LC_ALL=C git -C "$folder" reset --soft HEAD~1 1>/dev/null; then return 1; fi
+  if ! git -C "$folder" reset --soft HEAD~1 1>/dev/null; then return 1; fi
 
-  unsetopt monitor
-  unsetopt notify
+  if command -v gum &>/dev/null; then
+    # start spinning
+    unsetopt monitor
+    unsetopt notify
+    pipe_name=$(mktemp -u)
+    mkfifo "$pipe_name" &>/dev/null
+    gum spin --title="refixing... \"$last_commit_msg\"" -- sh -c "read < $pipe_name" &
+    spin_pid=$!
+    # start spinning
+  else
+    print " refixing... \"$last_commit_msg\""
+  fi
 
-  pipe_name=$(mktemp -u)
-  mkfifo "$pipe_name" &>/dev/null
+  local _pwd="$(pwd)"
 
-  gum spin --title="refixing... \"$last_commit_msg\"" -- sh -c "read < $pipe_name" &
-  spin_pid=$!
+  add-zsh-hook -d chpwd pump_chpwd_
+  cd "$folder"
 
-  $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null
-  $CURRENT_PUMP_PKG_MANAGER run lint &>/dev/null
-  $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null
+  local RET=1
 
-  print "   refixing... \"$last_commit_msg\""
+  if $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null; then
+    if $CURRENT_PUMP_PKG_MANAGER run lint &>/dev/null; then
+      if $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null; then
+        RET=0
+      fi
+    fi
+  fi
 
-  echo "done" > "$pipe_name" &>/dev/null
-  rm "$pipe_name"
-  wait $spin_pid &>/dev/null
+  cd "$_pwd"
+  add-zsh-hook chpwd pump_chpwd_
 
-  setopt notify
-  setopt monitor
+  if command -v gum &>/dev/null; then
+    # reset spinning
+    print "   refixing... \"$last_commit_msg\""
+    echo "done" > "$pipe_name" &>/dev/null
+    rm "$pipe_name"
+    wait $spin_pid &>/dev/null
+    setopt notify
+    setopt monitor
+    # reset spinning
+  fi
+
+  if (( RET != 0 )); then
+    $CURRENT_PUMP_PKG_MANAGER run lint --quiet --exit-on-fatal-error
+    print "" >&2
+    print " ${red_cor}fatal: refix encountered an issue that cannot be auto-fixed${reset_cor}" >&2
+    reseta "$folder" --quiet &>/dev/null
+    pull "$folder" --quiet &>/dev/null
+    return 1;
+  fi
 
   git -C "$folder" add .
   
@@ -4757,7 +4797,6 @@ function setup() {
 
   local proj_folder="";
   local _setup="${PUMP_SETUP[$i]}"
-  local pkgManager="${PUMP_PKG_MANAGER[$i]}"
 
   if [[ -n "$proj_arg" ]]; then
     if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
@@ -4827,7 +4866,9 @@ function setup() {
   local pkg_json="package.json"
   if [[ -f $pkg_json ]]; then
     local scripts=$(jq -r '.scripts // {} | to_entries[] | "\(.key)=\(.value)"' "$pkg_json")
-
+    
+    local pkgManager="${PUMP_PKG_MANAGER[$i]}"
+  
     local entry;
     for entry in ${(f)scripts}; do
       local name="${entry%%=*}"
@@ -5275,7 +5316,6 @@ function clone() {
   local _clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
   local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
-  local pkgManager="${PUMP_PKG_MANAGER[$i]}"
 
   if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
     return 1;
@@ -5445,6 +5485,8 @@ function clone() {
     print " •  ${yellow_cor}${proj_arg} -i${reset_cor} : to show the 'readme' file"
     print " --"
   fi
+
+  local pkgManager="${PUMP_PKG_MANAGER[$i]}"
 
   local pkg_json="package.json"
   if [[ -f $pkg_json ]]; then
