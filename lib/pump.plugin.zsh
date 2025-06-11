@@ -155,12 +155,16 @@ function parse_flags_() {
         
         echo "${prefix}is_$ch=1"
 
-        if [[ $valid_flags != *$ch* ]]; then
+        if [[ -n "$valid_flags" ]]; then
+          if [[ $valid_flags != *$ch* ]]; then
+            if [[ "$ch" != "d" ]]; then flags+=("-$ch"); fi
+            print " ${red_cor}fatal: invalid option: -$ch${reset_cor}" >&2
+            echo "${prefix}is_h=1"
+          elif [[ $valid_flags_pass_along == *$ch* ]]; then
+            flags+=("-$ch")
+          fi
+        else
           if [[ "$ch" != "d" ]]; then flags+=("-$ch"); fi
-          print " ${red_cor}fatal: invalid option: -$ch${reset_cor}" >&2
-          echo "${prefix}is_h=1"
-        elif [[ $valid_flags_pass_along == *$ch* ]]; then
-          flags+=("-$ch")
         fi
 
         if [[ "$ch" == "d" || "$is_debug" -eq 1 ]]; then
@@ -1907,6 +1911,10 @@ function save_jira_() {
   local i="$1"
   local jira_proj="$2"
 
+  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
+    return 0;
+  fi
+
   if [[ -z "$jira_proj" ]]; then
     confirm_ "set a JIRA project for this project?"
   else
@@ -3037,14 +3045,12 @@ function get_clone_default_branch_() {
   fi
 
   add-zsh-hook -d chpwd pump_chpwd_
-
   pushd "${folder}/.temp" &>/dev/null
   
   local default_branch=$(git config --get init.defaultBranch)
   local my_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 
   popd &>/dev/null
-
   add-zsh-hook chpwd pump_chpwd_
 
   rm -rf "${folder}/.temp" &>/dev/null
@@ -3081,7 +3087,6 @@ function get_clone_default_branch_() {
   fi
 
   echo "$selected_default_branch"
-  return 0;
 }
 
 function get_default_branch_() {
@@ -3092,16 +3097,19 @@ function get_default_branch_() {
   local proj_folder="${1:-$PWD}"
   local default_branch=""
 
-  if git -C "$proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
-    local remote_name=$(get_remote_origin_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
-    default_branch="$(LC_ALL=C git -C "$proj_folder" symbolic-ref refs/remotes/${remote_name}/HEAD 2>/dev/null)"
+  if git -C "$git_proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
+    local remote_name=$(get_remote_origin_ "$git_proj_folder")
+
+    default_branch="$(LC_ALL=C git -C "$git_proj_folder" symbolic-ref refs/remotes/${remote_name}/HEAD 2>/dev/null)"
     if [[ -z "$default_branch" ]]; then
-      default_branch=$(LC_ALL=C git -C "$proj_folder" remote show $remote_name 2>/dev/null | awk '/HEAD branch/ {print $NF}')
+      default_branch=$(LC_ALL=C git -C "$git_proj_folder" remote show $remote_name 2>/dev/null | awk '/HEAD branch/ {print $NF}')
     fi
   else
-    local branch="$(git -C "$proj_folder" config --get init.defaultBranch 2>/dev/null)"
-    default_branch=$(get_remote_branch_ -f "$branch" "$proj_folder")
+    local branch="$(git -C "$git_proj_folder" config --get init.defaultBranch 2>/dev/null)"
+    default_branch=$(get_remote_branch_ -f "$branch" "$git_proj_folder")
   fi
 
   if [[ -n "$default_branch" ]]; then
@@ -5405,11 +5413,9 @@ function clone() {
   local temp_default_branch_1=""
   local temp_default_branch_2=""
 
-  local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
-
   if (( single_mode )); then
     rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
-    if [[ -n "$working_proj_folder" || -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
+    if [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
       print " cannot clone project $proj_arg because it was set to ${pruple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
       print " either clean the folder, or  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
       return 1;
@@ -5417,6 +5423,8 @@ function clone() {
 
     folder_to_clone="$proj_folder"
   else
+    local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
+
     if [[ -n "$working_proj_folder" ]]; then
       if [[ -z "$branch_arg" ]]; then
         branch_arg=$(input_branch_name_ "type the name of your feature branch")
@@ -5430,9 +5438,8 @@ function clone() {
 
       rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
       if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
-        print " destination path already exists and is not empty: $folder_to_clone" >&2
-        print "  ${yellow_cor}${proj_arg} ${branch_folder}${reset_cor} : to go to that folder" >&2
-        return 1;
+        cd "$folder_to_clone"
+        return 0;
       fi
     fi
   fi
@@ -5444,7 +5451,7 @@ function clone() {
     if (( $? == 130 || $? == 2 )); then return 130; fi
 
     if [[ -z "$default_branch" ]]; then
-      local placeholder=$(get_default_branch_ "$working_proj_folder")
+      local placeholder=$(get_default_branch_ "$proj_folder")
       default_branch=$(input_branch_name_ "type the name of the default branch" "$placeholder")
       if [[ -z "$default_branch" ]]; then return 1; fi
     fi
@@ -5580,6 +5587,54 @@ function clone() {
   #   fi
   # fi
   
+}
+
+function jira() {
+  set +x
+  eval "$(parse_flags_ "jira_" "" "" "$@")"
+  (( jira_is_d )) && set -x
+
+  if (( jira_is_h )); then
+    print "  ${yellow_cor}jira${reset_cor} : to start working on a new JIRA ticket for current project"
+    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start working on a new JIRA ticket for a project"
+    return 0;
+  fi
+
+  local proj_arg="${1:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
+  
+  local i=$(find_proj_index_ "$proj_arg")
+  (( i )) || return 1;
+
+  if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
+
+  local jira_proj="${PUMP_JIRA_PROJ[$i]}"
+
+  if ! command -v acli &>/dev/null; then
+    print "${yellow_cor}  acli is not installed, please install it to use JIRA integration${reset_cor}" >&2
+    print "  install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+    return 1;
+  fi
+  
+  local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
+    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='In Development' OR status='In Progress'))) AND \
+    Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
+  if [[ -z "$tickets" ]]; then
+    print " no JIRA projects found" >&2
+    print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+    return 1;
+  fi
+
+  local ticket=""
+  ticket=$(choose_one_ "JIRA ticket to work on" "${(@f)$(printf "%s\n" "$tickets")}")
+  if [[ -z "$ticket" ]]; then return 1; fi
+
+  local key=${ticket%% *}
+
+  acli jira workitem assign --key="$key" --assignee="@me" --yes
+  acli jira workitem transition --key="$key" --status="In Progress" --yes
+
+  print ""
+  clone "$proj_arg" "$key"
 }
 
 function abort() {
@@ -8516,6 +8571,7 @@ function help() {
   print "  2. clone project, type:${blue_cor} clone${reset_cor}"
   print "  3. setup project, type:${blue_cor} setup${reset_cor}"
   print "  4. run a project, type:${blue_cor} run${reset_cor}"
+  print "  5. start new job, type:${blue_cor} jira${reset_cor}"
 
   if ! pause_output_; then return 0; fi
 
@@ -8540,6 +8596,7 @@ function help() {
     display_line_ "setup & run" "${blue_cor}"
     print ""
     print " ${blue_cor} clone ${reset_cor}\t = clone project or branch"
+    print " ${blue_cor} jira ${reset_cor}\t\t = start work on a new JIRA ticket"
     
     local _setup=${CURRENT_PUMP_SETUP:-$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")setup}
     local max=53
