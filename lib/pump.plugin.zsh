@@ -6967,11 +6967,11 @@ function release() {
     if ! git -C "$proj_folder" commit --no-verify --message="chore: release version $tag"; then return 1; fi
   fi
 
+  local _pwd="$(pwd)"
+  add-zsh-hook -d chpwd pump_chpwd_
+  cd "$proj_folder"
+
   if gh release view "$tag" 1>/dev/null 2>&1; then
-    local _pwd="$(pwd)"
-    add-zsh-hook -d chpwd pump_chpwd_
-    cd "$proj_folder"
-    
     if (( ! release_is_s )); then
       if ! confirm_ "$tag has already been released, delete and release again?"; then
         cd "$_pwd"
@@ -6981,10 +6981,10 @@ function release() {
     fi
     release_is_s=1
     gh release delete "$tag" --yes
-
-    cd "$_pwd"
-    add-zsh-hook chpwd pump_chpwd_
   fi
+
+  cd "$_pwd"
+  add-zsh-hook chpwd pump_chpwd_
 
   # check if tag already exists
   local existing_tag="$(git -C "$proj_folder" tag --list "$tag" 2>/dev/null)"
