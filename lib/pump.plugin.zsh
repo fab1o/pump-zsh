@@ -1131,6 +1131,60 @@ function sanitize_pkg_name_() {
 }
 
 # data checkers =========================================================
+function check_proj_() {
+  set +x
+  eval "$(parse_flags_ "check_proj_" "crfmpj" "" "$@")"
+  (( check_proj_is_d )) && set -x
+  
+  local i="$1"
+
+  if (( check_proj_is_c )); then
+    if ! check_proj_cmd_ $i "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+  fi
+
+  if (( check_proj_is_r )); then
+    if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+
+    if [[ -z "${PUMP_PROJ_REPO[$i]}" ]]; then
+      print " missing repository uri for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} : to edit project" >&2
+      return 1;
+    fi
+  fi
+
+  if (( check_proj_is_f )); then
+    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+
+    if [[ -z "${PUMP_PROJ_FOLDER[$i]}" || ! -d "${PUMP_PROJ_FOLDER[$i]}" ]]; then
+      print " missing project folder for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} : to edit project" >&2
+      return 1;
+    fi
+  fi
+
+  if (( check_proj_is_m )); then
+    if ! save_proj_mode_ -q $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}" 1>/dev/null; then return 1; fi
+  fi
+
+  if (( check_proj_is_p )); then
+    if ! check_proj_pkg_manager_ -q $i "${PUMP_PKG_MANAGER[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+
+    if [[ -z "${PUMP_PKG_MANAGER[$i]}" ]]; then
+      print " missing package manager for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      return 1;
+    fi
+  fi
+
+  if (( check_proj_is_j )); then
+    if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
+
+    if [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
+      print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      return 1;
+    fi
+  fi
+}
+
 function check_proj_cmd_() {
   set +x
   eval "$(parse_flags_ "check_proj_cmd_" "s" "" "$@")"
@@ -1146,7 +1200,7 @@ function check_proj_cmd_() {
 
 function check_proj_repo_() {
   set +x
-  eval "$(parse_flags_ "check_proj_repo_" "aes" "" "$@")"
+  eval "$(parse_flags_ "check_proj_repo_" "aesq" "aeq" "$@")"
   (( check_proj_repo_is_d )) && set -x
 
   local i="$1"
@@ -1184,13 +1238,7 @@ function check_proj_repo_() {
     print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
 
     if (( check_proj_repo_is_s )); then
-      if (( check_proj_repo_is_a )); then
-        if save_proj_repo_ -a $i "$proj_folder" "$pkg_name"; then return 0; fi
-      elif (( check_proj_repo_is_e )); then
-        if save_proj_repo_ -e $i "$proj_folder" "$pkg_name"; then return 0; fi
-      else
-        if save_proj_repo_ $i "$proj_folder" "$pkg_name"; then return 0; fi
-      fi
+      if save_proj_repo_ $i "$proj_folder" "$pkg_name" $@; then return 0; fi
     fi
 
     return 1;
@@ -1201,7 +1249,7 @@ function check_proj_repo_() {
 
 function check_proj_folder_() {
   set +x
-  eval "$(parse_flags_ "check_proj_folder_" "s" "" "$@")"
+  eval "$(parse_flags_ "check_proj_folder_" "sq" "q" "$@")"
   (( check_proj_folder_is_d )) && set -x
 
   local i="$1"
@@ -1246,7 +1294,7 @@ function check_proj_folder_() {
     print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
 
     if (( check_proj_folder_is_s )); then
-      if save_proj_folder_ -s $i "$pkg_name" "$proj_repo"; then return 0; fi
+      if save_proj_folder_ -s $i "$pkg_name" "$proj_repo" $@; then return 0; fi
     fi
 
     return 1;
@@ -1257,7 +1305,7 @@ function check_proj_folder_() {
 
 function check_proj_pkg_manager_() {
   set +x
-  eval "$(parse_flags_ "check_proj_pkg_manager_" "s" "" "$@")"
+  eval "$(parse_flags_ "check_proj_pkg_manager_" "sq" "q" "$@")"
   (( check_proj_pkg_manager_is_d )) && set -x
 
   local i="$1"
@@ -1281,7 +1329,7 @@ function check_proj_pkg_manager_() {
     print "${yellow_cor}  ${error_msg}${reset_cor}" 2>/dev/tty
 
     if (( check_proj_pkg_manager_is_s )); then
-      if save_pkg_manager_ $i "$proj_folder" "$proj_repo"; then return 0; fi
+      if save_pkg_manager_ $i "$proj_folder" "$proj_repo" $@; then return 0; fi
     fi
     return 1;
   fi
@@ -1731,9 +1779,7 @@ function save_proj_mode_() {
 
   update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
 
-  if (( save_proj_mode_is_q )); then
-    return 0;
-  fi
+  if (( save_proj_mode_is_q )); then return 0; fi
 
   clear_last_line_2_
   clear_last_line_1_
@@ -1747,7 +1793,7 @@ function save_proj_mode_() {
 
 function save_proj_folder_() {
   set +x
-  eval "$(parse_flags_ "save_proj_folder_" "aerfs" "" "$@")"
+  eval "$(parse_flags_ "save_proj_folder_" "aerfsq" "" "$@")"
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
@@ -1832,6 +1878,13 @@ function save_proj_folder_() {
     if ! check_proj_folder_ -s $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
   fi
 
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+
+  if (( save_proj_folder_is_q )); then
+    update_setting_ $i "PUMP_PROJ_FOLDER" "$proj_folder" &>/dev/null
+    return 0;
+  fi
+
   if [[ -z "$TEMP_PUMP_PROJ_FOLDER" ]]; then
     TEMP_PUMP_PROJ_FOLDER="$proj_folder"
     update_setting_ $i "PUMP_PROJ_FOLDER" "$TEMP_PUMP_PROJ_FOLDER" &>/dev/null
@@ -1844,7 +1897,7 @@ function save_proj_folder_() {
 
 function save_proj_repo_() {
   set +x
-  eval "$(parse_flags_ "save_proj_repo_" "afe" "" "$@")"
+  eval "$(parse_flags_ "save_proj_repo_" "afeq" "" "$@")"
   (( save_proj_repo_is_d )) && set -x
 
   local i="$1"
@@ -1892,6 +1945,13 @@ function save_proj_repo_() {
     fi
   fi
 
+  if [[ -z "$proj_repo" ]]; then return 1; fi
+
+  if (( save_proj_repo_is_q )); then
+    update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo" &>/dev/null
+    return 0;
+  fi
+
   if [[ -z "$TEMP_PUMP_PROJ_REPO" ]]; then
     TEMP_PUMP_PROJ_REPO="$proj_repo"
   
@@ -1905,7 +1965,7 @@ function save_proj_repo_() {
 
 function save_jira_() {
   set +x
-  eval "$(parse_flags_ "save_jira_" "fea" "" "$@")"
+  eval "$(parse_flags_ "save_jira_" "feaq" "" "$@")"
   (( save_jira_is_d )) && set -x
 
   local i="$1"
@@ -1938,11 +1998,14 @@ function save_jira_() {
     jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
     if [[ -z "$jira_proj" ]]; then return 1; fi
   
-    update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+    update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/
+    
   fi
   
   if [[ -z "$jira_proj" ]]; then return 1; fi
   
+  if (( save_jira_is_q )); then return 0; fi
+
   clear_last_line_1_
   print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
   print "" >&1
@@ -1988,9 +2051,13 @@ function save_pkg_manager_() {
 
     if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
   fi
+  
+  if [[ -z "$pkg_manager" ]]; then return 1; fi
 
   update_setting_ $i "PUMP_PKG_MANAGER" "$pkg_manager" &>/dev/null
-  
+
+  if (( save_pkg_manager_is_q )); then return 0; fi
+
   clear_last_line_1_
   print "  ${SAVE_PROJ_COR}package manager:${reset_cor} ${pkg_manager}" >&1
   print "" >&1
@@ -4553,9 +4620,7 @@ function pr() {
 
   if ! is_git_repo_; then return 1; fi
 
-  if gh pr view --web &>/dev/null; then
-    return 0;
-  fi
+  if gh pr view --web &>/dev/null; then return 0; fi
 
   # local git_status=$(git status --porcelain 2>/dev/null)
   # if [[ -n "$git_status" ]]; then
@@ -4716,8 +4781,8 @@ function run() {
     if (( i )); then
       proj_arg="$1"
       if [[ "$2" == "dev" || "$2" == "stage" || "$2" == "prod" ]]; then
-        if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}" 1>/dev/null; then return 1; fi
-
+        if ! check_proj_ -m $i; then return 1; fi
+        
         local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
         if (( single_mode )); then
@@ -4754,8 +4819,6 @@ function run() {
     return 1;
   fi
 
-  local proj_folder=""
-  local single_mode=""
   local _run="${PUMP_RUN[$i]}"
 
   if [[ "$_env" == "stage" ]]; then
@@ -4764,21 +4827,10 @@ function run() {
     _run="${PUMP_RUN_PROD[$i]}"
   fi
 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
-    return 1;
-  fi
-  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  if ! check_proj_ -fm $i; then return 1; fi
 
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
-    return 1;
-  fi
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-
-  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   if [[ -z "$_run" ]]; then
     print " missing PUMP_RUN_$i" >&2
@@ -4863,25 +4915,12 @@ function setup() {
     return 1;
   fi
 
-  local proj_folder="";
-  local single_mode=""
   local _setup="${PUMP_SETUP[$i]}"
+  
+  if ! check_proj_ -fm $i; then return 1; fi
 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
-    return 1;
-  fi
-  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
-    return 1;
-  fi
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-
-  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   if [[ -z "$_setup" ]]; then
     print " missing PUMP_SETUP_$i" >&2
@@ -5036,29 +5075,17 @@ function revs() {
   fi
 
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
-
-  local proj_folder=""
-  local single_mode=""
-
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "${PUMP_PROJ_REPO[$i]}"; then
+  if (( ! i )); then
+    print " run ${yellow_cor}revs -h${reset_cor} : to see usage" >&2
     return 1;
   fi
-  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
-    return 1;
-  fi
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+  if ! check_proj_ -fm $i; then return 1; fi
 
-  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   local revs_folder=$(get_revs_folder_ "$proj_folder" "$single_mode")
-
   local rev_options=(${~revs_folder}/rev.*(N/))
 
   if [[ ${#rev_options[@]} -eq 0 ]]; then
@@ -5112,45 +5139,20 @@ function rev() {
   fi
 
   local i=$(find_proj_index_ "$proj_arg")
-  (( i )) || return 1;
-
-  local proj_repo=""
-  local proj_folder=""
-  local single_mode=""
-  local _setup=""
-  local _clone=""
-  local code_editor=""
-
-  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-    return 1;
-  fi
-  proj_repo="${PUMP_PROJ_REPO[$i]}"
-
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
-    return 1;
-  fi
-  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
-    return 1;
-  fi
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-
-  _setup="${PUMP_SETUP[$i]}"
-  _clone="${PUMP_CLONE[$i]}"
-  code_editor="${PUMP_CODE_EDITOR[$i]}"
-
-  if [[ -z "$proj_repo" ]]; then
-    print " missing repository uri for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+  if (( ! i )); then
+    print " run ${yellow_cor}rev -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
-  if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
-    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
+  local _setup="${PUMP_SETUP[$i]}"
+  local _clone="${PUMP_CLONE[$i]}"
+  local code_editor="${PUMP_CODE_EDITOR[$i]}"
+
+  if ! check_proj_ -rfm $i; then return 1; fi
+
+  local proj_repo="${PUMP_PROJ_REPO[$i]}"
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   local revs_folder="$(get_revs_folder_ "$proj_folder" "$single_mode")"
 
@@ -5382,46 +5384,15 @@ function clone() {
     return 1;
   fi
 
-  local proj_repo=""
-  local proj_folder=""
-  local single_mode=""
   local _clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
   local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
 
-  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-    return 1;
-  fi
-  proj_repo="${PUMP_PROJ_REPO[$i]}"
+  if ! check_proj_ -rfm $i; then return 1; fi
 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then
-    return 1;
-  fi
-  proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then
-    return 1;
-  fi
-  single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
-
-  if [[ -z "$proj_repo" ]]; then
-    print " missing repository uri for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
-
-  if [[ -z "$proj_folder" ]]; then
-    print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
-    return 1;
-  fi
-
-  if [[ ! -d "$proj_folder" ]]; then
-    if ! mkdir -p "$proj_folder"; then
-      print " fatal: failed to create project folder: $proj_folder" >&2
-      return 1;
-    fi
-  fi
+  local proj_repo="${PUMP_PROJ_REPO[$i]}"
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
   local folder_to_clone=""
 
@@ -5630,13 +5601,12 @@ function jira() {
     return 1;
   fi
 
-  if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then return 1; fi
-  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then return 1; fi
+  if ! check_proj_ -jfm $i; then return 1; fi
   
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
   local jira_proj="${PUMP_JIRA_PROJ[$i]}"
+  
   local jira_status="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
 
   if (( single_mode )); then
@@ -7082,16 +7052,11 @@ function gha() {
 
     found=$i;
 
-    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then
-      return 1;
-    fi
+    if ! check_proj_ -fr $i; then return 1; fi
     
     proj_folder=$(get_proj_for_git_ "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg")
     if [[ -z "$proj_folder" ]]; then return 1; fi
 
-    if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg"; then
-      return 1;
-    fi
     proj_repo="${PUMP_PROJ_REPO[$i]}"
 
     gha_interval="${PUMP_GHA_INTERVAL[$i]}"
@@ -7158,26 +7123,26 @@ function gha() {
   return $RET;
 }
 
-function is_branch_() {
-  set +x
-  eval "$(parse_flags_ "is_branch_" "alr" "" "$@")"
-  (( abort_is_d )) && set -x
+# function is_branch_() {
+#   set +x
+#   eval "$(parse_flags_ "is_branch_" "alr" "" "$@")"
+#   (( abort_is_d )) && set -x
 
-  local branch="$1"
-  local folder="${2:-$PWD}"
+#   local branch="$1"
+#   local folder="${2:-$PWD}"
 
-  # check if branch exists locally
-  if git show-ref --verify --quiet "refs/heads/$branch"; then
-    return 0;
-  fi
+#   # check if branch exists locally
+#   if git show-ref --verify --quiet "refs/heads/$branch"; then
+#     return 0;
+#   fi
 
-  # check if it exists remotely (on origin)
-  if git ls-remote --heads origin "$branch" | grep -q "$branch"; then
-    return 0;
-  fi
+#   # check if it exists remotely (on origin)
+#   if git ls-remote --heads origin "$branch" | grep -q "$branch"; then
+#     return 0;
+#   fi
   
-  return 1; # not a branch
-}
+#   return 1; # not a branch
+# }
 
 function co() {
   set +x
@@ -8240,35 +8205,22 @@ function pro() {
   fi
 }
 
+# project handler =========================================================
+# pump()
 function proj_handler() {
-  # project handler =========================================================
-  # pump()
   local i="$1"
   shift
 
-  local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
-  local working="${PUMP_WORKING[$i]}"
-
-  if ! save_proj_mode_ -q $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
-  
-  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]:-1}"
-
   set +x
-  if (( single_mode)); then
-    eval "$(parse_flags_ "proj_handler_" "eincu" "" "$@")"
-  else
-    eval "$(parse_flags_ "proj_handler_" "meincu" "" "$@")"
-  fi
+  eval "$(parse_flags_ "proj_handler_" "meincu" "" "$@")"
   (( proj_handler_is_d )) && set -x
 
-  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_cmd" "${PUMP_PROJ_REPO[$i]}"; then
-    return 1;
-  fi
+  if ! check_proj_ -fm $i; then return 1; fi
 
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if [[ -z "$proj_folder" ]]; then return 1; fi
-
+  local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
 
   if (( proj_handler_is_h )); then
     (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd${reset_cor} : to open a $proj_cmd folder"
