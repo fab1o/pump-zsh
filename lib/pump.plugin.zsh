@@ -1924,8 +1924,8 @@ function save_jira_() {
   if (( RET == 130 || RET == 2 )); then return 130; fi
   if (( RET == 0 )); then
     if ! command -v acli &>/dev/null; then
-      print "${yellow_cor}  acli is not installed, please install it to use JIRA integration${reset_cor}" >&2
-      print "  install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+      print " acli is not installed" >&2
+      print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
       return 1;
     fi
     local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
@@ -2928,7 +2928,7 @@ function get_proj_for_git_() {
   print " fatal: could not locate a repository folder: $folder" >&2
 
   if [[ -n "$proj_cmd" ]]; then
-    print "  ${yellow_cor}clone $proj_cmd${reset_cor} : to clone project" >&2
+    print " run ${yellow_cor}clone $proj_cmd${reset_cor} : to clone project" >&2
   fi
 
   return 1;
@@ -3912,7 +3912,7 @@ function refix() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}refix -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}refix -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -3923,7 +3923,7 @@ function refix() {
 
   if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print " fatal: project is not set" >&2
-    print "  ${yellow_cor}pro${reset_cor} : to set project" >&2
+    print " run ${yellow_cor}pro${reset_cor} : to set project" >&2
     return 1;
   fi
 
@@ -4040,7 +4040,7 @@ function covc() {
 
   if [[ -z "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print " fatal: project is not set"
-    print " ${yellow_cor}pro${reset_cor} : to set project" >&2
+    print " run ${yellow_cor}pro${reset_cor} : to set project" >&2
     return 1;
   fi
 
@@ -4066,7 +4066,7 @@ function covc() {
 
   if [[ -z "$branch_arg" ]]; then
     print " fatal: not a valid branch argument" >&2
-    print "  ${yellow_cor}covc -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}covc -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -4744,13 +4744,13 @@ function run() {
   
   local i=$(find_proj_index_ "$proj_arg")
   if (( ! i )); then
-    print "  ${yellow_cor}run -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}run -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
   if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
     print " env is incorrect, valid options are: dev, stage or prod" >&2
-    print "  ${yellow_cor}run -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}run -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -4776,7 +4776,7 @@ function run() {
 
   if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
     print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
@@ -4859,7 +4859,7 @@ function setup() {
   
   local i=$(find_proj_index_ "$proj_arg")
   if (( ! i )); then
-    print "  ${yellow_cor}setup -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}setup -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -4879,7 +4879,7 @@ function setup() {
 
   if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
     print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
@@ -5024,14 +5024,14 @@ function revs() {
 
     if (( valid_project == 0 )); then
       print " fatal: not a valid project: $1" >&2
-      print "  ${yellow_cor}revs -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}revs -h${reset_cor} : to see usage" >&2
       return 1;
     fi
   fi
 
   if [[ -z "$proj_arg" ]]; then
     print " no project is set" >&2
-    print "  ${yellow_cor}pro${reset_cor} : to set project" >&2
+    print " run ${yellow_cor}pro${reset_cor} : to set project" >&2
     return 1;
   fi
 
@@ -5053,7 +5053,7 @@ function revs() {
 
   if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
     print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
@@ -5066,7 +5066,7 @@ function revs() {
     if [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
       print -n "  ${yellow_cor}$proj_arg${reset_cor} then" >&2
     fi
-    print "  ${yellow_cor}rev${reset_cor} : to open a review" >&2
+    print " run ${yellow_cor}rev${reset_cor} : to open a review" >&2
     return 1;
   fi
 
@@ -5142,13 +5142,13 @@ function rev() {
 
   if [[ -z "$proj_repo" ]]; then
     print " missing repository uri for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
   if [[ -z "$proj_folder" || ! -d "$proj_folder" ]]; then
     print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
@@ -5168,7 +5168,7 @@ function rev() {
 
     if [[ -z "$branch" ]]; then
       print " fatal: not a valid branch argument" >&2
-      print "  ${yellow_cor}rev -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}rev -h${reset_cor} : to see usage" >&2
       return 1;
     fi
 
@@ -5361,14 +5361,14 @@ function clone() {
         branch_arg="$1"
       else
         print " fatal: not a valid project or branch: $1" >&2
-        print "  ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
+        print " run ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
         return 1;
       fi
     fi
   else
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
       print " no projects found" >&2
-      print "  ${yellow_cor}pro -a${reset_cor} : to add a project" >&2
+      print " run ${yellow_cor}pro -a${reset_cor} : to add a project" >&2
       return 1;
     fi
 
@@ -5378,7 +5378,7 @@ function clone() {
   
   local i=$(find_proj_index_ "$proj_arg")
   if (( ! i )); then
-    print "  ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -5406,13 +5406,13 @@ function clone() {
 
   if [[ -z "$proj_repo" ]]; then
     print " missing repository uri for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
   if [[ -z "$proj_folder" ]]; then
     print " missing project folder or project folder doesn't exist for $proj_arg" >&2
-    print "  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
+    print " run ${yellow_cor}$proj_arg -e${reset_cor} : to edit project" >&2
     return 1;
   fi
 
@@ -5485,7 +5485,7 @@ function clone() {
     remote_branch=$(get_remote_branch_ "$branch_arg" "$proj_folder")
 
     if [[ -n "$remote_branch" ]]; then
-      print " fatal: branch already exists on remote: $branch_arg "
+      print " fatal: branch already exists on remote: $branch_arg" >&2
       return 1;
     fi
   fi
@@ -5503,6 +5503,7 @@ function clone() {
     folder_to_clone="${proj_folder}/${branch_folder}"
   fi
 
+  rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
   if command -v gum &>/dev/null; then
     if ! gum spin --title="cloning... $proj_repo on branch: $branch_arg" -- git clone "$proj_repo" "$folder_to_clone"; then
       print " failed to clone, either folder is not empty or have no access rights: $proj_repo" >&2
@@ -5623,19 +5624,38 @@ function jira() {
     return 1;
   fi
 
-  if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
+  if ! command -v acli &>/dev/null; then
+    print " acli is not installed" >&2
+    print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+    return 1;
+  fi
 
+  if ! save_jira_ -a $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi 
+  if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_arg" "$proj_repo"; then return 1; fi
+  if ! save_proj_mode_ $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "$proj_folder" 1>/dev/null; then return 1; fi
+  
+  local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
   local jira_proj="${PUMP_JIRA_PROJ[$i]}"
   local jira_status="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
 
-  if ! command -v acli &>/dev/null; then
-    print "${yellow_cor}  acli is not installed, please install it to use JIRA integration${reset_cor}" >&2
-    print "  install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
-    return 1;
+  if (( single_mode )); then
+    if [[ ! -d "$proj_folder" || -z "$(ls "$proj_folder" 2>/dev/null)" ]]; then
+      print " cannot run jira before cloning the project" >&2
+      print " run ${yellow_cor}clone${reset_cor}" >&2
+      return 1;
+    fi
+  else
+    local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
+    if [[ -z "$working_proj_folder" || ! -d "$working_proj_folder" || -z "$(ls "$working_proj_folder" 2>/dev/null)" ]]; then
+      print " cannot run jira before cloning the project" >&2
+      print " run ${yellow_cor}clone${reset_cor}" >&2
+      return 1;
+    fi
   fi
   
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
-    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='Build' OR status='In Development' OR status='In Progress'))) AND \
+    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_status'))) AND \
     Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
     print " no JIRA projects found" >&2
@@ -5696,7 +5716,7 @@ function renb() {
 
   if [[ -z "$new_name" ]]; then
     print " missing branch name" >&2
-    print "  ${yellow_cor}renb -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}renb -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -5729,7 +5749,7 @@ function chp() {
 
   if [[ -z "$1" ]]; then
     print " missing commit hash" >&2
-    print "  ${yellow_cor}chp -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}chp -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -6024,7 +6044,7 @@ function fetch() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}fetch -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}fetch -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6093,7 +6113,7 @@ function glog() {
       folder="$2"
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}push -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6103,7 +6123,7 @@ function glog() {
       fi
     else
       print " fatal: not a valid branch argument" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}push -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6170,7 +6190,7 @@ function push() {
       folder="$2"
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}push -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6178,7 +6198,7 @@ function push() {
       branch_arg="$1"
     else
       print " fatal: not a valid branch argument" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}push -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6268,7 +6288,7 @@ function pushf() {
       folder="$2"
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}pushf -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6276,7 +6296,7 @@ function pushf() {
       branch_arg="$1"
     else
       print " fatal: not a valid branch argument" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}pushf -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6401,7 +6421,7 @@ function pull() {
       folder="$2"
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6409,7 +6429,7 @@ function pull() {
       branch_arg="$1"
     else
       print " fatal: not a valid branch argument" >&2
-      print "  ${yellow_cor}push -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -6785,7 +6805,7 @@ function restore() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}restore -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}restore -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6817,7 +6837,7 @@ function clean() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}clean -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}clean -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6849,7 +6869,7 @@ function discard() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}discard -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}discard -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6884,7 +6904,7 @@ function reseta() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}reseta -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}reseta -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6926,7 +6946,7 @@ function glr() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}prune -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}glr -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -6967,7 +6987,7 @@ function gll() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}prune -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}gll -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -7056,7 +7076,7 @@ function gha() {
   if [[ -n "$proj_arg" ]]; then
     local i=$(find_proj_index_ "$proj_arg")
     if (( ! i )); then
-      print "  ${yellow_cor}gha -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}gha -h${reset_cor} : to see usage" >&2
       return 1;
     fi
 
@@ -7205,8 +7225,8 @@ function co() {
       print " succeed detached pull request: ${green_cor}${pr[3]}${reset_cor}"
       print " HEAD is now at $(git log -1 --pretty=format:'%h %s')"
       print " your branch is detached, you may now run:"
-      print "  ${yellow_cor}co ${pr[2]}${reset_cor} : to switch to the branch"
-      print "  ${yellow_cor}co ${${USER:0:1}:l}-${pr[2]} ${default_branch}${reset_cor} : to create branch off of a base branch"
+      print " run ${yellow_cor}co ${pr[2]}${reset_cor} : to switch to the branch"
+      print " run ${yellow_cor}co ${${USER:0:1}:l}-${pr[2]} ${default_branch}${reset_cor} : to create branch off of a base branch"
     fi
 
     return $RET;
@@ -7214,7 +7234,7 @@ function co() {
 
   if (( co_is_p || co_is_r )); then
     print " ${red_cor}fatal: invalid option${reset_cor}" >&2
-    print "  ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
+    print " run ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
     return 1;
   fi
 
@@ -7268,7 +7288,7 @@ function co() {
       co "$branch" "$base_branch"
     else
       print " fatal: cannot create branch from detached branch" >&2
-      print "  ${yellow_cor}co <branch> <base_branch>${reset_cor} : to create branch off of a base branch"
+      print " run ${yellow_cor}co <branch> <base_branch>${reset_cor} : to create branch off of a base branch"
       return 1;
     fi
   fi
@@ -7504,7 +7524,7 @@ function rebase() {
       (( arg_count++ ))
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}rebase -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}rebase -h${reset_cor} : to see usage" >&2
       return 1;
     fi
   fi
@@ -7601,7 +7621,7 @@ function merge() {
       (( arg_count++ ))
     else
       print " fatal: not a valid folder argument: $2" >&2
-      print "  ${yellow_cor}merge -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}merge -h${reset_cor} : to see usage" >&2
       return 1;
     fi
   fi
@@ -7685,7 +7705,7 @@ function prune() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}prune -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}prune -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -7761,7 +7781,7 @@ function delb() {
 
   if (( delb_is_s && delb_is_r )); then
     print " ${red_cor}fatal: cannot use -s and -r together${reset_cor}" >&2
-    print "  ${yellow_cor}delb -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}delb -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -7828,7 +7848,7 @@ function st() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print "  ${yellow_cor}st -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}st -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     shift
@@ -7988,7 +8008,7 @@ function pro() {
     done
 
     print " fatal: no more slots available, please remove a project to add a new one" >&2
-    print "  ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
     return 1;
   fi
 
@@ -8003,7 +8023,7 @@ function pro() {
       done
       if (( ${#projects[@]} == 0 )); then
         print " fatal: no projects to remove" >&2
-        print "  ${yellow_cor}pro -l${reset_cor} : to see available projects" >&2
+        print " run ${yellow_cor}pro -l${reset_cor} : to see available projects" >&2
         return 1;
       fi
       
@@ -8179,7 +8199,7 @@ function pro() {
       print " fatal: not a valid project argument" >&2
     fi
 
-    print "  ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
+    print " run ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
     pro -l
     
     return 1;
@@ -8306,7 +8326,7 @@ function proj_handler() {
         folder_arg="$1"
       else
         print " fatal: not a valid folder argument: $1" >&2
-        print "  ${yellow_cor}$proj_cmd -h${reset_cor} : to see usage" >&2
+        print " run ${yellow_cor}$proj_cmd -h${reset_cor} : to see usage" >&2
         return 1;
       fi
     fi
