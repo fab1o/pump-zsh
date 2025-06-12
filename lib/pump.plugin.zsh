@@ -2792,6 +2792,8 @@ function which_pro_index_pwd_() {
 function is_project_() {
   local proj_arg="$1"
 
+  if [[ -z "$proj_arg" ]]; then return 1; fi
+
   local i=0
   for i in {1..9}; do
     if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -3055,9 +3057,17 @@ function get_proj_for_git_() {
   local folder="${1:-$PWD}"
   local proj_cmd="$2"
 
-  folder="$(realpath -- "$folder" 2>/dev/null)"
+  local real_folder="$(realpath -- "$folder" 2>/dev/null)"
 
-  if [[ -z "$folder" ]]; then return 1; fi
+  if [[ -z "$real_folder" ]]; then
+    print " fatal: not a valid folder: $proj_folder" >&2
+    if [[ -n "$proj_cmd" ]]; then
+      print " run ${yellow_cor}$proj_cmd -e${reset_cor} : to edit project" >&2
+    fi
+    return 1;
+  fi
+
+  folder="$real_folder"
 
   if is_git_repo_ "$folder" &>/dev/null; then
     echo "$folder"
@@ -3157,7 +3167,7 @@ function get_remote_branch_() {
   local branch="$1"
   local proj_folder="${2-$PWD}"
 
-  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   # get_remote_branch_ -r
@@ -3267,7 +3277,7 @@ function get_default_branch_() {
   local proj_folder="${1:-$PWD}"
   local default_branch=""
 
-  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   if git -C "$git_proj_folder" rev-parse --is-inside-work-tree &>/dev/null; then
@@ -3299,7 +3309,7 @@ function get_repo_() {
   local proj_folder="${1-$PWD}"
   local branch="$2"
 
-  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   local remote_name=$(get_remote_origin_ "$proj_folder")
@@ -3415,7 +3425,7 @@ function select_branch_() {
   local proj_folder="${3:-$PWD}"
   local exclude_branches=(${@:4})
 
-  local git_proj_folder=$(get_proj_for_git_ "$proj_folder")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   local remote_name=$(get_remote_origin_ "$git_proj_folder")
@@ -3497,7 +3507,7 @@ function select_pr_() {
 
   local pr_list=""
 
-  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_cmd")
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_cmd" 2>/dev/null)
   if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
   add-zsh-hook -d chpwd pump_chpwd_
@@ -5808,17 +5818,17 @@ function jira() {
     return 0;
   fi
 
+  if ! command -v acli &>/dev/null; then
+    print " acli is not installed" >&2
+    print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+    return 1;
+  fi
+
   local proj_arg="${1:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
   
   local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print "  ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
-    return 1;
-  fi
-
-  if ! command -v acli &>/dev/null; then
-    print " acli is not installed" >&2
-    print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
     return 1;
   fi
 
@@ -6554,37 +6564,61 @@ function dtag() {
   (( dtag_is_d )) && set -x
 
   if (( dtag_is_h )); then
-    print "  ${yellow_cor}dtag${reset_cor} : to delete a tag"
+    print "  ${yellow_cor}dtag ${solid_yellow_cor}<pro>${reset_cor} : to delete a project's tag"
     print "  ${yellow_cor}dtag ${solid_yellow_cor}<name>${reset_cor} : to delete a tag directly"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local tag=""
+
+  if is_project_ "$1"; then
+    proj_arg="$1"
+    if [[ -n "$2" && $2 != -* ]]; then
+      tag="$2"
+    fi
+  elif [[ -n "$1" && $1 != -* ]]; then
+    tag="$1"
+  fi
   
-  prune --quiet
+  local i=$(find_proj_index_ -o "$proj_arg")
+  if (( ! i )); then
+    print "  ${yellow_cor}dtag -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
-  local remote_name="$(get_remote_origin_)"
+  if ! check_proj_ -f $i; then return 1; fi
+  
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
 
-  if [[ -z "$1" ]]; then
+  proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+  
+  prune "$proj_folder"
+
+  local remote_name="$(get_remote_origin_ "$proj_folder")"
+
+  if [[ -z "$tag" ]]; then
     # list all tags suing tags command then use choose_multiple_ to select tags, then delete all selected tags
-    local tags=$(tags 2>/dev/null)
+    local tags=$(tags "$proj_arg" 2>/dev/null)
     if [[ -z "$tags" ]]; then
       print " no tags found to delete" >&2
       return 0;
     fi
+
     local selected_tags=($(choose_multiple_ "tags to delete" $(echo "$tags" | tr '\n' ' ')))
-    if [[ -z "$selected_tags" ]]; then
-      return 1;
-    fi
+    if [[ -z "$selected_tags" ]]; then return 1; fi
+
     for tag in $selected_tags; do
-      git tag "$remote_name" --delete "$tag" 2>/dev/null
-      git push "$remote_name" --delete "$tag" ${@:2} 2>/dev/null
+      git -C "$proj_folder" tag "$remote_name" --delete "$tag" 2>/dev/null
+      git -C "$proj_folder" push "$remote_name" --delete "$tag" 2>/dev/null
     done
+
     return 0;
   fi
 
-  git tag "$remote_name" --delete "$1" 2>/dev/null
-  git push "$remote_name" --delete "$1" 2>/dev/null
+  git -C "$proj_folder" tag "$remote_name" --delete "$tag" 2>/dev/null
+  git -C "$proj_folder" push "$remote_name" --delete "$tag" 2>/dev/null
 
   return 0; # don't care if it fails to delete, consider success
 }
@@ -6684,8 +6718,8 @@ function drelease() {
   (( drelease_is_d )) && set -x
 
   if (( drelease_is_h )); then
-    print "  ${yellow_cor}drelease${reset_cor} : to delete a release and the tag"
-    print "  ${yellow_cor}drelease ${solid_yellow_cor}<tag>${reset_cor} : to delete a release and the tag directly"
+    print "  ${yellow_cor}drelease ${solid_yellow_cor}<pro>${reset_cor} : to delete a project's release and the tag"
+    print "  ${yellow_cor}drelease ${solid_yellow_cor}<tag>${reset_cor} : to delete a project's release and the tag directly"
     return 0;
   fi
 
@@ -6695,36 +6729,76 @@ function drelease() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local tag=""
 
-  local tag="$1"
+  if is_project_ "$1"; then
+    proj_arg="$1"
+    if [[ -n "$2" && $2 != -* ]]; then
+      tag="$2"
+    fi
+  elif [[ -n "$1" && $1 != -* ]]; then
+    tag="$1"
+  fi
+  
+  local i=$(find_proj_index_ -o "$proj_arg")
+  if (( ! i )); then
+    print "  ${yellow_cor}drelease -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
+
+  proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
+
+  if ! check_proj_ -f $i; then return 1; fi
+  
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
 
   if [[ -z "$tag" ]]; then
-    local tags=$(tags 2>/dev/null)
+    local tags=$(tags "$proj_arg" 2>/dev/null)
     if [[ -z "$tags" ]]; then
       print " no tags found to delete" >&2
       return 0;
     fi
 
     local selected_tags=($(choose_multiple_ "tags to delete" $(echo "$tags" | tr '\n' ' ')))
-    if [[ -z "$selected_tags" ]]; then
-      return 1;
-    fi
+    if [[ -z "$selected_tags" ]]; then return 1; fi
 
-    for tag in $selected_tags; do
+    local _pwd="$(pwd)"
+
+    add-zsh-hook -d chpwd pump_chpwd_
+    cd "$proj_folder"
+
+    for tag in ${selected_tags[@]}; do
       if command -v gum &>/dev/null; then
-        if ! gum spin --title="deleting... $tag" -- gh release delete "$tag" --cleanup-tag -y; then continue; fi
+        if ! gum spin --title="deleting... $tag" -- gh release delete "$tag" --cleanup-tag -y; then
+          dtag "$proj_arg" "$tag" &>/dev/null
+        fi
       else
         print " deleting... $tag"
-        if ! gh release delete "$tag" --cleanup-tag -y; then continue; fi
+        if ! gh release delete "$tag" --cleanup-tag -y; then
+          dtag "$proj_arg" "$tag" &>/dev/null
+        fi
       fi
       print " ${magenta_cor}deleted${reset_cor} $tag"
     done
-
+    
+    cd "$_pwd"
+    add-zsh-hook chpwd pump_chpwd_
     return 0;
   fi
 
+  local _pwd="$(pwd)"
+
+  add-zsh-hook -d chpwd pump_chpwd_
+  cd "$proj_folder"
+
   gh release delete "$tag" --cleanup-tag -y
+
+  cd "$_pwd"
+  add-zsh-hook chpwd pump_chpwd_
 
   return 0; # don't care if it fails to delete, consider success
 }
@@ -6735,7 +6809,7 @@ function release() {
   (( release_is_d )) && set -x
 
   if (( release_is_h )); then
-    print "  ${yellow_cor}release${reset_cor} : to create a new release of package.json version"
+    print "  ${yellow_cor}release ${solid_yellow_cor}<pro>${reset_cor} : to create a new release of package.json version"
     print "  ${yellow_cor}release ${solid_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
     print "  ${yellow_cor}release -s${reset_cor} : to skip confirmation"
     print "  --"
@@ -6751,19 +6825,45 @@ function release() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
-  if ! is_proj_folder_; then return 1; fi
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local tag=""
 
-  local my_branch="$(git branch --show-current)"
+  if is_project_ "$1"; then
+    proj_arg="$1"
+    if [[ -n "$2" && $2 != -* ]]; then
+      tag="$2"
+    fi
+  elif [[ -n "$1" && $1 != -* ]]; then
+    tag="$1"
+  fi
+  
+  local i=$(find_proj_index_ -o "$proj_arg")
+  if (( ! i )); then
+    print "  ${yellow_cor}release -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
+
+  proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
+
+  if ! check_proj_ -f $i; then return 1; fi
+  
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+
+  if ! is_proj_folder_ "$proj_folder"; then return 1; fi
+
+  local my_branch="$(git -C "$proj_folder" branch --show-current)"
 
   if [[ -z "$my_branch" ]]; then
     print " branch is detached, cannot create release" >&2
     return 1;
   fi
 
-  if [[ -n "$(git status --porcelain)" ]]; then
+  if [[ -n "$(git -C "$proj_folder" status --porcelain)" ]]; then
     print " uncommitted changes detected, cannot create release" >&2
-    st
+    st "$proj_folder"
     return 1;
   fi
 
@@ -6771,8 +6871,6 @@ function release() {
   if ! [[ "$my_branch" =~ ^(main|master|stage|staging|prod|production|release)$ || "$my_branch" == release* ]]; then
     print " ${yellow_cor}warning: unconventional branch to release: $my_branch ${yellow_cor}"
   fi
-
-  local tag="$1"
 
   if [[ -z "$tag" ]]; then
     if command -v npm &>/dev/null; then
@@ -6785,23 +6883,34 @@ function release() {
         release_type="patch"
       fi
 
-      if ! pull --quiet; then return 1; fi
+      if ! pull "$proj_folder" --quiet; then return 1; fi
+
+      local _pwd="$(pwd)"
+
+      add-zsh-hook -d chpwd pump_chpwd_
+      cd "$proj_folder"
 
       if [[ -n "$release_type" ]]; then
         if ! npm version "$release_type" --no-commit-hooks --no-git-tag-version &>/dev/null; then
           print " fatal: not able to bump version: $release_type" >&2
+
+          cd "$_pwd"
+          add-zsh-hook chpwd pump_chpwd_
           return 1;
         fi
       fi
 
       tag="$(npm pkg get version --workspaces=false | tr -d '"' 2>/dev/null)"
+      
+      cd "$_pwd"
+      add-zsh-hook chpwd pump_chpwd_
     fi
 
     if [[ -z "$tag" ]]; then
       local latest_tag=$(tags 1 2>/dev/null)
       local pkg_tag=""
 
-      pkg_tag="$(get_from_pkg_json_ "version")"
+      pkg_tag="$(get_from_pkg_json_ "version" "$proj_folder")"
 
       if [[ -n "$latest_tag" && "$latest_tag" =~ ^v[0-9]+.[0-9]+.[0-9]+$ ]]; then
         latest_tag=${latest_tag#v}
@@ -6847,43 +6956,59 @@ function release() {
 
   if (( ! release_is_s )); then
     if ! confirm_ "create release: $tag ?"; then
-      clean
+      clean "$proj_folder"
       return 1;
     fi
   fi
 
   # check of git status is dirty
-  local git_status=$(git status --porcelain 2>/dev/null)
+  local git_status=$(git -C "$proj_folder" status --porcelain 2>/dev/null)
   if [[ -n "$git_status" ]]; then
-    if ! git add .; then return 1; fi
-    if ! git commit --no-verify --message="chore: release version $tag"; then return 1; fi
+    if ! git -C "$proj_folder" add .; then return 1; fi
+    if ! git -C "$proj_folder" commit --no-verify --message="chore: release version $tag"; then return 1; fi
   fi
-  
+
+  add-zsh-hook -d chpwd pump_chpwd_
+  cd "$proj_folder"
+
   if gh release view "$tag" 1>/dev/null 2>&1; then
     if (( ! release_is_s )); then
       if ! confirm_ "$tag has already been released, delete and release again?"; then
+        cd "$_pwd"
+        add-zsh-hook chpwd pump_chpwd_
         return 1;
       fi
     fi
     release_is_s=1
     gh release delete "$tag" --yes
+
+    cd "$_pwd"
+    add-zsh-hook chpwd pump_chpwd_
   fi
 
   # check if tag already exists
-  local existing_tag="$(git tag --list "$tag" 2>/dev/null)"
+  local existing_tag="$(git -C "$proj_folder" tag --list "$tag" 2>/dev/null)"
   if [[ -n "$existing_tag" ]]; then
     if (( ! release_is_s )); then
       if ! confirm_ "$tag already exists, delete and release again?"; then
         return 1;
       fi
     fi
-    if ! dtag "$tag" --quiet; then return 1; fi
+    if ! dtag "$proj_arg" "$tag" --quiet; then return 1; fi
   fi
 
-  if ! tag "$tag"; then return 1; fi
-  if ! push --tags --quiet; then return 1; fi
+  if ! tag "$proj_arg" "$tag"; then return 1; fi
+  if ! push "$proj_folder" --tags --quiet; then return 1; fi
+
+  local _pwd="$(pwd)"
+
+  add-zsh-hook -d chpwd pump_chpwd_
+  cd "$proj_folder"
 
   gh release create "$tag" --title="$tag" --generate-notes
+
+  cd "$_pwd"
+  add-zsh-hook chpwd pump_chpwd_
 }
 
 function tag() {
@@ -6892,20 +7017,44 @@ function tag() {
   (( tag_is_d )) && set -x
 
   if (( tag_is_h )); then
-    print " release_ = ${yellow_cor}tag${reset_cor} : to create a new tag from package.json version"
+    print " release_ = ${yellow_cor}tag ${solid_yellow_cor}<pro>${reset_cor} : to create a new tag for a project"
     print " release_ = ${yellow_cor}tag ${solid_yellow_cor}<name>${reset_cor} : to create a new tag directly"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
-  if ! is_proj_folder_; then return 1; fi
-  
-  prune &>/dev/null
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local tag=""
 
-  local tag="$1"
+  if is_project_ "$1"; then
+    proj_arg="$1"
+    if [[ -n "$2" && $2 != -* ]]; then
+      tag="$2"
+    fi
+  elif [[ -n "$1" && $1 != -* ]]; then
+    tag="$1"
+  fi
+  
+  local i=$(find_proj_index_ -o "$proj_arg")
+  if (( ! i )); then
+    print "  ${yellow_cor}tag -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
+
+  proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
+
+  if ! check_proj_ -f $i; then return 1; fi
+  
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+
+  if ! is_proj_folder_ "$proj_folder"; then return 1; fi
+  
+  prune "$proj_folder" &>/dev/null
 
   if [[ -z "$tag" ]]; then
-    tag=$(get_from_pkg_json_ "version")
+    tag=$(get_from_pkg_json_ "version" "$proj_folder")
     if [[ -n "$tag" ]]; then
       if ! confirm_ "create tag: $tag ?"; then
         tag=""
@@ -6914,15 +7063,17 @@ function tag() {
   fi
 
   if [[ -z "$tag" ]]; then
-    tag=$(input_path_ "type the tag name")
+    tag=$(input_path_ "tag name")
     if [[ -z "$tag" ]]; then return 1; fi
+
+    print " ${purple_cor}tag name:${reset_cor} $tag"
   fi
 
-  git tag --annotate "$tag" --message="$tag" ${@:2}
+  git -C "$proj_folder" tag --annotate "$tag" --message="$tag" ${@:2}
   local RET=$?
 
   if (( RET == 0 )); then
-    git push --no-verify --tags
+    git -C "$proj_folder" push --no-verify --tags
     RET=$?
   fi
 
@@ -6935,28 +7086,52 @@ function tags() {
   (( tags_is_d )) && set -x
 
   if (( tags_is_h )); then
-    print "  ${yellow_cor}tags${reset_cor} : to list all tags"
-    print "  ${yellow_cor}tags <x>${reset_cor} : to list x number of tags"
+    print "  ${yellow_cor}tags ${solid_yellow_cor}<pro>${reset_cor} : to list all tags of a project"
+    print "  ${yellow_cor}tags ${solid_yellow_cor}<x>${reset_cor} : to list x number of tags of a project"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local n=100
 
-  prune &>/dev/null
+  if is_project_ "$1"; then
+    proj_arg="$1"
+    if [[ -n "$2" && $2 == <-> ]]; then
+      n="$2"
+    fi
+  elif [[ -n "$1" && $1 == <-> ]]; then
+    n="$1"
+  fi
+  
+  local i=$(find_proj_index_ -o "$proj_arg")
+  if (( ! i )); then
+    print "  ${yellow_cor}tags -h${reset_cor} : to see usage" >&2
+    return 1;
+  fi
 
-  local n="${1:-100}"
+  proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
+
+  if ! check_proj_ -f $i; then return 1; fi
+  
+  local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
+
+  proj_folder=$(get_proj_for_git_ "$proj_folder")
+  if [[ -z "$proj_folder" ]]; then return 1; fi
+
+  prune "$proj_folder" &>/dev/null
+
   local tags=""
 
   if (( n == 1 )); then
-    tags=$(git describe --tags --abbrev=0 2>/dev/null)
+    tags=$(git -C "$proj_folder" describe --tags --abbrev=0 2>/dev/null)
   fi
 
   if [[ -z "$tags" ]]; then
-    tags=$(git for-each-ref refs/tags --sort=-taggerdate --format='%(refname:short)' --count="$n")
+    tags=$(git -C "$proj_folder" for-each-ref refs/tags --sort=-taggerdate --format='%(refname:short)' --count="$n")
   fi
 
   if [[ -z "$tags" ]]; then
-    tags=$(git for-each-ref refs/tags --sort=-creatordate --format='%(refname:short)' --count="$n")
+    tags=$(git -C "$proj_folder" for-each-ref refs/tags --sort=-creatordate --format='%(refname:short)' --count="$n")
   fi
 
   if [[ -z "$tags" ]]; then
