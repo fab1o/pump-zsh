@@ -680,12 +680,12 @@ function update_setting_() {
   fi
 
   local _value=""
-  if (( i > 0 )); then
-    eval "_value=\${${key}[$i]}"
-    if [[ "$value" == "$_value" ]]; then
-      return 0; # no change
-    fi
-  else
+  if (( i == 0 )); then
+    # eval "_value=\${${key}[$i]}"
+    # if [[ "$value" == "$_value" ]]; then
+    #   return 0; # no change
+    # fi
+  # else
     return 0;
   fi
 
@@ -1414,9 +1414,15 @@ function choose_mode_() {
   local RET=$?
 
   local i=0
-  for i in {1..16}; do
-    clear_last_line_2_
-  done
+  if [[ -n "$proj_folder" ]]; then
+    for i in {1..15}; do
+      clear_last_line_2_
+    done
+  else
+    for i in {1..6}; do
+      clear_last_line_2_
+    done
+  fi
 
   return $RET;
 }
@@ -1803,7 +1809,7 @@ function save_proj_mode_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
+  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode"
 
   if (( save_proj_mode_is_q )); then return 0; fi
 
@@ -2001,11 +2007,7 @@ function save_jira_() {
     return 0;
   fi
 
-  if [[ -z "$jira_proj" ]]; then
-    confirm_ "set a JIRA project for this project?"
-  else
-    confirm_ "set another JIRA project to replace current one: $jira_proj ?"
-  fi
+  confirm_ "set a JIRA project for this project?"
   local RET=$?
   if (( RET == 130 || RET == 2 )); then return 130; fi
   if (( RET == 0 )); then
@@ -2023,14 +2025,17 @@ function save_jira_() {
 
     jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
     if [[ -z "$jira_proj" ]]; then return 1; fi
-  
-    update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/
+  else
+    jira_proj=""
   fi
-  
-  if (( save_jira_is_q )); then return 0; fi
-  if [[ -z "$jira_proj" ]]; then return 0; fi
 
-  clear_last_line_1_
+  update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+
+  if (( save_jira_is_q )); then return 0; fi
+
+  if (( save_jira_is_e )); then
+    clear_last_line_1_
+  fi
   clear_last_line_1_
   print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
   print "" >&1
@@ -2197,6 +2202,12 @@ function save_proj_() {
 
     if ! save_proj_repo_ -e $i "${PUMP_PROJ_FOLDER[$i]}" "$proj_name" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
+
+    if is_git_repo_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
+      PUMP_PROJ_SINGLE_MODE[$i]=1
+    elif get_proj_for_git_ "${PUMP_PROJ_FOLDER[$i]}" "$TEMP_PUMP_PROJ_SHORT_NAME" &>/dev/null; then
+      PUMP_PROJ_SINGLE_MODE[$i]=0
+    fi
 
     if ! save_proj_mode_ -e $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}"; then return 1; fi
   
@@ -2719,7 +2730,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_JIRA_PROJ[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${PUMP_JIRA_IN_PROGRESS[$i]}]"
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
     print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
