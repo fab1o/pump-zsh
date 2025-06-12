@@ -609,26 +609,23 @@ function get_folders_() {
 
   local dir=""
   for dir in "${dirs[@]}"; do
-    local name="${dir##*/}"
-    [[ $name != "revs" ]] && filtered+=("$name")
+    [[ "${dir##*/}" != "revs" ]] && filtered+=("${dir##*/}")
   done
 
   local priorities=(dev develop release main master production stage staging trunk mainline default stable)
-  local ordered=()
 
+  local name=""
   for name in "${priorities[@]}"; do
     if [[ " ${filtered[@]} " == *" $name "* ]]; then
-      ordered+=("$name")
+      echo "$name"
     fi
   done
 
   for name in "${filtered[@]}"; do
     if [[ ! " ${priorities[@]} " == *" $name "* ]]; then
-      ordered+=("$name")
+      echo "$name"
     fi
   done
-
-  printf '%s\n' "${ordered[@]}"
 }
 
 function check_config_file_() {
@@ -819,7 +816,7 @@ function find_proj_folder_() {
       fi
     fi
     
-    local dirs=("${(@f)$(get_folders_ "$folder_path")}")
+    local dirs=($(get_folders_ "$folder_path"))
     if [[ -z "$dirs" ]]; then
       cd "${HOME:-/}"
     fi
@@ -2236,7 +2233,7 @@ function save_proj_() {
 
   if (( refresh )); then
     set_current_proj_ $i
-    refresh_curr_proj_ $i
+    set_proj_aliases_ $i
     return 0;
   fi
   
@@ -2244,11 +2241,10 @@ function save_proj_() {
 }
 # end of save project data to config file =========================================
 
-function refresh_curr_proj_() {
+function set_proj_aliases_() {
   local i="$1"
 
   unset_aliases_
-
   set_aliases_ $i
 
   # do not need to refresh because themes were fixed
@@ -2300,15 +2296,13 @@ function unset_aliases_() {
 function set_aliases_() {
   local i="$1"
 
-  if [[ -z "$i" || $i -lt 1 || $i -gt 9 ]]; then
-    return 1;
-  fi
-
-  if ! check_proj_pkg_manager_ -s $i "$CURRENT_PUMP_PKG_MANAGER" "$CURRENT_PUMP_PROJ_FOLDER" "$CURRENT_PUMP_PROJ_REPO"; then return 1; fi
-
+  if [[ -z "$i" ]]; then return 1; fi
+  
   if [[ -z "$CURRENT_PUMP_PKG_MANAGER" ]]; then
     CURRENT_PUMP_PKG_MANAGER="${PUMP_PKG_MANAGER[$i]}"
   fi
+
+  if [[ -z "$CURRENT_PUMP_PKG_MANAGER" ]]; then return 1; fi
 
   # Reset all aliases
   #unalias -a &>/dev/null
@@ -2433,7 +2427,7 @@ function set_current_proj_() {
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
 }
 
-function clear_curr_proj_() {
+function clear_current_proj_() {
   unset_aliases_
   set_current_proj_ 0
 }
@@ -2745,12 +2739,32 @@ function which_pro_index_pwd_() {
 function is_project_() {
   local proj_arg="$1"
 
-  if ! find_proj_index_ "$proj_arg" &>/dev/null; then
-    return 1;
+  local i=0
+  for i in {1..9}; do
+    if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+      return 0;
+    fi
+  done
+
+  return 1;
+}
+
+function get_projects_() {
+  if [[ -n "${PUMP_PROJ_SHORT_NAME[*]}" ]]; then
+    local i=0
+    for i in {1..9}; do
+      if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        echo "${PUMP_PROJ_SHORT_NAME[$i]}"
+      fi
+    done
   fi
 }
 
 function find_proj_index_() {
+  set +x
+  eval "$(parse_flags_ "find_proj_index_" "zoe" "" "$@")"
+  (( find_proj_index_is_d )) && set -x
+
   local proj_arg="$1"
   local default_index="$2"
 
@@ -2760,8 +2774,20 @@ function find_proj_index_() {
       return 0;
     fi
 
-    print " fatal: no project argument provided" >&2
-    return 1;
+    if (( find_proj_index_is_o )); then
+      local projects=($(get_projects_))
+      if [[ -z "$projects" ]]; then
+        print " fatal: no projects found" >&2
+        print " run ${yellow_cor}pump -a${reset_cor} to add a project" >&2
+        return 1;
+      fi
+
+      proj_arg=$(choose_one_ "project" "${projects[@]}")
+      if [[ -z "$proj_arg" ]]; then return 1; fi
+    else
+      print " missing project argument" >&2
+      return 1;
+    fi
   fi
 
   local i=0
@@ -2772,12 +2798,27 @@ function find_proj_index_() {
     fi
   done
 
-  if [[ -n "$default_index" ]]; then
-    echo "$default_index"
-    return 0;
+  print " not a valid project argument: $proj_arg" >&2
+
+  if (( find_proj_index_is_o && find_proj_index_is_e )); then
+    local projects=($(get_projects_))
+    if [[ -z "$projects" ]]; then
+      print " fatal: no projects found" >&2
+      print " run ${yellow_cor}pump -a${reset_cor} to add a project" >&2
+      return 1;
+    fi
+
+    proj_arg=$(choose_one_ "project" "${projects[@]}")
+    if [[ -z "$proj_arg" ]]; then return 1; fi
+
+    for i in {1..9}; do
+      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
+        echo "$i"
+        return 0;
+      fi
+    done
   fi
 
-  print " fatal: not a valid project argument: $proj_arg" >&2
   return 1;
 }
 
@@ -4779,21 +4820,26 @@ function run() {
       else
         folder_arg="$2"
       fi
-    else
+    elif is_proj_folder_ "$1" &>/dev/null; then
       folder_arg="$1"
       _env="$2"
+    else
+      proj_arg="$1"
+      folder_arg="$2"
     fi
   elif [[ -n "$1" ]]; then
     if is_project_ "$1"; then
       proj_arg="$1"
     elif [[ "$1" == "dev" || "$1" == "stage" || "$1" == "prod" ]]; then
       _env="$1"
-    else
+    elif is_proj_folder_ "$1" &>/dev/null; then
       folder_arg="$1"
+    else
+      proj_arg="$1"
     fi
   fi
   
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}run -h${reset_cor} : to see usage" >&2
     return 1;
@@ -4833,7 +4879,7 @@ function run() {
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
-        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+        local dirs=($(get_folders_ "$proj_folder"))
         if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
@@ -4887,14 +4933,16 @@ function setup() {
     proj_arg="$1"
     folder_arg="$2"
   elif [[ -n "$1" ]]; then
-    if is_project_ $1; then
+    if is_project_ "$1"; then
       proj_arg="$1"
-    else
+    elif is_proj_folder_ "$1" &>/dev/null; then
       folder_arg="$1"
+    else
+      proj_arg="$1"
     fi
   fi
   
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}setup -h${reset_cor} : to see usage" >&2
     return 1;
@@ -4922,7 +4970,7 @@ function setup() {
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
-        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+        local dirs=($(get_folders_ "$proj_folder"))
         if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
@@ -5058,7 +5106,7 @@ function revs() {
     return 1;
   fi
 
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}revs -h${reset_cor} : to see usage" >&2
     return 1;
@@ -5115,14 +5163,14 @@ function rev() {
     proj_arg="$1"
     branch_arg="$2"
   elif [[ -n "$1" ]]; then
-    if is_project_ $1; then
+    if is_project_ "$1"; then
       proj_arg="$1"
     else
       branch_arg="$1"
     fi
   fi
 
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}rev -h${reset_cor} : to see usage" >&2
     return 1;
@@ -5362,7 +5410,7 @@ function clone() {
     if [[ -z "$proj_arg" ]]; then return 1; fi
   fi
   
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}clone -h${reset_cor} : to see usage" >&2
     return 1;
@@ -5573,7 +5621,7 @@ function jira() {
 
   local proj_arg="${1:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
   
-  local i=$(find_proj_index_ "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print "  ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
     return 1;
@@ -7028,7 +7076,7 @@ function gha() {
   local found=0
 
   if [[ -n "$proj_arg" ]]; then
-    local i=$(find_proj_index_ "$proj_arg")
+    local i=$(find_proj_index_ -o "$proj_arg")
     if (( ! i )); then
       print " run ${yellow_cor}gha -h${reset_cor} : to see usage" >&2
       return 1;
@@ -7849,8 +7897,8 @@ function pro() {
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -i <name>${reset_cor} : to display the project's readme if available"
-    print "  ${yellow_cor}pro -n <name>${reset_cor} : to set Node.js version for a project"
+    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display the project's readme if available"
+    print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset Node.js version for a project"
     print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project's settings"
     print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset project's \"don't ask again\" settings"
     pro -l
@@ -7859,18 +7907,18 @@ function pro() {
 
   if (( pro_is_l )); then
     # pro -l list projects
-    print "  --"
-    if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
+    if (( ${#PUMP_PROJ_SHORT_NAME[@]} == 0 )); then
       print "  no projects yet" >&2
       print "   ${yellow_cor}pro -a <name>${reset_cor} : to add a new project" >&2
       return 1;
     fi
     
+    print "  options:"
     if [[ -n "${PUMP_PROJ_SHORT_NAME[*]}" ]]; then
       local i=0
       for i in {1..9}; do
         if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-          print "  ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor} : to set project ${PUMP_PROJ_SHORT_NAME[$i]}"
+          print "  ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}"
         fi
       done
     fi
@@ -7886,7 +7934,7 @@ function pro() {
       proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
     fi
 
-    local i=$(find_proj_index_ "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg")
     (( i )) || return 1;
 
     local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
@@ -7911,7 +7959,8 @@ function pro() {
 
   # pro -u [<name>] reset project settings
   if (( pro_is_u )); then
-    local i=$(find_proj_index_ "$proj_arg" 0)
+    local i=$(find_proj_index_ -oe "$proj_arg")
+    (( i )) || return 1;
 
     update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
     update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
@@ -7923,12 +7972,14 @@ function pro() {
     update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
     update_setting_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
     
+    print " successfully reset project settings for: ${green_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}"
     return $?;
   fi
 
   # pro -c [<name>] show project config
   if (( pro_is_c )); then
     local i=$(find_proj_index_ "$proj_arg" 0)
+    [[ -n "$i" ]] || return 1;
     
     print_current_proj_ $i
     return $?;
@@ -7936,7 +7987,7 @@ function pro() {
 
   # pro -e <name> edit project
   if (( pro_is_e )); then
-    local i=$(find_proj_index_ "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg")
     (( i )) || return 1;
 
     save_proj_ -e $i "$proj_arg"
@@ -7987,7 +8038,7 @@ function pro() {
     fi
 
     local i=$(find_proj_index_ "$proj_arg")
-    if (( ! i )); then return 1; fi
+    (( i )) || return 1;
 
     local refresh=0;
     [[ "$proj_arg" == "$CURRENT_PUMP_PROJ_SHORT_NAME" ]] && refresh=1;
@@ -8000,8 +8051,8 @@ function pro() {
     print " removed: ${proj_arg}"
 
     if (( refresh )); then
-      clear_curr_proj_
-      refresh_curr_proj_ $i
+      clear_current_proj_
+      set_proj_aliases_ $i
     fi
 
     return $?;
@@ -8009,12 +8060,8 @@ function pro() {
 
   # pro -n <name> set Node.js version for a project
   if (( pro_is_n )); then
-    local i=$(find_proj_index_ "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg")
     (( i )) || return 1;
-
-    local nvm_skip_lookup="${PUMP_NVM_SKIP_LOOKUP[$i]}"
-    local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-    local pump_pro="${PUMP_PRO[$i]}"
 
     if ! command -v nvm &>/dev/null; then
       return 1;
@@ -8026,22 +8073,22 @@ function pro() {
     #   echo "$CURRENT_PUMP_PROJ_SHORT_NAME" > "$PUMP_PRO_FILE"
     # fi
 
-    local version_to_use=""
-    local skip_save=0
+    local nvm_skip_lookup="${PUMP_NVM_SKIP_LOOKUP[$i]}"
+    local old_nvm_use_v="${PUMP_NVM_USE_V[$i]}"
+    local skip_lookup=0
 
-    if (( nvm_skip_lookup )); then
-      skip_save=1
-      version_to_use="${PUMP_NVM_USE_V[$i]}"
+    if (( pro_is_x && nvm_skip_lookup )); then
+      skip_lookup=1
 
-      if [[ -n "$version_to_use" ]]; then
-        if ! nvm use "$version_to_use"; then
-          skip_save=0
-        fi
+      if [[ -n "${PUMP_NVM_USE_V[$i]}" ]] && ! nvm use "${PUMP_NVM_USE_V[$i]}"; then
+        skip_lookup=0
       fi
     fi
+    
+    local nvm_use_v=""
 
-    if (( skip_save == 0 )); then
-      proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
+    if (( skip_lookup == 0 )); then
+      local proj_folder=$(get_proj_for_pkg_ "${PUMP_PROJ_FOLDER[$i]}" "package.json")
       if [[ -z "$proj_folder" ]]; then return 1; fi
 
       setopt NO_NOTIFY
@@ -8067,40 +8114,50 @@ function pro() {
         #   versions+=("${nvm_use_v}")
         # fi
         if [[ -n "$versions" ]]; then
-          version_to_use=$(choose_one_ -a "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
+          nvm_use_v=$(choose_one_ -a "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
         fi
       fi
 
-      if [[ -n "$version_to_use" ]]; then
-        local major_version=$(get_major_version_ "$version_to_use")
-        if [[ -z "$major_version" ]]; then major_version="$version_to_use"; fi
-        if nvm use "$major_version"; then
-          update_setting_ $i "PUMP_NVM_USE_V" "$major_version" &>/dev/null
-        fi
+      # if [[ -n "$nvm_use_v" ]]; then
+      #   # local major_version=$(get_major_version_ "$nvm_use_v")
+      #   # if [[ -z "$major_version" ]]; then major_version="$nvm_use_v"; fi
+      #   update_setting_ $i "PUMP_NVM_USE_V" "$nvm_use_v" &>/dev/null
+      # fi
+
+      if [[ -n "$nvm_use_v" ]] && (( pro_is_x )); then
+        nvm use "$nvm_use_v"
       fi
 
-      if [[ -n "$node_engine" && -n "$version_to_use" && -z "$nvm_skip_lookup" ]] || [[ -z "$node_engine" && -z "$nvm_skip_lookup" ]]; then
-        if [[ -n "$node_engine" ]]; then
-          confirm_ "save Node.js version to skip checking from now on? you won't be asked again"
-        else
-          confirm_ "skip Node.js version checks from now on? you won't be asked again"
+      if [[ -n "$nvm_use_v" ]] && (( ! pro_is_x )); then
+        print -n " Node.js version set";
+        if [[ -n "$old_nvm_use_v" ]]; then
+          print -n " from: ${solid_yellow_cor}$old_nvm_use_v${reset_cor}"
         fi
+        print " to: ${green_cor}$nvm_use_v${reset_cor}"
+        update_setting_ $i "PUMP_NVM_USE_V" "$nvm_use_v" &>/dev/null
+        update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
+      
+      elif [[ -n "$node_engine" && -n "$nvm_use_v" && -z "$nvm_skip_lookup" ]]; then
+        confirm_ "save Node.js version and stop detecting?"
+        local RET=$?
+
+        if (( RET == 0 )); then
+          update_setting_ $i "PUMP_NVM_USE_V" "$nvm_use_v" &>/dev/null
+          update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
+        fi
+      
+      elif [[ -z "$node_engine" && -z "$nvm_skip_lookup" ]]; then
+        confirm_ "skip detecting Node.js version from now on?"
         local RET=$?
 
         if (( RET == 0 )); then
           update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
-        elif (( RET == 1 )); then
-          update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 0 &>/dev/null
         fi
       fi
     fi
 
-    if [[ -n "$pump_pro" ]]; then
-      eval "$pump_pro"
-    fi
-
     return 0;
-  fi
+  fi # end of pro -n
 
   # pro pwd project based on current working directory
   if [[ "$proj_arg" == "pwd" ]]; then
@@ -8161,10 +8218,7 @@ function pro() {
 
   # pro <name>
   local i=$(find_proj_index_ "$proj_arg")
-  if (( ! i )); then
-    pro -l
-    return 1;
-  fi
+  (( i )) || return 1;
 
   # load the project config settings
   load_config_entry_ $i
@@ -8181,16 +8235,20 @@ function pro() {
 
   if (( pro_is_f )) || [[ "$proj_arg" != "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     set_current_proj_ $i
-    # refresh the current project
+
     print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}" >/dev/tty
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}" >/dev/tty
     fi
     print "" >/dev/tty
 
-    refresh_curr_proj_ $i
+    set_proj_aliases_ $i
 
     pro -nx "$proj_arg"
+
+    if [[ -n "$CURRENT_PUMP_PRO" ]]; then
+      eval "$CURRENT_PUMP_PRO"
+    fi
   fi
 }
 
@@ -8221,7 +8279,7 @@ function proj_handler() {
     print "  --"
     print "  ${yellow_cor}$proj_cmd -e${reset_cor} : to edit ${proj_cmd}"
     print "  ${yellow_cor}$proj_cmd -i${reset_cor} : to display ${proj_cmd}'s readme if available"
-    print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to set Node.js version for $proj_cmd"
+    print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to reset Node.js version for $proj_cmd"
     print "  ${yellow_cor}$proj_cmd -c${reset_cor} : to show ${proj_cmd}'s settings"
     print "  ${yellow_cor}$proj_cmd -u${reset_cor} : to unset ${proj_cmd}'s \"don't ask again\" settings"
     return 0;
@@ -8289,7 +8347,7 @@ function proj_handler() {
     if [[ -n "$folder_arg" ]]; then
       resolved_folder="${proj_folder}/${folder_arg}"
     else
-      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+      local dirs=($(get_folders_ "$proj_folder"))
       if [[ -n "$dirs" ]]; then
         local chosen_folder=($(choose_one_ -a "folder to open" "${dirs[@]}"))
 
@@ -8868,8 +8926,8 @@ function pump_chpwd_() {
   if [[ -n "$proj_arg" ]]; then
     pro "$proj_arg"
   else
-    clear_curr_proj_
-    refresh_curr_proj_
+    clear_current_proj_
+    set_proj_aliases_
   fi
 }
 

@@ -397,8 +397,7 @@ PUMP_NVM_SKIP_LOOKUP_9=
 
 # optional
 # default: empty (will ask)
-# the Node.js version to use with nvm (requires nvm and the Node.js version pre-installed)
-# example: 18
+# Node.js version to use with nvm (requires nvm and the Node.js version pre-installed)
 PUMP_NVM_USE_V_1=
 PUMP_NVM_USE_V_2=
 PUMP_NVM_USE_V_3=
@@ -411,7 +410,7 @@ PUMP_NVM_USE_V_9=
 
 # optional
 # default: empty (will ask)
-# the default branch when cloning a repository
+# name of the default branch when cloning a repository
 PUMP_DEFAULT_BRANCH_1=
 PUMP_DEFAULT_BRANCH_2=
 PUMP_DEFAULT_BRANCH_3=
