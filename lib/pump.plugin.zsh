@@ -2222,11 +2222,14 @@ function save_proj_() {
     mkdir -p "${PUMP_PROJ_FOLDER[$i]}"
   fi
 
+  local display_msg=1
+
   if (( ! single_mode )); then
     if is_git_repo_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}" &>/dev/null; then
       if create_backup_proj_folder_ "${PUMP_PROJ_FOLDER[$i]}"; then
         print " project must be cloned again as project mode has changed" >&1
         print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
+        display_msg=0
       fi
     fi
   fi
@@ -2237,7 +2240,9 @@ function save_proj_() {
     return 0;
   fi
   
-  print " now run command: ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
+  if (( display_msg )); then
+    print " now run command: ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&1
+  fi
 }
 # end of save project data to config file =========================================
 
@@ -5434,8 +5439,8 @@ function clone() {
   if (( single_mode )); then
     rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
     if [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
-      print " cannot clone project $proj_arg because it was set to ${pruple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
-      print " either clean the folder, or  ${yellow_cor}$proj_arg -e${reset_cor} : to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
+      print " cannot clone because project is set to ${purple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
+      print " clean the folder or run ${yellow_cor}$proj_arg -e${reset_cor} to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
       return 1;
     fi
 
@@ -5476,7 +5481,10 @@ function clone() {
   fi
 
   if [[ -z "$pump_default_branch" || "$default_branch" != "$pump_default_branch" ]]; then
-    if confirm_ "save default branch "$'\e[32m'$default_branch$'\e[0m'" and don't ask again, unless it changes?"; then
+    confirm_ "save default branch "$'\e[32m'$default_branch$'\e[0m'" and don't ask again, unless it changes?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+    if (( RET == 0 )); then
       update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch
     fi
   fi
@@ -5509,7 +5517,7 @@ function clone() {
   rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
   if command -v gum &>/dev/null; then
     if ! gum spin --title="cloning... $proj_repo on branch: $branch_arg" -- git clone "$proj_repo" "$folder_to_clone"; then
-      print " failed to clone, either folder is not empty or have no access rights: $proj_repo" >&2
+      print " failed to clone: folder is not empty or no access rights: $proj_repo" >&2
       return 1;
     fi
   else
