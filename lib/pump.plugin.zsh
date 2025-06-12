@@ -435,7 +435,7 @@ function input_from_() {
 
   # >&2 needs to display because this is called from a subshell
   # print " ${header}:" >&2
-  print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
+  print " ${lightpurple_prompt_cor}${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
     _input=$(gum input --placeholder="$placeholder" --char-limit="$max" --value="$value")
@@ -463,6 +463,8 @@ function input_from_() {
   # fi
 
   _input=$(printf '%s' "$_input" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+  clear_last_line_2_
 
   if [[ -n "$_input" ]]; then
     echo "$_input"
@@ -1776,9 +1778,6 @@ function save_proj_cmd_() {
     TEMP_PUMP_PROJ_SHORT_NAME="$typed_proj_cmd"
     if (( save_proj_cmd_is_e )); then
       clear_last_line_1_
-      clear_last_line_1_
-    elif (( save_proj_cmd_is_a )); then
-      clear_last_line_1_
     fi
     print "  ${SAVE_PROJ_COR}project name:${reset_cor} $TEMP_PUMP_PROJ_SHORT_NAME" >&1
     print "" >&1
@@ -1989,7 +1988,9 @@ function save_proj_repo_() {
   
     update_setting_ $i "PUMP_PROJ_REPO" "$TEMP_PUMP_PROJ_REPO" &>/dev/null
 
-    clear_last_line_1_
+    if (( save_proj_repo_is_a )); then
+      clear_last_line_1_
+    fi
     print "  ${SAVE_PROJ_COR}project repository:${reset_cor} ${TEMP_PUMP_PROJ_REPO}" >&1
     print "" >&1
   fi
@@ -4815,13 +4816,13 @@ function pra() {
 
 function pr() {
   set +x
-  eval "$(parse_flags_ "pr_" "tl" "" "$@")"
+  eval "$(parse_flags_ "pr_" "sl" "" "$@")"
   (( pr_is_d )) && set -x
 
   if (( pr_is_h )); then
     print "  ${yellow_cor}pr ${solid_yellow_cor}<title>${reset_cor} : to create a pull request"
     print "  ${yellow_cor}pr -l${reset_cor} : to create a pull request and select labels if any"
-    print "  ${yellow_cor}pr -t${reset_cor} : to create a pull request only if tests pass"
+    print "  ${yellow_cor}pr -s${reset_cor} : to skip tests"
     return 0;
   fi
 
@@ -4867,18 +4868,15 @@ function pr() {
     return 1;
   fi
 
-  local new_pr_title="" # must declare before input_from_ so the cancel (ctrl+c) works
-  new_pr_title=$(input_from_ "Pull Request Title" "$pr_title")
+  pr_title=$(input_name_ "Pull Request Title" "$pr_title" 255)
   if (( $? == 130 )); then return 130; fi
 
-  if [[ -n "$new_pr_title" ]]; then
-    pr_title="$new_pr_title"
-  fi
+  print " ${lightpurple_prompt_cor}Pull Request Title:${reset_cor} $pr_title" >&2
 
-  local PR_BODY="${(F)pr_commit_msgs}"
+  local pr_body="${(F)pr_commit_msgs}"
 
   # for commit in "${pr_commit_msgs[@]}"; do
-  #   PR_BODY+="${commit}\n"
+  #   pr_body+="${commit}\n"
   # done
 
   if [[ -n "$CURRENT_PUMP_PR_REPLACE" && -f "$CURRENT_PUMP_PR_TEMPLATE" ]]; then
@@ -4887,20 +4885,20 @@ function pr() {
     if [[ -n "$pr_template" ]]; then
       if (( CURRENT_PUMP_PR_APPEND )); then
         # Append commit msgs right after CURRENT_PUMP_PR_REPLACE in pr template
-        PR_BODY=$(echo "$pr_template" | perl -pe "s/(\Q${CURRENT_PUMP_PR_REPLACE}\E)/\1\n\n${PR_BODY}\n/")
+        pr_body=$(echo "$pr_template" | perl -pe "s/(\Q${CURRENT_PUMP_PR_REPLACE}\E)/\1\n\n${pr_body}\n/")
       else
         # Replace CURRENT_PUMP_PR_REPLACE with commit msgs in pr template
-        PR_BODY=$(echo "$pr_template" | perl -pe "s/\Q${CURRENT_PUMP_PR_REPLACE}\E/${PR_BODY}/g")
+        pr_body=$(echo "$pr_template" | perl -pe "s/\Q${CURRENT_PUMP_PR_REPLACE}\E/${pr_body}/g")
       fi
     fi
   fi
 
-  if [[ -z "$PR_BODY" ]]; then
+  if [[ -z "$pr_body" ]]; then
     print " no pull request body, cannot create pull request" >&2
     return 1;
   fi
 
-  if (( ! pr_is_t )) && [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
+  if (( ! pr_is_s )) && [[ -z "$CURRENT_PUMP_PR_RUN_TEST" ]]; then
     if confirm_ "run tests before pull request?"; then
       if confirm_ "save this preference and don't ask again?" "save" "ask again"; then
         local i=0
@@ -4915,16 +4913,15 @@ function pr() {
     fi
   fi
 
-  if (( CURRENT_PUMP_PR_RUN_TEST || pr_is_t )); then
+  if (( ! pr_is_s && CURRENT_PUMP_PR_RUN_TEST )); then
     test || return 1;
   fi
 
   # debugging purposes
   # print -- "${magenta_cor}Title:${reset_cor} $pr_title"
   # print -- "${magenta_cor}Body:${reset_cor}"
-  # print -- "$PR_BODY"
-
-  # push || return 1;
+  # print -- "$pr_body"
+  # return 1;
 
   if (( pr_is_l )); then
     local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
@@ -4942,16 +4939,16 @@ function pr() {
         if [[ -z "$choose_labels" ]]; then return 1; fi
 
         if [[ "$choose_labels" == "none" ]]; then
-          gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch"
+          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
         else
           local choose_labels_comma="${(j:,:)${(f)choose_labels}}"
-          gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch" --label="$choose_labels_comma"
+          gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch" --label="$choose_labels_comma"
         fi
       fi
     fi
   fi
 
-  gh pr create --assignee="@me" --title="$pr_title" --body="$PR_BODY" --web --head="$my_branch"
+  gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
 }
 
 function run() {
