@@ -6955,7 +6955,7 @@ function release() {
   fi
 
   if (( ! release_is_s )); then
-    if ! confirm_ "create release: $tag ?"; then
+    if ! confirm_ "create a new $proj_arg's release: $tag ?"; then
       clean "$proj_folder"
       return 1;
     fi
