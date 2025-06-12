@@ -820,7 +820,7 @@ function find_proj_folder_() {
     fi
     
     local dirs=("${(@f)$(get_folders_ "$folder_path")}")
-    if (( ${#dirs[@]} == 0 )); then
+    if [[ -z "$dirs" ]]; then
       cd "${HOME:-/}"
     fi
 
@@ -1235,10 +1235,10 @@ function check_proj_repo_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
+    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
 
     if (( check_proj_repo_is_s )); then
-      if save_proj_repo_ $i "$proj_folder" "$pkg_name" $@; then return 0; fi
+      if save_proj_repo_ $i "$proj_folder" "$pkg_name" ${@:5}; then return 0; fi
     fi
 
     return 1;
@@ -1291,10 +1291,10 @@ function check_proj_folder_() {
   done
 
   if [[ -n "$error_msg" ]]; then
-    print "${yellow_cor}  ${error_msg}${reset_cor}" >&2
+    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
 
     if (( check_proj_folder_is_s )); then
-      if save_proj_folder_ -s $i "$pkg_name" "$proj_repo" $@; then return 0; fi
+      if save_proj_folder_ -s $i "$pkg_name" "$proj_repo" ${@:5}; then return 0; fi
     fi
 
     return 1;
@@ -1326,10 +1326,10 @@ function check_proj_pkg_manager_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "${yellow_cor}  ${error_msg}${reset_cor}" 2>/dev/tty
+    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
 
     if (( check_proj_pkg_manager_is_s )); then
-      if save_pkg_manager_ $i "$proj_folder" "$proj_repo" $@; then return 0; fi
+      if save_pkg_manager_ $i "$proj_folder" "$proj_repo" ${@:5}; then return 0; fi
     fi
     return 1;
   fi
@@ -1793,7 +1793,7 @@ function save_proj_mode_() {
 
 function save_proj_folder_() {
   set +x
-  eval "$(parse_flags_ "save_proj_folder_" "aerfsq" "" "$@")"
+  eval "$(parse_flags_ "save_proj_folder_" "aerfsq" "q" "$@")"
   (( save_proj_folder_is_d )) && set -x
 
   local i="$1"
@@ -1875,7 +1875,7 @@ function save_proj_folder_() {
       fi
     fi
   else
-    if ! check_proj_folder_ -s $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
+    if ! check_proj_folder_ -s $i "$proj_folder" "$folder_name" "$proj_repo" ${@:5}; then return 1; fi
   fi
 
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -1897,7 +1897,7 @@ function save_proj_folder_() {
 
 function save_proj_repo_() {
   set +x
-  eval "$(parse_flags_ "save_proj_repo_" "afeq" "" "$@")"
+  eval "$(parse_flags_ "save_proj_repo_" "afeq" "q" "$@")"
   (( save_proj_repo_is_d )) && set -x
 
   local i="$1"
@@ -1941,7 +1941,7 @@ function save_proj_repo_() {
       proj_repo=""
     else
       # don't pass $proj_folder to check_proj_repo_ so it doesn't ask again if we want to use the same repo
-      if ! check_proj_repo_ -s $i "$proj_repo";  then return 1; fi
+      if ! check_proj_repo_ -s $i "$proj_repo" "$proj_folder" "$proj_cmd" ${@:5};  then return 1; fi
     fi
   fi
 
@@ -1999,12 +1999,10 @@ function save_jira_() {
     if [[ -z "$jira_proj" ]]; then return 1; fi
   
     update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/
-    
   fi
   
-  if [[ -z "$jira_proj" ]]; then return 1; fi
-  
   if (( save_jira_is_q )); then return 0; fi
+  if [[ -z "$jira_proj" ]]; then return 0; fi
 
   clear_last_line_1_
   print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
@@ -2026,7 +2024,7 @@ function save_pkg_manager_() {
 
   local pkg_manager=$(detect_pkg_manager_ "$proj_folder")
 
-  if [[ -z "$pkg_manager" ]]; then
+  if [[ -z "$pkg_manager" && -n "$proj_repo" ]]; then
     pkg_manager=$(detect_pkg_manager_online_ "$proj_repo")
   fi
 
@@ -2049,7 +2047,7 @@ function save_pkg_manager_() {
     pkg_manager=($(choose_one_ "package manager" "npm" "yarn" "pnpm" "bun")) # "poe"
     if [[ -z "$pkg_manager" ]]; then return 1; fi
 
-    if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder"; then return 1; fi
+    if ! check_proj_pkg_manager_ $i "$pkg_manager" "$proj_folder" "$proj_repo" ${@:4}; then return 1; fi
   fi
   
   if [[ -z "$pkg_manager" ]]; then return 1; fi
@@ -2449,8 +2447,6 @@ function get_node_engine_() {
   local package_json="${proj_folder}/package.json"
   if [[ ! -f $package_json ]]; then return 1; fi
 
-  if ! command -v nvm &>/dev/null; then return 1; fi
-
   local node_engine=""
 
   if command -v jq &>/dev/null; then
@@ -2540,8 +2536,6 @@ function get_node_versions_() {
     local package_json="${proj_folder}/package.json"
     if [[ ! -f $package_json ]]; then return 1; fi
 
-    if ! command -v nvm &>/dev/null; then return 1; fi
-
     if command -v jq &>/dev/null; then
       node_engine=$(jq -r '.engines.node // empty' "$package_json")
     else
@@ -2566,7 +2560,7 @@ function get_node_versions_() {
   done
 
   if (( ${#matching_versions[@]} == 0 )); then
-    print " ${yellow_cor}warning: no matching node versions found for engine: $node_engine ${reset_cor}" 2>/dev/tty >&2
+    print " no matching node versions found for engine: $node_engine" 2>/dev/tty >&2
     print " try to install a version with: nvm install" 2>/dev/tty >&2
     return 1;
   fi
@@ -4114,13 +4108,10 @@ function covc() {
   local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
   (( i )) || return 1;
 
+  if ! check_proj_ -r $i; then return 1; fi 
+
+  local proj_repo="${PUMP_PROJ_REPO[$i]}"
   local proj_folder="$PWD"
-  local proj_repo=""
-  
-  if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME"; then
-    return 1;
-  fi
-  proj_repo="${PUMP_PROJ_REPO[$i]}"
 
   if [[ -z "$CURRENT_PUMP_COV" || -z "$CURRENT_PUMP_SETUP" ]]; then
     print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor} - edit your pump.zshenv then  ${yellow_cor}refresh${reset_cor}" >&2
@@ -4714,17 +4705,12 @@ function pr() {
   # push || return 1;
 
   if (( pr_is_l )); then
-    local proj_repo=""
+    local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
+    (( i )) || return 1;
+    
+    if ! check_proj_ -r $i; then return 1; fi
 
-    local i=0
-    for i in {1..9}; do
-      if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        if check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "$CURRENT_PUMP_PROJ_SHORT_NAME"; then
-          proj_repo="${PUMP_PROJ_REPO[$i]}"
-        fi
-        break;
-      fi
-    done
+    local proj_repo="${PUMP_PROJ_REPO[$i]}"
 
     if [[ -n "$proj_repo" ]]; then
       local labels=("${(@f)$(gh label list --repo "$proj_repo" --limit 25 | awk '{print $1}')}")
@@ -4848,8 +4834,7 @@ function run() {
         folder_to_execute="$proj_folder"
       else
         local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
-          
-        if (( ${#dirs[@]} )); then
+        if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
           
@@ -4938,8 +4923,7 @@ function setup() {
         folder_to_execute="$proj_folder"
       else
         local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
-          
-        if (( ${#dirs[@]} )); then
+        if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
           
@@ -8032,6 +8016,10 @@ function pro() {
     local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
     local pump_pro="${PUMP_PRO[$i]}"
 
+    if ! command -v nvm &>/dev/null; then
+      return 1;
+    fi
+
     # if (( pro_is_f )); then
     #   echo "$CURRENT_PUMP_PROJ_SHORT_NAME" > "$PUMP_PRO_PWD_FILE"
     # else
@@ -8039,17 +8027,23 @@ function pro() {
     # fi
 
     local version_to_use=""
-    local RET=1;
+    local skip_save=0
 
-    if (( nvm_skip_lookup && pro_is_x )); then
-      local nvm_use_v="${PUMP_NVM_USE_V[$i]}"
-      version_to_use="$nvm_use_v"
+    if (( nvm_skip_lookup )); then
+      skip_save=1
+      version_to_use="${PUMP_NVM_USE_V[$i]}"
 
-      if [[ -n "$version_to_use" ]] && command -v nvm &>/dev/null; then
-        nvm use "$version_to_use"
-        RET=$?
+      if [[ -n "$version_to_use" ]]; then
+        if ! nvm use "$version_to_use"; then
+          skip_save=0
+        fi
       fi
-    else
+    fi
+
+    if (( skip_save == 0 )); then
+      proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
+      if [[ -z "$proj_folder" ]]; then return 1; fi
+
       setopt NO_NOTIFY
       {
         # exec
@@ -8059,11 +8053,6 @@ function pro() {
       } 2>/dev/tty
 
       # gum spin --title="detecting Node.js engine..." -- sleep 2 2>/dev/tty &!
-
-      proj_folder=$(get_proj_for_pkg_ "$proj_folder" "package.json")
-      if [[ -z "$proj_folder" ]]; then
-        return 1;
-      fi
 
       local node_engine=$(get_node_engine_ "$proj_folder")
 
@@ -8079,18 +8068,29 @@ function pro() {
         # fi
         if [[ -n "$versions" ]]; then
           version_to_use=$(choose_one_ -a "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
-          RET=$?
         fi
       fi
 
       if [[ -n "$version_to_use" ]]; then
-        if command -v nvm &>/dev/null; then
-          local major_version=$(get_major_version_ "$version_to_use")
-          if [[ -z "$major_version" ]]; then major_version="$version_to_use"; fi
-          if nvm use "$major_version"; then
-            update_setting_ $i "PUMP_NVM_USE_V" "$major_version" &>/dev/null
-            RET=0
-          fi
+        local major_version=$(get_major_version_ "$version_to_use")
+        if [[ -z "$major_version" ]]; then major_version="$version_to_use"; fi
+        if nvm use "$major_version"; then
+          update_setting_ $i "PUMP_NVM_USE_V" "$major_version" &>/dev/null
+        fi
+      fi
+
+      if [[ -n "$node_engine" && -n "$version_to_use" && -z "$nvm_skip_lookup" ]] || [[ -z "$node_engine" && -z "$nvm_skip_lookup" ]]; then
+        if [[ -n "$node_engine" ]]; then
+          confirm_ "save Node.js version to skip checking from now on? you won't be asked again"
+        else
+          confirm_ "skip Node.js version checks from now on? you won't be asked again"
+        fi
+        local RET=$?
+
+        if (( RET == 0 )); then
+          update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
+        elif (( RET == 1 )); then
+          update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 0 &>/dev/null
         fi
       fi
     fi
@@ -8099,18 +8099,7 @@ function pro() {
       eval "$pump_pro"
     fi
 
-    if (( RET == 0 && pro_is_x )) && [[ -z "$nvm_skip_lookup" ]]; then
-      confirm_ "save Node.js version to skip checking for versions from now on? you won't be asked again"
-      local _RET=$?
-
-      if (( _RET == 0 )); then
-        update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
-      elif (( _RET == 1 )); then
-        update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 0 &>/dev/null
-      fi
-    fi
-
-    return $RET;
+    return 0;
   fi
 
   # pro pwd project based on current working directory
@@ -8299,12 +8288,11 @@ function proj_handler() {
   else
     if [[ -n "$folder_arg" ]]; then
       resolved_folder="${proj_folder}/${folder_arg}"
-    else  
+    else
       local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
-      
-      if (( ${#dirs[@]} )); then
+      if [[ -n "$dirs" ]]; then
         local chosen_folder=($(choose_one_ -a "folder to open" "${dirs[@]}"))
-        
+
         if [[ -n "$chosen_folder" ]]; then
           resolved_folder="${proj_folder}/${chosen_folder}"
         fi
