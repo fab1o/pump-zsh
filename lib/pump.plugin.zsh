@@ -7052,6 +7052,10 @@ function tag() {
   
   prune "$proj_folder" &>/dev/null
 
+  # print " ${yellow_cor}tagging project:${reset_cor} $proj_arg"
+  # print " ${yellow_cor}tagging folder:${reset_cor} $proj_folder"
+  # print " ${yellow_cor}tagging name:${reset_cor} $tag"
+
   if [[ -z "$tag" ]]; then
     tag=$(get_from_pkg_json_ "version" "$proj_folder")
     if [[ -n "$tag" ]]; then
@@ -7068,7 +7072,7 @@ function tag() {
     print " ${purple_cor}tag name:${reset_cor} $tag"
   fi
 
-  git -C "$proj_folder" tag --annotate "$tag" --message="$tag" ${@:2}
+  git -C "$proj_folder" tag --annotate "$tag" --message="$tag"
   local RET=$?
 
   if (( RET == 0 )); then
