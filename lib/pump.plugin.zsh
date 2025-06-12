@@ -1814,11 +1814,7 @@ function save_proj_mode_() {
 
   clear_last_line_2_
   clear_last_line_1_
-  if (( single_mode )); then
-    print "  ${SAVE_PROJ_COR}project mode:${reset_cor} single" >&1
-  else
-    print "  ${SAVE_PROJ_COR}project mode:${reset_cor} multiple" >&1
-  fi
+  print "  ${SAVE_PROJ_COR}project mode:${reset_cor} $( (( single_mode )) && echo "single" || echo "multiple" )" >&1
   print "" >&1
 }
 
@@ -4868,10 +4864,10 @@ function pr() {
     return 1;
   fi
 
-  pr_title=$(input_name_ "Pull Request Title" "$pr_title" 255)
+  pr_title=$(input_name_ "pull request title" "$pr_title" 255)
   if (( $? == 130 )); then return 130; fi
 
-  print " ${lightpurple_prompt_cor}Pull Request Title:${reset_cor} $pr_title" >&2
+  print " ${lightpurple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
 
   local pr_body="${(F)pr_commit_msgs}"
 
@@ -5633,8 +5629,10 @@ function clone() {
 
     if [[ -n "$working_proj_folder" ]]; then
       if [[ -z "$branch_arg" ]]; then
-        branch_arg=$(input_branch_name_ "type the name of your feature branch")
+        branch_arg=$(input_branch_name_ "feature branch name")
         if [[ -z "$branch_arg" ]]; then return 1; fi
+
+        print " ${purple_cor}feature branch name:${reset_cor} $branch_arg"
       fi
 
       local branch_folder="${branch_arg//\\/-}"
@@ -5658,7 +5656,7 @@ function clone() {
 
     if [[ -z "$default_branch" ]]; then
       local placeholder=$(get_default_branch_ "$proj_folder")
-      default_branch=$(input_branch_name_ "type the name of the default branch" "$placeholder")
+      default_branch=$(input_branch_name_ "type the default branch" "$placeholder")
       if [[ -z "$default_branch" ]]; then return 1; fi
     fi
   fi
@@ -8080,7 +8078,7 @@ function get_pkg_name_() {
 
 function pro() {
   set +x
-  eval "$(parse_flags_ "pro_" "aerucfilnx" "" "$@")"
+  eval "$(parse_flags_ "pro_" "aerucfitlnx" "" "$@")"
   (( pro_is_d )) && set -x
 
   if (( pro_is_h )); then
@@ -8090,9 +8088,10 @@ function pro() {
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display a project's readme if available"
+    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display main project's settings"
+    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to display all project's settings"
+    print "  ${yellow_cor}pro -t ${solid_yellow_cor}<name>${reset_cor} : to display a project's readme if available"
     print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset Node.js version for a project"
-    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to show a project's settings"
     print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset a project's \"don't ask again\" settings"
     print "  --"
     pro -l
@@ -8123,8 +8122,30 @@ function pro() {
 
   local proj_arg="$1"
 
-  # pro -i [<name>] display project readme
+  # pro -i [<name>] display main project's settings
   if (( pro_is_i )); then
+    if [[ -z "$proj_arg" ]]; then
+      proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
+    fi
+
+    local i=$(find_proj_index_ -oe "$proj_arg")
+    (( i )) || return 1;
+
+    local pro_i_cor="${blue_cor}"
+
+    display_line_ "" "${pro_i_cor}"
+    print "  ${pro_i_cor}project name:${reset_cor} ${PUMP_PROJ_SHORT_NAME[$i]}"
+    print "  ${pro_i_cor}project repository:${reset_cor} ${PUMP_PROJ_REPO[$i]}"
+    print "  ${pro_i_cor}project folder:${reset_cor} ${PUMP_PROJ_FOLDER[$i]}"
+    print "  ${pro_i_cor}project mode:${reset_cor} $( (( ${PUMP_PROJ_SINGLE_MODE[$i]} )) && echo "single" || echo "multiple" )"
+    print "  ${pro_i_cor}package manager:${reset_cor} ${PUMP_PKG_MANAGER[$i]}"
+    print "  ${pro_i_cor}jira project:${reset_cor} ${PUMP_JIRA_PROJ[$i]}"
+    display_line_ "" "${pro_i_cor}"
+    return $?;
+  fi
+
+  # pro -t [<name>] display project readme
+  if (( pro_is_t )); then
     if [[ -z "$proj_arg" ]]; then
       proj_arg="${CURRENT_PUMP_PROJ_SHORT_NAME}"
     fi
@@ -8483,9 +8504,10 @@ function proj_handler() {
     (( single_mode )) && print "  ${yellow_cor}$proj_cmd <branch>${reset_cor} : to open $proj_cmd and switch to branch"
     print "  --"
     print "  ${yellow_cor}$proj_cmd -e${reset_cor} : to edit ${proj_cmd}"
-    print "  ${yellow_cor}$proj_cmd -i${reset_cor} : to display ${proj_cmd}'s readme if available"
+    print "  ${yellow_cor}$proj_cmd -i${reset_cor} : to display main ${proj_cmd}'s settings"
+    print "  ${yellow_cor}$proj_cmd -c${reset_cor} : to display all ${proj_cmd}'s settings"
+    print "  ${yellow_cor}$proj_cmd -t${reset_cor} : to display ${proj_cmd}'s readme if available"
     print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to reset Node.js version for $proj_cmd"
-    print "  ${yellow_cor}$proj_cmd -c${reset_cor} : to show ${proj_cmd}'s settings"
     print "  ${yellow_cor}$proj_cmd -u${reset_cor} : to unset ${proj_cmd}'s \"don't ask again\" settings"
     return 0;
   fi
@@ -8497,6 +8519,11 @@ function proj_handler() {
   
   if (( proj_handler_is_i )); then
     pro -i "$proj_cmd"
+    return $?
+  fi
+  
+  if (( proj_handler_is_t )); then
+    pro -t "$proj_cmd"
     return $?
   fi
 
