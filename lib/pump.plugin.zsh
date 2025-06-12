@@ -7006,6 +7006,9 @@ function release() {
 
   gh release create "$tag" --title="$tag" --generate-notes
 
+  print ""
+  glog -ca -1
+
   cd "$_pwd"
   add-zsh-hook chpwd pump_chpwd_
 }
