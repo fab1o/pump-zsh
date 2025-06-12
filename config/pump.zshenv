@@ -117,6 +117,20 @@ PUMP_RUN_PROD_8=
 PUMP_RUN_PROD_9=
 
 # optional
+# default: PUMP_PKG_MANAGER run fix
+# script to run for command `fix`
+PUMP_FIX_1=
+PUMP_FIX_2=
+PUMP_FIX_3=
+PUMP_FIX_4=
+PUMP_FIX_5=
+PUMP_FIX_6=
+PUMP_FIX_7=
+PUMP_FIX_8=
+PUMP_FIX_9=
+
+
+# optional
 # default: empty (will ask)
 # code editor for reviews of each project
 PUMP_CODE_EDITOR_1=

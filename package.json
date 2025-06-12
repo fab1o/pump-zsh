@@ -24,7 +24,6 @@
     "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
     "install_deps": "bash ./scripts/install_deps.sh",
     "install_pump": "zsh ./scripts/install.zsh",
-    "setup": "echo 'this is a setup script'",
     "start": "echo 'this is a start script'",
     "test": "echo 'this is a test script'",
     "uninstall": "zsh ./scripts/uninstall.zsh",
