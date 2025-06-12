@@ -5748,7 +5748,7 @@ function clone() {
 
   local pkg_json="package.json"
   if [[ -f $pkg_json ]]; then
-    print " • run ${solid_magenta_cor}setup${reset_cor} (alias for \"$pkg_manager $([[ $pkg_manager == "yarn" ]] && echo "" || echo "run ")setup\" if you have in your package.json)"
+    print " • run ${solid_magenta_cor}setup${reset_cor} (alias for \"$pkg_manager $([[ $pkg_manager == "yarn" ]] && echo "" || echo "run ")setup\" if you have it in your package.json)"
     print " • run ${solid_magenta_cor}i${reset_cor} or ${solid_magenta_cor}install${reset_cor} (alias for \"$pkg_manager i\")"
     print " --"
   fi
