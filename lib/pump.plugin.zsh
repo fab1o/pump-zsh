@@ -8428,7 +8428,7 @@ function pro() {
     print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display main project's settings"
     print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to display all project's settings"
     print "  ${yellow_cor}pro -t ${solid_yellow_cor}<name>${reset_cor} : to display a project's readme if available"
-    print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset Node.js version for a project"
+    print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset node.js version for a project"
     print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset a project's \"don't ask again\" settings"
     print "  --"
     pro -l
@@ -8476,7 +8476,8 @@ function pro() {
     print "  ${pro_i_cor}project folder:${reset_cor} ${PUMP_PROJ_FOLDER[$i]}"
     print "  ${pro_i_cor}project mode:${reset_cor} $( (( ${PUMP_PROJ_SINGLE_MODE[$i]} )) && echo "single" || echo "multiple" )"
     print "  ${pro_i_cor}package manager:${reset_cor} ${PUMP_PKG_MANAGER[$i]}"
-    print "  ${pro_i_cor}jira project:${reset_cor} ${PUMP_JIRA_PROJ[$i]}"
+    print "  ${pro_i_cor}node.js version:${reset_cor} ${PUMP_NVM_USE_V[$i]}"
+    # print "  ${pro_i_cor}jira project:${reset_cor} ${PUMP_JIRA_PROJ[$i]}"
     display_line_ "" "${pro_i_cor}"
     return $?;
   fi
@@ -8615,7 +8616,7 @@ function pro() {
     return $?;
   fi
 
-  # pro -n <name> set Node.js version for a project
+  # pro -n <name> set node.js version for a project
   if (( pro_is_n )); then
     local i=$(find_proj_index_ -oe "$proj_arg")
     (( i )) || return 1;
@@ -8653,12 +8654,12 @@ function pro() {
       setopt NO_NOTIFY
       {
         # exec
-        gum spin --title="detecting Node.js..." -- bash -c 'sleep 3'
+        gum spin --title="detecting node.js..." -- bash -c 'sleep 3'
         # echo -e "\r\033[K"
         # tput sgr0
       } 2>/dev/tty
 
-      # gum spin --title="detecting Node.js engine..." -- sleep 2 2>/dev/tty &!
+      # gum spin --title="detecting node.js engine..." -- sleep 2 2>/dev/tty &!
 
       local node_engine=$(get_node_engine_ "$proj_folder")
 
@@ -8673,7 +8674,7 @@ function pro() {
         #   versions+=("${nvm_use_v}")
         # fi
         if [[ -n "$versions" ]]; then
-          nvm_use_v=$(choose_one_ -a "Node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
+          nvm_use_v=$(choose_one_ -a "node.js version to use with ${proj_arg}'s engine $node_engine" "${(@f)$(printf "%s\n" "$versions" | sort -V)}")
         fi
       fi
 
@@ -8688,7 +8689,7 @@ function pro() {
       fi
 
       if [[ -n "$nvm_use_v" ]] && (( ! pro_is_x )); then
-        print -n " Node.js version set";
+        print -n " node.js version set";
         if [[ -n "$old_nvm_use_v" ]]; then
           print -n " from: ${solid_yellow_cor}$old_nvm_use_v${reset_cor}"
         fi
@@ -8697,7 +8698,7 @@ function pro() {
         update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
       
       elif [[ -n "$node_engine" && -n "$nvm_use_v" && -z "$nvm_skip_lookup" ]]; then
-        confirm_ "save Node.js version and stop detecting?"
+        confirm_ "save node.js version and stop detecting?"
         local RET=$?
 
         if (( RET == 0 )); then
@@ -8706,7 +8707,7 @@ function pro() {
         fi
       
       elif [[ -z "$node_engine" && -z "$nvm_skip_lookup" ]]; then
-        confirm_ "skip detecting Node.js version from now on?"
+        confirm_ "skip detecting node.js version from now on?"
         local RET=$?
 
         if (( RET == 0 )); then
@@ -8844,7 +8845,7 @@ function proj_handler() {
     print "  ${yellow_cor}$proj_cmd -i${reset_cor} : to display main ${proj_cmd}'s settings"
     print "  ${yellow_cor}$proj_cmd -c${reset_cor} : to display all ${proj_cmd}'s settings"
     print "  ${yellow_cor}$proj_cmd -t${reset_cor} : to display ${proj_cmd}'s readme if available"
-    print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to reset Node.js version for $proj_cmd"
+    print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to reset node.js version for $proj_cmd"
     print "  ${yellow_cor}$proj_cmd -u${reset_cor} : to unset ${proj_cmd}'s \"don't ask again\" settings"
     return 0;
   fi

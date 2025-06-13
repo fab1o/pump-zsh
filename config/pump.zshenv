@@ -129,7 +129,6 @@ PUMP_FIX_7=
 PUMP_FIX_8=
 PUMP_FIX_9=
 
-
 # optional
 # default: empty (will ask)
 # code editor for reviews of each project
@@ -158,20 +157,6 @@ PUMP_CLONE_8=
 PUMP_CLONE_9=
 
 # optional
-# default: node
-# options: node, deno, bun
-# runtime environment for each project
-PUMP_USE_1=
-PUMP_USE_2=
-PUMP_USE_3=
-PUMP_USE_4=
-PUMP_USE_5=
-PUMP_USE_6=
-PUMP_USE_7=
-PUMP_USE_8=
-PUMP_USE_9=
-
-# optional
 # default: empty (no ask)
 # script to run after `pro` command
 # example: nvm use 18
@@ -184,6 +169,20 @@ PUMP_PRO_6=
 PUMP_PRO_7=
 PUMP_PRO_8=
 PUMP_PRO_9=
+
+# optional
+# default: node
+# options: node, deno, bun
+# runtime environment for each project
+PUMP_USE_1=
+PUMP_USE_2=
+PUMP_USE_3=
+PUMP_USE_4=
+PUMP_USE_5=
+PUMP_USE_6=
+PUMP_USE_7=
+PUMP_USE_8=
+PUMP_USE_9=
 
 # optional
 # default: PUMP_PKG_MANAGER run test
