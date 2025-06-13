@@ -6298,9 +6298,9 @@ function glog() {
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog ${solid_yellow_cor}[<folder>]${reset_cor} : to log all commits"
+    print "  ${yellow_cor}glog ${solid_yellow_cor}[<folder>]${reset_cor} : to log last 10 commits"
     print "  ${yellow_cor}glog -c ${solid_yellow_cor}[<branch>]${reset_cor} : to log branch's commits since default branch"
-    print "  ${yellow_cor}glog -a ${solid_yellow_cor}[<branch>]${reset_cor} : to log all commits (default)"
+    print "  ${yellow_cor}glog -a ${solid_yellow_cor}[<branch>]${reset_cor} : to log all commits"
     print "  ${yellow_cor}glog -n ${solid_yellow_cor}[<folder>]${reset_cor} : to log n commits, where n is a number"
     return 0;
   fi
@@ -6362,7 +6362,7 @@ function glog() {
     return $?;
   fi
 
-  git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative $@
+  git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative -n 10 $@
 }
 
 function push() {
@@ -6562,7 +6562,7 @@ function pullr() {
   (( pullr_is_d )) && set -x
 
   if (( pullr_is_h )); then
-    print "  ${yellow_cor}pullr ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull rebase from origin"
+    print "  ${yellow_cor}pullr ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull --rebase"
     return 0;
   fi
 
@@ -6578,7 +6578,7 @@ function pull() {
     print "  ${yellow_cor}pull ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
     print "  ${yellow_cor}pull -t${reset_cor} : to pull tags along with branches"
     print "  ${yellow_cor}pull -to${reset_cor} : to pull tags only"
-    print "  ${yellow_cor}pull -r${reset_cor} : to pull rebase from origin"
+    print "  ${yellow_cor}pull -r${reset_cor} : to pull --rebase"
     return 0;
   fi
 
@@ -7838,7 +7838,7 @@ function rebase() {
     print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branch on top of the HEAD of $(git config --get init.defaultBranch)"
     print "  ${yellow_cor}rebase ${solid_yellow_cor}<base_branch> [<folder>]${reset_cor} : to apply the commits on top of the HEAD of base branch"
     print "  ${yellow_cor}rebase -a${reset_cor} : to rebase multiple branches"
-    print "  ${yellow_cor}rebase -p${reset_cor} : to push after rebase succeeds with no conflicts"
+    print "  ${yellow_cor}rebase -p${reset_cor} : to push after rebase if succeeds with no conflicts"
     return 0;
   fi
 
@@ -8845,8 +8845,8 @@ function __commit() {
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
-    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit (with conventional commits: https://www.conventionalcommits.org/)"
-    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message"
+    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit --no-verify (with conventional commits: https://www.conventionalcommits.org/)"
+    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit  --no-verify --message"
     print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
     print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
     return 0;
@@ -9162,8 +9162,8 @@ function help() {
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (with conventional commits)"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push no-verify to $remote_name"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "push force to $remote_name"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push to $remote_name"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "force push to $remote_name"
 
   if ! pause_output_; then return 0; fi
   
