@@ -3292,6 +3292,7 @@ function select_branch_() {
   elif (( select_branch_is_r )); then
     fetch "$git_proj_folder" --quiet
     branch_results=("${(@f)$(git -C "$git_proj_folder" for-each-ref --format='%(refname:short)' refs/remotes \
+      | sed "s#^$remote_name/##" \
       | grep -i "$searchText" \
       | sort -fu
     )}")
@@ -5275,7 +5276,8 @@ function rev() {
 
   local revs_folder="$(get_revs_folder_ "$proj_folder" "$single_mode")"
 
-  local branch="";
+  local branch=""
+  local pr_title=""
 
   # rev -e exact branch
   if (( rev_is_e )); then
@@ -5310,6 +5312,7 @@ function rev() {
       if [[ -z "${pr[2]}" ]]; then return 1; fi
       
       branch="${pr[2]}"
+      pr_title="${pr[3]}"
     fi
 
     if [[ -z "$branch" ]]; then return 1; fi
@@ -5324,7 +5327,7 @@ function rev() {
   local already_merged=0;
 
   if [[ -d "$full_rev_folder" ]]; then
-    print " opening review and pulling changes: ${green_cor}$branch ${reset_cor}"
+    print " opening review and pulling changes: ${green_cor}${pr_title:-$branch}${reset_cor}"
 
     if ! git -C "$full_rev_folder" checkout $branch --quiet; then
       if reseta "$full_rev_folder"; then
@@ -5366,7 +5369,7 @@ function rev() {
     local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg")
     if [[ -z "$git_proj_folder" ]]; then return 1; fi
 
-    print " creating review for pull request: ${green_cor}$branch ${reset_cor}"
+    print " creating review for pull request: ${green_cor}${branch}${reset_cor}"
 
     if command -v gum &>/dev/null; then
       local output=""
