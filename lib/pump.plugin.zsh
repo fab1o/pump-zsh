@@ -647,14 +647,7 @@ function check_config_file_() {
   fi
 }
 
-function update_setting_() {
-  check_config_file_
-
-  if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then
-    # print "  warn: config file $PUMP_CONFIG_FILE does not exist, cannot update setting" >&2
-    return 0;
-  fi
-
+function update_setting_short_name_() {
   local i="$1"
   local key="$2"
   local value="$3"
@@ -680,15 +673,31 @@ function update_setting_() {
     fi
     functions[$value]="proj_handler $i \"\$@\";"
   fi
+}
 
-  local _value=""
-  if (( i == 0 )); then
-    # eval "_value=\${${key}[$i]}"
-    # if [[ "$value" == "$_value" ]]; then
-    #   return 0; # no change
-    # fi
-  # else
+function update_setting_() {
+  check_config_file_
+
+  if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then
+    # print "  warn: config file $PUMP_CONFIG_FILE does not exist, cannot update setting" >&2
     return 0;
+  fi
+
+  local i="$1"
+  local key="$2"
+  local value="$3"
+
+  if [[ "$key" == "PUMP_PROJ_SHORT_NAME" ]]; then
+    update_setting_short_name_ "$i" "$key" "$value"
+  fi
+
+  if (( i == 0 )); then
+    return 0;
+  # local _value=""
+  # eval "_value=\${${key}[$i]}"
+  # if [[ "$value" == "$_value" ]]; then
+  #   return 0; # no change
+  # fi
   fi
 
   # set the key variable
@@ -1153,19 +1162,19 @@ function sanitize_pkg_name_() {
 # data checkers =========================================================
 function check_proj_() {
   set +x
-  eval "$(parse_flags_ "check_proj_" "crfmpj" "" "$@")"
+  eval "$(parse_flags_ "check_proj_" "crfmpjq" "q" "$@")"
   (( check_proj_is_d )) && set -x
   
   local i="$1"
 
   if (( check_proj_is_c )); then
-    if ! check_proj_cmd_ $i "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+    if ! check_proj_cmd_ $i "${PUMP_PROJ_SHORT_NAME[$i]}" ${@:2}; then return 1; fi
   fi
 
   if (( check_proj_is_r )); then
-    if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
+    if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" ${@:2}; then return 1; fi
 
-    if [[ -z "${PUMP_PROJ_REPO[$i]}" ]]; then
+    if (( ! check_proj_is_q )) && [[ -z "${PUMP_PROJ_REPO[$i]}" ]]; then
       print " missing repository uri for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
       print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} : to edit project" >&2
       return 1;
@@ -1173,9 +1182,9 @@ function check_proj_() {
   fi
 
   if (( check_proj_is_f )); then
-    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+    if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}" ${@:2}; then return 1; fi
 
-    if [[ -z "${PUMP_PROJ_FOLDER[$i]}" || ! -d "${PUMP_PROJ_FOLDER[$i]}" ]]; then
+    if (( ! check_proj_is_q )) && [[ -z "${PUMP_PROJ_FOLDER[$i]}" || ! -d "${PUMP_PROJ_FOLDER[$i]}" ]]; then
       print " missing project folder for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
       print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} : to edit project" >&2
       return 1;
@@ -1183,22 +1192,22 @@ function check_proj_() {
   fi
 
   if (( check_proj_is_m )); then
-    if ! save_proj_mode_ -q $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}" 1>/dev/null; then return 1; fi
+    if ! save_proj_mode_ -q $i "${PUMP_PROJ_SINGLE_MODE[$i]}" "${PUMP_PROJ_FOLDER[$i]}" ${@:2} 1>/dev/null; then return 1; fi
   fi
 
   if (( check_proj_is_p )); then
-    if ! check_proj_pkg_manager_ -q $i "${PUMP_PKG_MANAGER[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
+    if ! check_proj_pkg_manager_ -q $i "${PUMP_PKG_MANAGER[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}" ${@:2}; then return 1; fi
 
-    if [[ -z "${PUMP_PKG_MANAGER[$i]}" ]]; then
+    if (( ! check_proj_is_q )) && [[ -z "${PUMP_PKG_MANAGER[$i]}" ]]; then
       print " missing package manager for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
       return 1;
     fi
   fi
 
   if (( check_proj_is_j )); then
-    if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" 1>/dev/null; then return 1; fi
+    if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
 
-    if [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
+    if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
       print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
       return 1;
     fi
@@ -1207,7 +1216,7 @@ function check_proj_() {
 
 function check_proj_cmd_() {
   set +x
-  eval "$(parse_flags_ "check_proj_cmd_" "s" "" "$@")"
+  eval "$(parse_flags_ "check_proj_cmd_" "sq" "" "$@")"
   (( check_proj_cmd_is_d )) && set -x
 
   local i="$1"
@@ -1220,7 +1229,7 @@ function check_proj_cmd_() {
 
 function check_proj_repo_() {
   set +x
-  eval "$(parse_flags_ "check_proj_repo_" "aesq" "aeq" "$@")"
+  eval "$(parse_flags_ "check_proj_repo_" "aesq" "ae" "$@")"
   (( check_proj_repo_is_d )) && set -x
 
   local i="$1"
@@ -1269,7 +1278,7 @@ function check_proj_repo_() {
 
 function check_proj_folder_() {
   set +x
-  eval "$(parse_flags_ "check_proj_folder_" "sq" "q" "$@")"
+  eval "$(parse_flags_ "check_proj_folder_" "sq" "" "$@")"
   (( check_proj_folder_is_d )) && set -x
 
   local i="$1"
@@ -1289,10 +1298,14 @@ function check_proj_folder_() {
     if (( check_proj_folder_is_s )); then
       local real_proj_folder=$(realpath -- "$proj_folder" 2>/dev/null)
       if [[ -z "$real_proj_folder" ]]; then
-        if [[ -n "$pkg_name" ]]; then
-          error_msg="project folder doesn't exist for ${solid_blue_cor}$pkg_name${reset_cor}: $proj_folder"
+        if (( check_proj_folder_is_q )); then
+          #mkdir -p "$proj_folder" 2>/dev/null
         else
-          error_msg="project folder doesn't exist: $proj_folder"
+          if [[ -n "$pkg_name" ]]; then
+            error_msg="project folder doesn't exist for ${solid_blue_cor}$pkg_name${reset_cor}: $proj_folder"
+          else
+            error_msg="project folder doesn't exist: $proj_folder"
+          fi
         fi
       fi
       # if ! mkdir -p "$proj_folder"; then
@@ -1333,7 +1346,7 @@ function check_proj_folder_() {
 
 function check_proj_pkg_manager_() {
   set +x
-  eval "$(parse_flags_ "check_proj_pkg_manager_" "sq" "q" "$@")"
+  eval "$(parse_flags_ "check_proj_pkg_manager_" "sq" "" "$@")"
   (( check_proj_pkg_manager_is_d )) && set -x
 
   local i="$1"
@@ -1890,19 +1903,19 @@ function save_proj_folder_() {
     clear_last_line_2_
     if [[ -z "$proj_folder" ]]; then return 1; fi
 
-    if ! check_proj_folder_ $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
+    if ! check_proj_folder_ -q $i "$proj_folder" "$folder_name" "$proj_repo"; then return 1; fi
   
     if (( folder_exists == 0 )); then
       proj_folder="${proj_folder}/${folder_name}"
 
-      if (( save_proj_folder_is_s )); then # only create folder is calling from check_proj_folder_
+      if (( save_proj_folder_is_s )); then # only create folder if calling from check_proj_folder_
         if [[ ! -d "$proj_folder" ]]; then
           mkdir -p "$proj_folder"
         fi
       fi
     fi
   else
-    if ! check_proj_folder_ -s $i "$proj_folder" "$folder_name" "$proj_repo" ${@:5}; then return 1; fi
+    if ! check_proj_folder_ -sq $i "$proj_folder" "$folder_name" "$proj_repo" ${@:5}; then return 1; fi
   fi
 
   if [[ -z "$proj_folder" ]]; then return 1; fi
@@ -2125,8 +2138,8 @@ function save_proj_f_() {
     update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
     update_setting_ $i "PUMP_PROJ_SINGLE_MODE" 1 &>/dev/null
 
-    update_setting_ $i "PUMP_PROJ_FOLDER" $PWD &>/dev/null
-    update_setting_ $i "PUMP_PROJ_REPO" $proj_repo &>/dev/null
+    update_setting_ $i "PUMP_PROJ_FOLDER" "$PWD" &>/dev/null
+    update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo" &>/dev/null
 
     if ! save_pkg_manager_ -fq $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     # if ! save_proj_cmd_ -fe $i "$proj_cmd" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
@@ -5614,7 +5627,7 @@ function clone() {
   local print_readme="${PUMP_PRINT_README[$i]}"
   local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
 
-  if ! check_proj_ -rfm $i; then return 1; fi
+  if ! check_proj_ -rfm -q $i; then return 1; fi
 
   local proj_repo="${PUMP_PROJ_REPO[$i]}"
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
@@ -5692,7 +5705,7 @@ function clone() {
     fi
   fi
   
-  if [[ "$branch_arg" != "$my_branch" ]]; then
+  if [[ "$branch_arg" != "$default_branch" ]]; then
     print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
   else
     print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
@@ -5764,8 +5777,9 @@ function clone() {
 
   local pkg_json="package.json"
   if [[ -f $pkg_json ]]; then
+    print " • run ${solid_magenta_cor}i${reset_cor} or ${solid_magenta_cor}install${reset_cor} (alias for \"$pkg_manager install\")"
     print " • run ${solid_magenta_cor}setup${reset_cor} (alias for \"$pkg_manager $([[ $pkg_manager == "yarn" ]] && echo "" || echo "run ")setup\" if you have it in your package.json)"
-    print " • run ${solid_magenta_cor}i${reset_cor} or ${solid_magenta_cor}install${reset_cor} (alias for \"$pkg_manager i\")"
+    print "   you can also fully customize ${solid_magenta_cor}setup${reset_cor} by editing the pump.zshenv file entry: PUMP_SETUP"
     print " --"
   fi
 
