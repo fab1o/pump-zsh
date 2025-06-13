@@ -8183,13 +8183,11 @@ function pro() {
       return 1;
     fi
     
-    print " projects:"
-    
     if [[ -n "${PUMP_PROJ_SHORT_NAME[*]}" ]]; then
       local i=0
       for i in {1..9}; do
         if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-          print "  ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}"
+          print " ${solid_blue_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor} = set project to ${PUMP_PROJ_SHORT_NAME[$i]}"
         fi
       done
     fi
@@ -8511,6 +8509,7 @@ function pro() {
     fi
 
     print " run ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
+    print " or run:" >&2
     pro -l
     
     return 1;
@@ -8520,6 +8519,8 @@ function pro() {
   local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
     print " run ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
+    print " or run:" >&2
+    pro -l
     return 1;
   fi
 
@@ -8879,6 +8880,8 @@ function help() {
 
   local remote_name=$(get_remote_origin_)
 
+  local project_cor=""
+
   if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print ""
     print -n "  project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}"
@@ -8886,74 +8889,47 @@ function help() {
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
     print ""
+    project_cor="$solid_blue_cor"
   else
     print ""
-    display_line_ "no project is set" "${red_cor}"
-    print ""
-    if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
-      pro -a
-    else
-      print "  ${red_cor}pro <name>${reset_cor}\t = to set project and enable custom commands"
-      local i=0
-      for i in {1..9}; do
-        if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-          local short="${PUMP_PROJ_SHORT_NAME[$i]}"
-          local tab=$([[ ${#short} -lt 5 ]] && echo -e "\t\t" || echo -e "\t")
-          
-          print " ${red_cor} $short ${reset_cor}${tab} = set project to $short"
-        fi
-      done
-    fi
+    print "  ${red_cor}no project is set${reset_cor} - to set a project, run:"
+    project_cor="${red_cor}"
   fi
-  
+
   print ""
-  display_line_ "general" "${solid_yellow_cor}"
+  display_line_ "set project" "${project_cor}"
   print ""
-  print " ${solid_yellow_cor} cl ${reset_cor}\t\t = clear"
-  print " ${solid_yellow_cor} colors ${reset_cor}\t = display colors from 0 to 255"
-  print " ${solid_yellow_cor} del ${reset_cor}\t\t = delete utility"
-  print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
-  print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
-  print " ${solid_yellow_cor} kill <port> ${reset_cor}\t = kill port"
-  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -la"
-  print " ${solid_yellow_cor} nver ${reset_cor}\t\t = node version"
-  print " ${solid_yellow_cor} nlist ${reset_cor}\t = npm list global"
-  print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
-  print " ${solid_yellow_cor} upgrade ${reset_cor}\t = upgrade pump + zsh + omp"
-
-  if ! pause_output_; then return 0; fi
-
-  display_line_ "get started" "${blue_cor}"
-  print ""
-  print "  1. set a project, type:${solid_blue_cor} pro${reset_cor}"
-  print "  2. clone project, type:${blue_cor} clone${reset_cor}"
-  print "  3. setup project, type:${blue_cor} setup${reset_cor}"
-  print "  4. run a project, type:${blue_cor} run${reset_cor}"
-  print "  5. start new job, type:${blue_cor} jira${reset_cor}"
-
-  if ! pause_output_; then return 0; fi
-
-  if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
-    display_line_ "project selection" "${solid_blue_cor}"
-    print ""
-    print " ${solid_blue_cor} pro ${reset_cor}\t\t = project management"
-
+  print " ${project_cor} pro ${reset_cor}\t\t = set project"
+  if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
+    pro -a
+  else
     local i=0
     for i in {1..9}; do
       if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
         local short="${PUMP_PROJ_SHORT_NAME[$i]}"
         local tab=$([[ ${#short} -lt 5 ]] && echo -e "\t\t" || echo -e "\t")
         
-        print " ${solid_blue_cor} $short ${reset_cor}${tab} = set project to $short"
+        print " ${project_cor} $short ${reset_cor}${tab} = set project to $short"
       fi
     done
-    if ! pause_output_; then return 0; fi
   fi
 
-  display_line_ "setup & run" "${blue_cor}"
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "get started" "${yellow_cor}"
   print ""
-  print " ${blue_cor} clone ${reset_cor}\t = clone project or branch"
-  print " ${blue_cor} jira ${reset_cor}\t\t = start work on a new JIRA ticket"
+  print "  1. set a project, type:${solid_yellow_cor} pro${reset_cor}"
+  print "  2. clone project, type:${yellow_cor} clone${reset_cor}"
+  print "  3. setup project, type:${yellow_cor} setup${reset_cor}"
+  print "  4. run a project, type:${yellow_cor} run${reset_cor}"
+  print "  5. start new job, type:${yellow_cor} jira${reset_cor}"
+
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "setup & run" "${yellow_cor}"
+  print ""
+  print " ${yellow_cor} clone ${reset_cor}\t = clone project or branch"
+  print " ${yellow_cor} jira ${reset_cor}\t\t = work on a jira ticket"
 
   local _setup="run \"setup\" script or package manager's install"
   local _run="${CURRENT_PUMP_RUN:-"run \"dev\" script"}"
@@ -8966,38 +8942,38 @@ function help() {
   local max=53
 
   if (( ${#_setup} > max )); then
-    # print " ${blue_cor} setup ${reset_cor}\t = ${_setup[1,$max]}"
-    print " ${blue_cor} setup ${reset_cor}\t = run PUMP_SETUP"
+    # print " ${yellow_cor} setup ${reset_cor}\t = ${_setup[1,$max]}"
+    print " ${yellow_cor} setup ${reset_cor}\t = run PUMP_SETUP"
   else
-    print " ${blue_cor} setup ${reset_cor}\t = $_setup"
+    print " ${yellow_cor} setup ${reset_cor}\t = $_setup"
   fi
   if (( ${#_run} > max )); then
-    print " ${blue_cor} run ${reset_cor}\t\t = run PUMP_RUN"
+    print " ${yellow_cor} run ${reset_cor}\t\t = run PUMP_RUN"
   else
-    print " ${blue_cor} run ${reset_cor}\t\t = $_run"
+    print " ${yellow_cor} run ${reset_cor}\t\t = $_run"
   fi
   if (( ${#_run_stage} > max )); then
-    print " ${blue_cor} run stage ${reset_cor}\t = run PUMP_RUN_STAGE"
+    print " ${yellow_cor} run stage ${reset_cor}\t = run PUMP_RUN_STAGE"
   else
-    print " ${blue_cor} run stage ${reset_cor}\t = $_run_stage"
+    print " ${yellow_cor} run stage ${reset_cor}\t = $_run_stage"
   fi
   if (( ${#_run_prod} > max )); then
-    print " ${blue_cor} run prod ${reset_cor}\t = run PUMP_RUN_PROD"
+    print " ${yellow_cor} run prod ${reset_cor}\t = run PUMP_RUN_PROD"
   else
-    print " ${blue_cor} run prod ${reset_cor}\t = $_run_prod"
+    print " ${yellow_cor} run prod ${reset_cor}\t = $_run_prod"
   fi
 
   if ! pause_output_; then return 0; fi
-  
+
   display_line_ "code review" "${cyan_cor}"
   print ""
   print " ${cyan_cor} rev ${reset_cor}\t\t = open a pull request for review"
   print " ${cyan_cor} revs ${reset_cor}\t\t = list existing reviews"
   print " ${cyan_cor} prune revs ${reset_cor}\t = delete merged reviews"
 
-  if ! pause_output_; then return 0; fi
-
   if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
+    if ! pause_output_; then return 0; fi
+
     display_line_ "$CURRENT_PUMP_PKG_MANAGER" "${solid_magenta_cor}"
     print ""
     print " ${solid_magenta_cor} build ${reset_cor}\t = $CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")build"
@@ -9046,9 +9022,9 @@ function help() {
     print " ${magenta_cor} e2eui ${reset_cor}\t = $CURRENT_PUMP_E2EUI"
     print " ${magenta_cor} test ${reset_cor}\t\t = $CURRENT_PUMP_TEST"
     print " ${magenta_cor} testw ${reset_cor}\t = $CURRENT_PUMP_TEST_WATCH"
-
-    if ! pause_output_; then return 0; fi
   fi
+  
+  if ! pause_output_; then return 0; fi
   
   display_line_ "git" "${solid_cyan_cor}"
   print ""
@@ -9115,7 +9091,6 @@ function help() {
   print ""
   print " ${solid_cyan_cor} fetch ${reset_cor}\t = fetch from $remote_name"
   print " ${solid_cyan_cor} pull ${reset_cor}\t\t = pull from $remote_name"
-  print ""
 
   if ! pause_output_; then return 0; fi
   
@@ -9142,30 +9117,47 @@ function help() {
 
   if ! pause_output_; then return 0; fi
   
-  display_line_ "release" "${yellow_cor}"
+  display_line_ "release" "${solid_pink_cor}"
   print ""
-  print " ${yellow_cor} dtag ${reset_cor}\t\t = delete a tag"
-  print " ${yellow_cor} drelease ${reset_cor}\t = delete a release"
-  print " ${yellow_cor} release ${reset_cor}\t = create a release"
-  print " ${yellow_cor} tag ${reset_cor}\t\t = create a tag"
-  print " ${yellow_cor} tags ${reset_cor}\t\t = list latest tags"
-  print " ${yellow_cor} tags 1 ${reset_cor}\t = display latest tag"
+  print " ${solid_pink_cor} dtag ${reset_cor}\t\t = delete a tag"
+  print " ${solid_pink_cor} drelease ${reset_cor}\t = delete a release"
+  print " ${solid_pink_cor} release ${reset_cor}\t = create a release"
+  print " ${solid_pink_cor} tag ${reset_cor}\t\t = create a tag"
+  print " ${solid_pink_cor} tags ${reset_cor}\t\t = list latest tags"
+  print " ${solid_pink_cor} tags 1 ${reset_cor}\t = display latest tag"
   
   if ! pause_output_; then return 0; fi
   
-  display_line_ "multi-step task" "${solid_pink_cor}"
+  display_line_ "special task" "${blue_cor}"
   print ""
-  print " ${solid_pink_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
-  print " ${solid_pink_cor} pra ${reset_cor}\t\t = set assignee to all pull requests"
-  print " ${solid_pink_cor} refix ${reset_cor}\t = reset last commit, run fix then re-push"
-  print " ${solid_pink_cor} recommit ${reset_cor}\t = reset last commit then commit changes to index again"
-  print " ${solid_pink_cor} release ${reset_cor}\t = bump version and create a release on github"
-  print " ${solid_pink_cor} repush ${reset_cor}\t = reset last commit then push changes again"
-  print " ${solid_pink_cor} rev ${reset_cor}\t\t = open a pull request for review on code editor"
+  print " ${blue_cor} cov <b> ${reset_cor}\t = compare test coverage with another branch"
+  print " ${blue_cor} jira ${reset_cor}\t\t = clone/checkout work for a jira ticket"
+  print " ${blue_cor} pra ${reset_cor}\t\t = set assignee to all pull requests"
+  print " ${blue_cor} refix ${reset_cor}\t = reset last commit, run fix then re-push"
+  print " ${blue_cor} recommit ${reset_cor}\t = reset last commit then commit changes to index again"
+  print " ${blue_cor} release ${reset_cor}\t = bump version and create a release on github"
+  print " ${blue_cor} repush ${reset_cor}\t = reset last commit then push changes again"
+  print " ${blue_cor} rev ${reset_cor}\t\t = open a pull request for review on code editor"
+  
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "general" "${solid_yellow_cor}"
+  print ""
+  print " ${solid_yellow_cor} cl ${reset_cor}\t\t = clear"
+  print " ${solid_yellow_cor} colors ${reset_cor}\t = display colors from 0 to 255"
+  print " ${solid_yellow_cor} del ${reset_cor}\t\t = delete utility"
+  print " ${solid_yellow_cor} help ${reset_cor}\t\t = display this help"
+  print " ${solid_yellow_cor} hg <text> ${reset_cor}\t = history | grep text"
+  print " ${solid_yellow_cor} kill <port> ${reset_cor}\t = kill port"
+  print " ${solid_yellow_cor} ll ${reset_cor}\t\t = ls -la"
+  print " ${solid_yellow_cor} nver ${reset_cor}\t\t = node version"
+  print " ${solid_yellow_cor} nlist ${reset_cor}\t = npm list global"
+  print " ${solid_yellow_cor} refresh ${reset_cor}\t = source .zshrc"
+  print " ${solid_yellow_cor} upgrade ${reset_cor}\t = upgrade pump + zsh + omp"
 
   print ""
-  print ""
-  print "  to learn more, visit:${blue_cor} https://github.com/fab1o/pump-zsh/wiki ${reset_cor}"
+  print "  add ${yellow_cor}-h${reset_cor} after any command to see more usage details"
+  print "  and visit: ${blue_cor}https://github.com/fab1o/pump-zsh/wiki${reset_cor}"
 }
 
 function validate_proj_cmd_strict_() {
