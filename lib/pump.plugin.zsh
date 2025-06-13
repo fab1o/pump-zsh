@@ -5868,6 +5868,16 @@ function jira() {
       return 1;
     fi
   fi
+
+  local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
+  if [[ -z "$projects" ]]; then
+    print " no JIRA projects found" >&2
+    print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+    return 1;
+  fi
+
+  jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+  if [[ -z "$jira_proj" ]]; then return 1; fi
   
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
     (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_status'))) AND \
