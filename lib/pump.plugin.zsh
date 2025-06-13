@@ -6556,15 +6556,29 @@ function pushf() {
   return $RET;
 }
 
+function pullr() {
+  set +x
+  eval "$(parse_flags_ "pullr_" "" "pqf" "$@")"
+  (( pullr_is_d )) && set -x
+
+  if (( pullr_is_h )); then
+    print "  ${yellow_cor}pullr ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull rebase from origin"
+    return 0;
+  fi
+
+  pull -r $@
+}
+
 function pull() {
   set +x
-  eval "$(parse_flags_ "pull_" "to" "prqf" "$@")"
+  eval "$(parse_flags_ "pull_" "tor" "pqf" "$@")"
   (( pull_is_d )) && set -x
 
   if (( pull_is_h )); then
     print "  ${yellow_cor}pull ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
     print "  ${yellow_cor}pull -t${reset_cor} : to pull tags along with branches"
     print "  ${yellow_cor}pull -to${reset_cor} : to pull tags only"
+    print "  ${yellow_cor}pull -r${reset_cor} : to pull rebase from origin"
     return 0;
   fi
 
@@ -6620,11 +6634,13 @@ function pull() {
   fi
 
   git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
-  if (( $? != 0 )); then
+  RET=$?
+  if (( RET != 0 && pull_is_r )); then
     git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
-    if (( $? != 0 )); then
+    RET=$?
+    if (( RET != 0 )); then
       git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
-      return $?;
+      RET=$?
     fi
   fi
 
@@ -6632,6 +6648,8 @@ function pull() {
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
+
+  return $RET
 }
 
 function dtag() {
@@ -9127,7 +9145,6 @@ function help() {
   print ""
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "fetch" "fetch from $remote_name"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pull" "pull from $remote_name"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pullf" "pull force from $remote_name"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pullr" "pull rebase from $remote_name"
 
   if ! pause_output_; then return 0; fi
