@@ -6221,9 +6221,7 @@ function fetch() {
   if (( fetch_is_t )); then 
     git -C "$folder" fetch --all --tags --prune-tags --force $@
     RET=$?
-    if (( fetch_is_o )); then
-      return $RET;
-    fi
+    if (( fetch_is_o )); then return $RET; fi
   fi
 
   local remote_name=$(get_remote_origin_ "$folder")
@@ -6627,7 +6625,9 @@ function pull() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then return 1; fi
+  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then
+    return 1;
+  fi
 
   local RET=0
 
