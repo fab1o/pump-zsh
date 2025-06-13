@@ -1,11 +1,6 @@
 typeset -g is_debug=0 # (debug flag) when -d is on, it will be shared across all subsequent function calls
 typeset -g MAX_NAME_COUNT=15
 
-typeset -Ag node_folder node_branch node_project
-typeset -Ag ll_next ll_prev
-typeset -gi node_counter=0
-typeset -g head=""
-
 typeset -g dark_gray_cor="\e[38;5;240m"
 typeset -g gray_cor="\e[38;5;248m"
 
@@ -43,24 +38,31 @@ typeset -g purple_cor="\e[38;5;99m"
 
 typeset -g reset_cor="\e[0m"
 
-typeset -g purple_prompt_cor=$'\e[1;38;5;99m'
-typeset -g lightpurple_prompt_cor=$'\e[38;2;167;139;250m'
+typeset -g green_prompt_cor=$'\e[32m'
+typeset -g blue_prompt_cor=$'\e[0;94m'
+typeset -g magenta_prompt_cor=$'\e[0;95m'
+
+typeset -g bright_pink_prompt_cor=$'\e[38;5;201m'
+typeset -g pink_prompt_cor=$'\e[38;5;212m'
+
+typeset -g purple_prompt_cor=$'\e[38;5;99m'
+typeset -g bold_purple_prompt_cor=$'\e[1;38;5;99m'
+typeset -g light_purple_prompt_cor=$'\e[38;2;167;139;250m'
+
 typeset -g reset_prompt_cor=$'\e[0m'
 
 typeset -g PUMP_VERSION="0.0.0"
 
 typeset -g PUMP_VERSION_FILE="$(dirname "$0")/.version"
-typeset -g PUMP_WORKING_FILE="$(dirname "$0")/.working"
 typeset -g PUMP_CONFIG_FILE="$(dirname "$0")/config/pump.zshenv"
-# typeset -g PUMP_PRO_FILE="$(dirname "$0")/.pump"
-# typeset -g PUMP_PRO_PWD_FILE="$(dirname "$0")/.pump.pwd"
 
 [[ -f "$PUMP_VERSION_FILE" ]] && PUMP_VERSION=$(<"$PUMP_VERSION_FILE")
 
 if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then
   cp "$(dirname "$0")/config/pump.zshenv.default" "$PUMP_CONFIG_FILE" &>/dev/null
   if [[ ! -f "$PUMP_CONFIG_FILE" ]]; then
-    print "${red_cor} config file '$PUMP_CONFIG_FILE' does not exist, re-install pump-zsh ${reset_cor}"
+    print " ${red_cor}fatal:${reset_cor} config file does not exist, re-install pump-zsh:" >&2
+    print " curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh" >&2
     return 1;
   fi
 fi
@@ -179,18 +181,11 @@ function parse_flags_() {
     fi
   done
 
-  # local OPTIND=1 opt
-  # while getopts ":abcdefghijklmnopqrstuvwxyz" opt; do; done
-
-  # if (( OPTIND > 1 )); then
-  #   shift $((OPTIND - 1))
-  # else
-    if [[ ${#non_flags} -gt 0 ]]; then
-      echo "set -- ${(q+)non_flags[@]} ${(q+)flags[@]} ${(q+)flags_double_dash[@]}"
-    else
-      echo "set -- "" ${(q+)flags[@]} ${(q+)flags_double_dash[@]}"
-    fi
-  # fi
+  if [[ ${#non_flags} -gt 0 ]]; then
+    echo "set -- ${(q+)non_flags[@]} ${(q+)flags[@]} ${(q+)flags_double_dash[@]}"
+  else
+    echo "set -- "" ${(q+)flags[@]} ${(q+)flags_double_dash[@]}"
+  fi
 }
 
 function confirm_() {
@@ -210,19 +205,17 @@ function confirm_() {
     else
       change_default=0
     fi
-
     ##########################################################################
     # VERY IMPORTANT: 2>/dev/tty to display on VSCode Terminal and on refresh
     ##########################################################################
-
     if (( change_default )); then
-      gum confirm ""confirm:$'\e[0m'" $question" \
+      gum confirm "confirm:${reset_prompt_cor} $question" \
         --no-show-help \
         --default=false \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
     else
-      gum confirm ""confirm:$'\e[0m'" $question" \
+      gum confirm "confirm:${reset_prompt_cor} $question" \
         --no-show-help \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
@@ -303,128 +296,6 @@ function cl() {
   tput reset
 }
 
-function ll_add_node_() {
-  local project="$1"
-  local folder="$(pwd)"
-  
-  local branch=$(git branch --show-current)
-
-  if [[ -z "$project" ]]; then
-    project=$(find_proj_by_folder_)
-  fi
-
-  node_project[$id]="$i"
-  node_folder[$id]="$folder"
-  node_branch[$id]="$branch"
-
-  local id="node$((++node_counter))"
-
-  node_project[$id]="$i"
-  node_folder[$id]="$folder"
-  node_branch[$id]="$branch"
-
-  if [[ -z "$head" ]]; then
-    ll_next[$id]="$id"
-    ll_prev[$id]="$id"
-    head="$id"
-  else
-    local tail="${ll_prev[$head]}"
-    ll_next[$tail]="$id"
-    ll_prev[$id]="$tail"
-    ll_next[$id]="$head"
-    ll_prev[$head]="$id"
-  fi
-}
-
-function ll_remove_node_() {
-  local folder="$1" branch="$2" project="$3"
-
-  if [[ -z "$head" ]]; then
-    return 1;
-  fi
-
-  local id="$head"
-
-  while true; do
-    if [[ "${node_folder[$id]}" == "$folder" &&
-          "${node_branch[$id]}" == "$branch" &&
-          "${node_project[$id]}" == "$project" ]]; then
-  
-      local prev="${ll_prev[$id]}"
-      local next="${ll_next[$id]}"
-
-      if [[ "$id" == "$prev" ]]; then
-        # Single node
-        unset node_folder[$id] node_branch[$id] node_project[$id]
-        unset ll_prev[$id] ll_next[$id]
-        head=""
-      else
-        ll_next[$prev]="$next"
-        ll_prev[$next]="$prev"
-        [[ "$id" == "$head" ]] && head="$next"
-        unset node_folder[$id] node_branch[$id] node_project[$id]
-        unset ll_prev[$id] ll_next[$id]
-      fi
-
-      return 0
-    fi
-
-    id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break;
-  done
-
-  return 1;
-}
-
-function ll_traverse_() {
-  if [[ -z "$head" ]]; then
-    return
-  fi
-
-  local id="$head"
-
-  while true; do
-    print "pro=${PUMP_PROJ_SHORT_NAME[${node_project[$id]}]}, folder=${node_folder[$id]}, branch=${node_branch[$id]}"
-    id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break;
-  done
-}
-
-function ll_save_() {
-  local file="${1:-$PUMP_WORKING_FILE}"
-
-  echo "" > "$file"
-
-  if [[ -z "$head" ]]; then return; fi
-
-  local id="$head"
-  while true; do
-    echo "${node_project[$id]}|${node_folder[$id]}|${node_branch[$id]}" >> "$file"
-    id="${ll_next[$id]}"
-    [[ "$id" == "$head" ]] && break;
-  done
-}
-
-function ll_restore_() {
-  local file="${1:-$PUMP_WORKING_FILE}"
-
-  if [[ ! -f "$file" ]]; then
-    return 1;
-  fi
-
-  # Clear everything
-  node_folder=()
-  node_branch=()
-  node_project=()
-  ll_next=()
-  ll_prev=()
-  head=""
-
-  while IFS='|' read -r project folder branch; do
-    ll_add_node_ "$project" "$folder" "$branch"
-  done < "$file"
-}
-
 function input_from_() {
   local header="$1"
   local placeholder="$2"
@@ -434,8 +305,7 @@ function input_from_() {
   local _input=""
 
   # >&2 needs to display because this is called from a subshell
-  # print " ${header}:" >&2
-  print " ${lightpurple_prompt_cor}${header}:${reset_cor}" >&2
+  print " ${light_purple_prompt_cor}${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
     _input=$(gum input --placeholder="$placeholder" --char-limit="$max" --value="$value")
@@ -452,12 +322,8 @@ function input_from_() {
     read "?> " _input
     stty echoctl
     trap - INT
-
-    # clear_last_line_2_
   fi
   
-  # clear_last_line_2_
-
   # if [[ "$_input" == $'\e' ]]; then # doesn't work
   #   return 130;
   # fi
@@ -484,7 +350,7 @@ function filter_one_() {
   local RET=0
 
   if command -v gum &>/dev/null; then
-    print "${purple_prompt_cor} choose $header: ${reset_cor}" >&2
+    print "${bold_purple_prompt_cor} choose $header: ${reset_cor}" >&2
     
     local choice=""
     
@@ -533,7 +399,7 @@ function choose_one_() {
   
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${lightpurple_prompt_cor}choose $header: ${reset_prompt_cor}"
+  PS3="${light_purple_prompt_cor}choose $header: ${reset_prompt_cor}"
 
   select choice in "${@:2}" "quit"; do
     case $choice in
@@ -563,9 +429,9 @@ function choose_multiple_() {
   if command -v gum &>/dev/null; then
     local choice=""
     if (( choose_multiple_is_a )); then
-      choices="$(gum choose --select-if-one --height="20" --no-limit --header=" choose multiple $header ${lightpurple_prompt_cor}(use spacebar to select)${purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
+      choices="$(gum choose --select-if-one --height="20" --no-limit --header=" choose multiple $header ${light_purple_prompt_cor}(use spacebar to select)${bold_purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
     else
-      choices="$(gum choose --height="20" --no-limit --header=" choose multiple $header ${lightpurple_prompt_cor}(use spacebar to select)${purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
+      choices="$(gum choose --height="20" --no-limit --header=" choose multiple $header ${light_purple_prompt_cor}(use spacebar to select)${bold_purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
     fi
     RET=$?
     
@@ -578,7 +444,7 @@ function choose_multiple_() {
   trap 'print ""; return 130' INT # for some reason it returns 2
 
   choices=()
-  PS3="${lightpurple_prompt_cor}choose multiple $header, then choose \"done\" to finish ${choices[*]}${reset_prompt_cor}"
+  PS3="${light_purple_prompt_cor}choose multiple $header, then choose \"done\" to finish ${choices[*]}${reset_prompt_cor}"
 
   select choice in "${@:2}" "done"; do
     case $choice in
@@ -793,7 +659,7 @@ function find_proj_folder_() {
 
   # >&2 needs to display because this is called from a subshell
   # print " ${header}:" >&2
-  print "${lightpurple_prompt_cor} ${header}:${reset_cor}" >&2
+  print "${light_purple_prompt_cor} ${header}:${reset_cor}" >&2
   print "" >&2
 
   add-zsh-hook -d chpwd pump_chpwd_
@@ -820,7 +686,7 @@ function find_proj_folder_() {
         print "  ${red_cor}not a folder, please select a folder${reset_cor}" >&2
         cd "$HOME"
       else
-        confirm_ "set project folder to: "$'\e[94m'${realfolder}$'\e[0m'" or continue to browse further?" "set folder" "continue to browse"
+        confirm_ "set project folder to: ${blue_prompt_cor}${realfolder}${reset_prompt_cor} or continue to browse further?" "set folder" "continue to browse"
         RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if (( RET == 1 )); then
@@ -1092,41 +958,6 @@ function display_line_() {
   fi
 
   print "${color} $line ${reset_cor}" >&1
-}
-
-function delete_pump_working_() {
-  local item="$1"
-  local pump_working_branch="$2"
-  local proj_arg="$3"
-
-  if [[ -z "$pump_working_branch" || -z "$proj_arg" ]]; then
-    return 0;
-  fi
-
-  if [[ "$item" == "$pump_working_branch" ]]; then
-    local i=0
-    for i in {1..9}; do
-      if [[ "$proj_arg" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        rm -f "${PUMP_WORKING_FILE[$i]}"
-        PUMP_WORKING[$i]=""
-        break;
-      fi
-    done
-  fi
-}
-
-function delete_pump_workings_() {
-  local pump_working_branch="$1"
-  local proj_arg="$2"
-  local selected_items="$3"
-
-  if [[ -z "$pump_working_branch" || -z "$proj_arg" ]]; then
-    return 0;
-  fi
-
-  for item in $selected_items; do
-    delete_pump_working_ "$item" "$pump_working_branch" "$proj_arg"
-  done
 }
 
 function sanitize_pkg_name_() {
@@ -1425,7 +1256,7 @@ function choose_mode_() {
 
   local default=$((( mode )) && echo "single" || echo "multiple")
 
-  confirm_ "manage the project with "$'\e[38;5;212m'multiple$'\e[0m'" or "$'\e[38;5;99m'single$'\e[0m'" mode?" "multiple" "single" "$default"
+  confirm_ "manage the project with ${pink_prompt_cor}multiple${reset_prompt_cor} or ${purple_prompt_cor}single${reset_prompt_cor} mode?" "multiple" "single" "$default"
   local RET=$?
 
   local i=0
@@ -1849,7 +1680,7 @@ function save_proj_folder_() {
     fi
     if (( save_proj_folder_is_a )); then
       # ask to use pwd
-      confirm_ "use as project folder: "$'\e[94m'$PWD$'\e[0m'"?"
+      confirm_ "use as project folder: ${blue_prompt_cor}$PWD${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
@@ -1862,7 +1693,7 @@ function save_proj_folder_() {
   local RET=0
   
   if (( save_proj_folder_is_e )) && [[ -n "$proj_folder" ]]; then
-    confirm_ "keep using project folder: "$'\e[94m'$proj_folder$'\e[0m'"?"
+    confirm_ "keep using project folder: ${blue_prompt_cor}$proj_folder${reset_prompt_cor}?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1949,7 +1780,7 @@ function save_proj_repo_() {
 
   if (( ! save_proj_repo_is_f )); then
     if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
-      confirm_ "keep using repository: "$'\e[94m'$proj_repo$'\e[0m'"?"
+      confirm_ "keep using repository: ${blue_prompt_cor}$proj_repo${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 1 )); then
@@ -2077,7 +1908,7 @@ function save_pkg_manager_() {
   local RET=0
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
-    confirm_ "set package manager "$'\e[38;5;212m'${pkg_manager}$'\e[0m'"?"
+    confirm_ "set package manager ${pink_prompt_cor}${pkg_manager}${reset_prompt_cor}?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -3556,7 +3387,7 @@ function select_pr_() {
   local RET=0
 
   if [[ $count -gt 20 ]]; then
-    print "${purple_prompt_cor} choose pull request: ${reset_cor}" >&2
+    print "${bold_purple_prompt_cor} choose pull request: ${reset_cor}" >&2
     select_pr_title=$(echo "$titles" | gum filter --limit 1 --select-if-one --height 20  --indicator=">" --placeholder=" type to filter")
     RET=$?
   else
@@ -3572,26 +3403,6 @@ function select_pr_() {
   if [[ -z "$select_pr_choice" || -z "$select_pr_branch" ]]; then return 1; fi
 
   echo "${select_pr_choice}|${select_pr_branch}|${select_pr_title}"
-}
-
-function open_working_() {
-  local project="$node_project[$head]"
-  local folder="$node_folder[$head]"
-  local branch="$node_branch[$head]"
-
-  local past_folder="$(pwd)"
-  local past_branch=$(git branch --show-current)
-  
-  if [[ -n "$folder" ]]; then
-    if pushd "$folder" &>/dev/null; then
-      if [[ -n "$branch" ]]; then
-        co -ex "$branch"
-        ll_add_node_ "$project" "$past_folder" "$past_branch"
-      fi
-    fi
-  elif [[ -n "$branch" ]]; then
-    co -ex "$branch"
-  fi
 }
 
 function get_from_pkg_json_() {
@@ -3993,7 +3804,7 @@ function del_file_() {
   fi
 
   if (( ! del_file_s && count <= 3 )) && [[ "${file:t}" != ".DS_Store" ]]; then;
-    confirm_ "delete $type: $file"$'\e[0m'" ?"
+    confirm_ "delete $type: ${blue_prompt_cor}$file${reset_prompt_cor}?"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET != 0 )); then
@@ -4002,9 +3813,6 @@ function del_file_() {
     fi
   fi
 
-  # if [[ -d "$file" && -n "$pump_working_branch" && -n "$_pro" ]]; then
-  #   delete_pump_working_ $(basename "$file") "$pump_working_branch" "$_pro"
-  # fi
   if command -v gum &>/dev/null; then
     gum spin --title="deleting... $file" -- rm -rf -- "$file"
   else
@@ -4049,7 +3857,7 @@ function del_files_() {
     if (( ! del_files_s && count > 3 )); then
       if (( dont_ask == 0 )); then
         dont_ask=1;
-        confirm_ "delete all: "$'\e[94m'"${(j:, :)files[$count,-1]}"$'\e[0m'" ?"
+        confirm_ "delete all: ${blue_prompt_cor}${(j:, :)files[$count,-1]}${reset_prompt_cor}?"
         RET=$?
         if (( RET == 130 )); then
           break;
@@ -4924,7 +4732,7 @@ function pr() {
   pr_title=$(input_name_ "pull request title" "$pr_title" 255)
   if (( $? == 130 )); then return 130; fi
 
-  print " ${lightpurple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
+  print " ${light_purple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
 
   jira_key=$(extract_jira_key_ "$pr_title")
   if (( $? == 1 )); then
@@ -5734,7 +5542,7 @@ function clone() {
   fi
 
   if [[ -z "$pump_default_branch" || "$default_branch" != "$pump_default_branch" ]]; then
-    confirm_ "save default branch "$'\e[32m'$default_branch$'\e[0m'" and don't ask again, unless it changes?"
+    confirm_ "save default branch ${green_prompt_cor}$default_branch${reset_prompt_cor} and don't ask again, unless it changes?"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 0 )); then
@@ -5786,10 +5594,6 @@ function clone() {
   if [[ -n "$jira_key" ]]; then
     jira -p "$jira_key" "$proj_arg" 2>/dev/null
   fi
-
-  # if (( $? == 0 )); then
-  #   save_pump_working_ "$proj_arg"
-  # fi
 
   local my_branch=$(git branch --show-current)
 
@@ -6330,7 +6134,7 @@ function recommit() {
     qty_unstaged_files=$(git diff --name-only | wc -l)
     if (( qty_unstaged_files > 1 )); then
       if [[ -z "$CURRENT_PUMP_COMMIT_ADD" ]]; then
-        confirm_ "add all unstaged changes to commit \""$'\e[94m'$last_commit_msg$'\e[0m'"\" ?"
+        confirm_ "include all unstaged changes to commit \"${blue_prompt_cor}$last_commit_msg${reset_prompt_cor}\"?"
         if (( $? == 130 || $? == 2 )); then return 130; fi
         if (( $? == 0 )); then
           if ! git reset --quiet --soft HEAD~1 1>/dev/null; then return 1; fi
@@ -7812,16 +7616,9 @@ function co() {
       print " fatal: branch is required" >&2
       return 1;
     fi
-    
-    # local current_branch=$(git branch --show-current)
-    # local _past_folder="$(pwd)"
 
     git switch "$branch" ${@:2}
     RET=$?
-
-    # if (( RET == 0 )); then
-    #   ll_add_node_
-    # fi
 
     return $RET;
   fi
@@ -7857,49 +7654,9 @@ function co() {
     jira -p "$jira_key" 2>/dev/null
   fi
 
-  # ll_add_node_
-
   git config "branch.${branch}.gh-merge-base" "$base_branch"
   
   return 0;
-}
-
-function next() {
-  set +x
-  eval "$(parse_flags_ "next_" "" "" "$@")"
-  (( next_is_d )) && set -x
-
-  if (( next_is_h )); then
-    print "  ${yellow_cor}next${reset_cor} : to go the next folder and branch"
-    return 0;
-  fi
-
-  if [[ -z "$head" ]]; then
-    print " fatal: no next folder or branch found" >&2
-    return 1;
-  fi
-
-  $head=$ll_next[$head]
-  open_working_
-}
-
-function prev() {
-  set +x
-  eval "$(parse_flags_ "prev_" "" "" "$@")"
-  (( prev_is_d )) && set -x
-
-  if (( prev_is_h )); then
-    print "  ${yellow_cor}prev${reset_cor} : to go the previous folder and branch"
-    return 0;
-  fi
-
-  if [[ -z "$head" ]]; then
-    print " fatal: no previous folder or branch found" >&2
-    return 1;
-  fi
-
-  $head=$ll_prev[$head]
-  open_working_
 }
 
 function back() {
@@ -7915,11 +7672,6 @@ function back() {
   if ! is_git_repo_; then return 1; fi
 
   git switch -
-
-  # if (( $? == 0 )); then
-  #   $head=$ll_prev[$head]
-  #   open_working_
-  # fi
 }
 
 function dev() {
@@ -8317,7 +8069,7 @@ function delb() {
   for branch in ${selected_branches[@]}; do
     if (( ! delb_is_s || delb_is_r )); then
       local origin=$((( delb_is_r )) && echo "remote" || echo "local")
-      confirm_ "delete ${origin} branch: "$'\e[0;95m'$branch$'\e[0m'" ?"
+      confirm_ "delete ${origin} branch: ${magenta_prompt_cor}$branch${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then break; fi
       if (( RET == 1 )); then continue; fi
@@ -8338,10 +8090,6 @@ function delb() {
       deleted_branches+=("$branch")
     fi
   done
-
-  # if (( ${#deleted_branches[@]} )); then
-  #   delete_pump_workings_ "$pump_working_branch" "$proj_arg" "${deleted_branches[@]}"
-  # fi
 
   return $RET;
 }
@@ -8742,7 +8490,7 @@ function pro() {
       if (( foundI )); then
         save_proj_f_ -e $foundI "$proj_cmd" "$pkg_name"
       else
-        if confirm_ "add new project: "$'\e[38;5;201m'"$pkg_name"$'\e[0m'" ?"; then
+        if confirm_ "add new project: ${bright_pink_prompt_cor}$pkg_name${reset_prompt_cor}?"; then
           save_proj_f_ -a $emptyI "$proj_cmd" "$pkg_name"
         fi
       fi
@@ -9145,7 +8893,7 @@ function help() {
     if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
       pro -a
     else
-      print "  ${red_cor}pro <name>${reset_cor}\t = to set project and enable commands not listed here"
+      print "  ${red_cor}pro <name>${reset_cor}\t = to set project and enable custom commands"
       local i=0
       for i in {1..9}; do
         if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
@@ -9316,8 +9064,8 @@ function help() {
   print " ${solid_cyan_cor} co ${reset_cor}\t\t = switch branch (checkout)"
   print " ${solid_cyan_cor} dev ${reset_cor}\t\t = switch to dev or develop branch"
   print " ${solid_cyan_cor} main ${reset_cor}\t\t = switch to main branch"
-  print " ${solid_cyan_cor} next ${reset_cor}\t\t = go to the next working folder/branch"
-  print " ${solid_cyan_cor} prev ${reset_cor}\t\t = go to the previous working folder/branch"
+  # print " ${solid_cyan_cor} next ${reset_cor}\t\t = go to the next working folder/branch"
+  # print " ${solid_cyan_cor} prev ${reset_cor}\t\t = go to the previous working folder/branch"
   print " ${solid_cyan_cor} prod ${reset_cor}\t\t = switch to prod or production branch"
   print " ${solid_cyan_cor} renb <b>${reset_cor}\t = rename branch"
   print " ${solid_cyan_cor} stage ${reset_cor}\t = switch to stage or staging branch"
@@ -9667,67 +9415,11 @@ for i in {1..9}; do
   fi
 done
 
-# function activate_pro_() {
-#   # pro pwd
-#   if pro -f "pwd" 2>/dev/null; then
-#     rm -f "$PUMP_PRO_PWD_FILE" &>/dev/null
-#     return 0;
-#   fi
+pro -f "pwd" 2>/dev/null
 
-#   # Read the current project short name from the PUMP_PRO_FILE if it exists
-#   if [[ -f "$PUMP_PRO_FILE" ]]; then
-#     local project_names=()
-#     local pump_pro_file_value=$(<"$PUMP_PRO_FILE")
-
-#     if [[ -n "$pump_pro_file_value" ]]; then
-#       local i=0
-#       local found=0
-#       for i in {1..9}; do
-#         if [[ "$pump_pro_file_value" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-#           found=1
-#           if ! validate_proj_cmd_ "$pump_pro_file_value" &>/dev/null; then
-#             rm -f "$PUMP_PRO_FILE" &>/dev/null
-#           else
-#             project_names=("$pump_pro_file_value")
-#           fi
-#           break;
-#         fi
-#       done
-#       if (( found == 0 )); then
-#         rm -f "$PUMP_PRO_FILE" &>/dev/null
-#       fi
-#     fi
-#   fi
-
-#   local i=0
-#   for i in {1..9}; do
-#     if [[ -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-#       if [[ ! " ${project_names[@]} " =~ " ${PUMP_PROJ_SHORT_NAME[$i]} " ]]; then
-#         project_names+=("${PUMP_PROJ_SHORT_NAME[$i]}")
-#       fi
-#     fi
-#   done
-
-#   # Loop over the projects to check and execute them
-#   for project in "${project_names[@]}"; do
-#     if pro -f "$project" 2>/dev/null; then
-#       rm -f "$PUMP_PRO_PWD_FILE" &>/dev/null
-#       return 0;
-#     fi
-#   done
-
-#   return 1;
-# }
-
-# activate_pro_ # set project
-
-if pro -f "pwd" 2>/dev/null; then
-  # rm -f "$PUMP_PRO_PWD_FILE" &>/dev/null
-fi
+add-zsh-hook chpwd pump_chpwd_
 
 # ==========================================================================
 # 1>/dev/null or >/dev/null	  Hide stdout, show stderr
 # 2>/dev/null                 show stdout, hide stderr
 # &>/dev/null	                Hide both stdout and stderr outputs
-
-add-zsh-hook chpwd pump_chpwd_
