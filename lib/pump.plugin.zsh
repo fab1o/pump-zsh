@@ -6227,7 +6227,7 @@ function fetch() {
   fi
 
   local remote_name=$(get_remote_origin_ "$folder")
-  local results="$(git -C "$folder" fetch $remote_name --prune $@ 2>/dev/null)"
+  local results="$(git -C "$folder" fetch $remote_name --prune $@ 2>&1 | tee /dev/tty)"
   RET=$?
 
   if [[ -n "$results" ]]; then
@@ -6362,7 +6362,11 @@ function glog() {
     return $?;
   fi
 
-  git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative -n 10 $@
+  if (( glog_is_a )); then
+    git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative $@
+  else
+    git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative -n 10 $@
+  fi
 }
 
 function push() {
@@ -6635,16 +6639,26 @@ function pull() {
 
   git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
   RET=$?
-  if (( RET != 0 && pull_is_r )); then
-    git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
-    RET=$?
-    if (( RET != 0 )); then
-      git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
+  if (( RET != 0 )); then
+    if (( ! pull_is_r )); then
+      confirm_ "pull failed, try pull --rebase?"
+      if (( $? == 130 || $? == 2 )); then return 1; fi
+      if (( $? == 0 )); then
+        pull_is_r=1
+      fi
+    fi
+
+    if (( pull_is_r )); then
+      git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
       RET=$?
+      if (( RET != 0 )); then
+        git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
+        RET=$?
+      fi
     fi
   fi
 
-  if (( ! ${argv[(Ie)--quiet]} )); then
+  if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
