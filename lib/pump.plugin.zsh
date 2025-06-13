@@ -2440,7 +2440,6 @@ function remove_proj_() {
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" &>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
-  update_setting_ $i "PUMP_JIRA_PROJ" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_IN_REVIEW" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_DONE" "" &>/dev/null
@@ -2485,7 +2484,6 @@ function set_current_proj_() {
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
-  CURRENT_PUMP_JIRA_PROJ="${PUMP_JIRA_PROJ[$i]}"
   CURRENT_PUMP_JIRA_IN_PROGRESS="${PUMP_JIRA_IN_PROGRESS[$i]}"
   CURRENT_PUMP_JIRA_IN_REVIEW="${PUMP_JIRA_IN_REVIEW[$i]}"
   CURRENT_PUMP_JIRA_DONE="${PUMP_JIRA_DONE[$i]}"
@@ -2745,7 +2743,6 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_JIRA_PROJ[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${PUMP_JIRA_IN_PROGRESS[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${PUMP_JIRA_IN_REVIEW[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${PUMP_JIRA_DONE[$i]}]"
@@ -2787,7 +2784,6 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
-  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_PROJ=${reset_cor}$CURRENT_PUMP_JIRA_PROJ]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}$CURRENT_PUMP_JIRA_IN_REVIEW]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}$CURRENT_PUMP_JIRA_DONE]"
@@ -3691,7 +3687,6 @@ function load_config_entry_() {
     PUMP_PUSH_ON_REFIX
     PUMP_PRINT_README
     PUMP_PKG_NAME
-    PUMP_JIRA_PROJ
     PUMP_JIRA_IN_PROGRESS
     PUMP_JIRA_IN_REVIEW
     PUMP_JIRA_DONE
@@ -3845,9 +3840,6 @@ function load_config_entry_() {
         ;;
       PUMP_PKG_NAME)
         PUMP_PKG_NAME[$i]="$value"
-        ;;
-      PUMP_JIRA_PROJ)
-        PUMP_JIRA_PROJ[$i]="$value"
         ;;
       PUMP_JIRA_IN_PROGRESS)
         PUMP_JIRA_IN_PROGRESS[$i]="$value"
@@ -5940,7 +5932,6 @@ function jira() {
   
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
-  local jira_proj="${PUMP_JIRA_PROJ[$i]}"
   local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
   local jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"In Review"}"
   local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
@@ -6009,6 +6000,7 @@ function jira() {
     return 1;
   fi
 
+  local jira_proj=""
   jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
   if [[ -z "$jira_proj" ]]; then return 1; fi
 
@@ -8477,7 +8469,6 @@ function pro() {
     print "  ${pro_i_cor}project mode:${reset_cor} $( (( ${PUMP_PROJ_SINGLE_MODE[$i]} )) && echo "single" || echo "multiple" )"
     print "  ${pro_i_cor}package manager:${reset_cor} ${PUMP_PKG_MANAGER[$i]}"
     print "  ${pro_i_cor}node.js version:${reset_cor} ${PUMP_NVM_USE_V[$i]}"
-    # print "  ${pro_i_cor}jira project:${reset_cor} ${PUMP_JIRA_PROJ[$i]}"
     display_line_ "" "${pro_i_cor}"
     return $?;
   fi
@@ -9576,7 +9567,6 @@ typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
-typeset -gA PUMP_JIRA_PROJ
 typeset -gA PUMP_JIRA_IN_PROGRESS
 typeset -gA PUMP_JIRA_IN_REVIEW
 typeset -gA PUMP_JIRA_IN_DONE
@@ -9616,7 +9606,6 @@ typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
-typeset -g CURRENT_PUMP_JIRA_PROJ=""
 typeset -g CURRENT_PUMP_JIRA_IN_PROGRESS=""
 typeset -g CURRENT_PUMP_JIRA_IN_REVIEW=""
 typeset -g CURRENT_PUMP_JIRA_DONE=""
