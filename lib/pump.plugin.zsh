@@ -8845,8 +8845,8 @@ function __commit() {
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
-    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit (open commit wizard)"
-    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message (no wizard)"
+    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit (with commit wizard)"
+    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message"
     print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
     print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
     return 0;
@@ -8873,7 +8873,7 @@ function __commit() {
 
   if [[ -z "$1" ]]; then
     if ! command -v gum &>/dev/null; then
-      print " fatal: commit wizard requires gum" >&2
+      print " fatal: commit with wizard requires gum" >&2
       print " install gum:${blue_cor} https://github.com/charmbracelet/gum ${reset_cor}" >&2
       return 1;
     fi
@@ -8885,6 +8885,7 @@ function __commit() {
     fi
 
     # scope is optional
+    local scope_commit=""
     scope_commit=$(gum input --placeholder "scope")
     if (( $? != 0 )); then return 0; fi
     
@@ -9152,7 +9153,7 @@ function help() {
   display_line_ "git push" "${solid_cyan_cor}"
   print ""
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (open wizard)"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (with wizard)"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message (no wizard)"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push no-verify to $remote_name"
@@ -9169,12 +9170,11 @@ function help() {
   
   display_line_ "release" "${solid_pink_cor}"
   print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "dtag" "delete a tag"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "drelease" "delete a release"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "release" "create a release"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "tag" "create a tag"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "tags" "list latest tags"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "tags 1" "display latest tag"
+  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "dtag" "delete a tag"
+  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "drelease" "delete a release"
+  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "release" "create a release"
+  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "tag" "create a tag"
+  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "tags" "display latest tags"
   
   if ! pause_output_; then return 0; fi
   
