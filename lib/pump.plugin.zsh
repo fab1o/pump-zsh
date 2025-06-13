@@ -8845,7 +8845,7 @@ function __commit() {
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
-    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit (with commit wizard)"
+    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit (with conventional commits: https://www.conventionalcommits.org/)"
     print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit with message"
     print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
     print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
@@ -8873,16 +8873,15 @@ function __commit() {
 
   if [[ -z "$1" ]]; then
     if ! command -v gum &>/dev/null; then
-      print " fatal: commit with wizard requires gum" >&2
+      print " fatal: commit (with conventional commits) requires gum" >&2
       print " install gum:${blue_cor} https://github.com/charmbracelet/gum ${reset_cor}" >&2
       return 1;
     fi
     
     # types="fix|feat|docs|refactor|test|chore|style|revert"
-    local type_commit=$(gum choose "fix" "feat" "docs" "refactor" "test" "chore" "style" "revert")
-    if [[ -z "$type_commit" ]]; then
-      return 0;
-    fi
+    local type_commit=""
+    type_commit=$(choose_one_ "commmit type" "fix" "feat" "test" "build" "chore" "ci" "docs" "perf" "refactor" "revert" "style")
+    if [[ -z "$type_commit" ]]; then return 0; fi
 
     # scope is optional
     local scope_commit=""
@@ -8893,31 +8892,38 @@ function __commit() {
       scope_commit="($scope_commit)"
     fi
 
-    local msg_arg=""
-
-    msg_arg="$(gum input --value "${type_commit}${scope_commit}: ")"
+    if confirm_ "breaking change?"; then
+      type_commit="${type_commit}!"
+    fi
+    
+    local commit_msg=""
+    commit_msg="$(gum input --value "${type_commit}${scope_commit}: ")"
     if (( $? != 0 )); then return 0; fi
+    if [[ -z "$commit_msg" ]]; then return 0; fi
+
+    commit_msg="${commit_msg%.}"
 
     local my_branch=$(git branch --show-current)
+    local jira_key=$(extract_jira_key_ "$my_branch")
     
-    if [[ $my_branch =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then # [A-Z]+-[0-9]+
-      local ticket="${match[1]} "
+    if [[ -n "$jira_key" ]]; then
       local skip=0;
 
-      # check if an old commit message already contains the ticket number
-      git log -n 15 --pretty=format:"%s" | xargs -0 | while read -r line; do
-        if [[ "$line" == "$ticket"* ]]; then
+      local default_branch=$(get_default_branch_)
+      
+      git --no-pager log --no-merges "${default_branch}..${my_branch}" --pretty=format:"%s" | xargs -0 | while read -r line; do
+        if [[ "$line" == "$jira_key"* ]]; then
           skip=1;
           break;
         fi
       done
 
       if (( skip == 0 )); then
-        msg_arg="$ticket $commit_msg"
+        commit_msg="${ticket} ${commit_msg}"
       fi
     fi
 
-    git commit --no-verify --message "$msg_arg" $@
+    git commit --no-verify --message "$commit_msg" $@
   elif [[ $1 != -* ]]; then
     git commit --no-verify --message "$1" ${@:2}
   else
@@ -9153,8 +9159,8 @@ function help() {
   display_line_ "git push" "${solid_cyan_cor}"
   print ""
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (with wizard)"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message (no wizard)"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (with conventional commits)"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push no-verify to $remote_name"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "push force to $remote_name"
