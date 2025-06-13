@@ -5194,20 +5194,27 @@ function revs() {
   fi
 
   if (( revs_is_p )); then
+    local full_revs=()
+
     for rev in "${rev_choices[@]}"; do
-      local rev_folder="${revs_folder}/${rev}"
-      if command -v gum &>/dev/null; then
-        gum spin --title="deleting... $rev" -- rm -rf -- "$rev_folder"
-      else
-        print "deleting... $rev"
-        rm -rf -- "$rev_folder"
-      fi
-      if (( $? == 0 )); then
-        print -l -- " ${green_cor}deleted${reset_cor} $rev"
-      else
-        print -l -- " ${red_cor}not deleted${reset_cor} $rev"
-      fi
+      full_revs+=("${revs_folder}/${rev}")
     done
+
+    del "${full_revs[@]}"
+    # for rev in "${rev_choices[@]}"; do
+    #   local rev_folder="${revs_folder}/${rev}"
+    #   if command -v gum &>/dev/null; then
+    #     gum spin --title="deleting... $rev" -- rm -rf -- "$rev_folder"
+    #   else
+    #     print "deleting... $rev"
+    #     rm -rf -- "$rev_folder"
+    #   fi
+    #   if (( $? == 0 )); then
+    #     print -l -- " ${green_cor}deleted${reset_cor} $rev"
+    #   else
+    #     print -l -- " ${red_cor}not deleted${reset_cor} $rev"
+    #   fi
+    # done
   else
     rev -e "$proj_arg" "${rev_choice//rev./}"
   fi
