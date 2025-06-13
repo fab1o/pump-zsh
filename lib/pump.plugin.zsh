@@ -4985,12 +4985,12 @@ function pr() {
     test || return 1;
   fi
 
-  print -- "debugging purposes:"
-  print -- "${magenta_cor}jira_key:${reset_cor} $jira_key"
-  print -- "${magenta_cor}Title:${reset_cor} $pr_title"
-  print -- "${magenta_cor}Body:${reset_cor}"
-  print -- "$pr_body"
-  return 1;
+  # print -- "debugging purposes:"
+  # print -- "${magenta_cor}jira_key:${reset_cor} $jira_key"
+  # print -- "${magenta_cor}Title:${reset_cor} $pr_title"
+  # print -- "${magenta_cor}Body:${reset_cor}"
+  # print -- "$pr_body"
+  # return 1;
 
   if (( pr_is_l )); then
     local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
@@ -5019,9 +5019,12 @@ function pr() {
 
   if gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"; then
     if [[ -n "$jira_key" ]]; then
-      jira -r "$jira_key"
+      jira -r "$jira_key" 2>/dev/null
     fi
+    return 0;
   fi
+
+  return 1;
 }
 
 function run() {
@@ -5789,7 +5792,7 @@ function clone() {
 
   local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
   if [[ -n "$jira_key" ]]; then
-    jira -p "$jira_key" "$proj_arg"
+    jira -p "$jira_key" "$proj_arg" 2>/dev/null
   fi
 
   # if (( $? == 0 )); then
@@ -5886,12 +5889,12 @@ function jira() {
   (( jira_is_d )) && set -x
 
   if (( jira_is_h )); then
-    print "  ${yellow_cor}jira${reset_cor} : to start working on a new jira ticket for current project"
-    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start working on a new jira ticket for a project"
-    print "  ${yellow_cor}jira -p <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"In Progress\""
-    print "  ${yellow_cor}jira -r <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"In Review\""
-    print "  ${yellow_cor}jira -c <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"Close\" or \"Done\""
-    print "  ${yellow_cor}jira -s <key> <status> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket (e.g. \"In Progress\", \"In Review\", \"Done\")"
+    print "  ${yellow_cor}jira${reset_cor} : to start the work on a new ticket for current project"
+    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start the work on a new ticket for a project"
+    print "  ${yellow_cor}jira -p <pro> <key>${reset_cor} : to update the status of a ticket to \"In Progress\""
+    print "  ${yellow_cor}jira -r <pro> <key>${reset_cor} : to update the status of a ticket to \"In Review\""
+    print "  ${yellow_cor}jira -c <pro> <key>${reset_cor} : to update the status of a ticket to \"Close\" or \"Done\""
+    print "  ${yellow_cor}jira -s <key> <status>${reset_cor} : to update the status of a ticket (e.g. \"In Progress\", \"In Review\", \"Done\")"
     return 0;
   fi
 
@@ -5901,19 +5904,22 @@ function jira() {
     return 1;
   fi
 
-  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  # do not assign CURRENT_PUMP_PROJ_SHORT_NAME here, because user must define it
+  # as we cannot determine if a jira ticket belongs to current project with correct statutes
+  local proj_arg=""
   local jira_key=""
   local jira_status=""
 
   if [[ -n "$3" ]]; then
-    jira_key="$1"
-    jira_status="$2"
-    proj_arg="$3"
+    proj_arg="$1"
+    jira_key="$2"
+    jira_status="$3"
   elif [[ -n "$2" ]]; then
-    jira_key="$1"
-    if is_project_ "$2"; then
-      proj_arg="$2"
+    if is_project_ "$1"; then
+      proj_arg="$1"
+      jira_key="$2"
     else
+      jira_key="$1"
       jira_status="$2"
     fi
   elif [[ -n "$1" ]]; then
@@ -5945,20 +5951,21 @@ function jira() {
       print " run ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
       return 1;
     fi
+
     if (( jira_is_s )); then
       if [[ -z "$jira_status" ]]; then
         print " missing status argument" >&2
         print " run ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
         return 1;
       fi
-    fi
-
-    if (( jira_is_p )); then
-      jira_status="$jira_in_progress"
-    elif (( jira_is_r )); then
-      jira_status="$jira_in_review"
-    elif (( jira_is_c )); then
-      jira_status="$jira_done"
+    else
+      if (( jira_is_p )); then
+        jira_status="$jira_in_progress"
+      elif (( jira_is_r )); then
+        jira_status="$jira_in_review"
+      elif (( jira_is_c )); then
+        jira_status="$jira_done"
+      fi
     fi
 
     local output=$(acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
@@ -6022,10 +6029,14 @@ function jira() {
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
-  jira -p "$jira_key" "$proj_arg"
-
-  print ""
-  clone "$proj_arg" "$jira_key"
+  if (( single_mode )); then
+    cd "$proj_folder"
+    local default_branch=$(get_default_branch_ "$proj_folder")
+    co "$jira_key" "$default_branch"
+  else
+    print ""
+    clone "$proj_arg" "$jira_key"
+  fi
 }
 
 function abort() {
@@ -7787,20 +7798,18 @@ function co() {
     local branch="$1"
     local base_branch="$2"
 
-    if [[ -n "$base_branch" ]]; then
-      co "$branch" "$base_branch"
-      return $?;
+    if [[ -z "$base_branch" ]]; then
+      base_branch=$(git branch --show-current)
     fi
 
-    base_branch=$(git branch --show-current)
-
-    if [[ -n "$base_branch" ]]; then
-      co "$branch" "$base_branch"
-    else
+    if [[ -z "$base_branch" ]]; then
       print " fatal: cannot create branch from detached branch" >&2
       print " run ${yellow_cor}co <branch> <base_branch>${reset_cor} : to create branch off of a base branch"
       return 1;
     fi
+
+    co "$branch" "$base_branch"
+    return $?;
   fi
 
   # co -e branch just checkout, do not create branch
@@ -7853,7 +7862,7 @@ function co() {
 
   local jira_key=$(extract_jira_key_ "$branch")
   if [[ -n "$jira_key" ]]; then
-    jira -p "$jira_key"
+    jira -p "$jira_key" 2>/dev/null
   fi
 
   # ll_add_node_
