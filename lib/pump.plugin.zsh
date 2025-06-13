@@ -592,6 +592,8 @@ function update_setting_() {
     print "  ${yellow_cor}warning: failed to update ${key}_i in config${reset_cor}" >&2
     print "   • check if you have write permissions to the file: $PUMP_CONFIG_FILE" >&2
     print "   • re-install pump-zsh" >&2
+  else
+    print " updated setting: [${solid_magenta_cor}${key}_$i=${reset_cor}${gray_cor}${value}${reset_cor}]"
   fi
 
   return 0;
@@ -1652,7 +1654,7 @@ function save_proj_mode_() {
     fi
   fi
 
-  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode"
+  update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "$single_mode" &>/dev/null
 
   if (( save_proj_mode_is_q )); then return 0; fi
 
@@ -1988,7 +1990,7 @@ function save_proj_f_() {
     if ! save_proj_cmd_ -f $i "$proj_cmd"; then return 1; fi
     # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
-    if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
+    if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME" &>/dev/null; then return 1; fi
 
     print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
     display_line_ "" "${SAVE_PROJ_COR}"
@@ -2092,7 +2094,7 @@ function save_proj_() {
     update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
   fi
   
-  if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
+  if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME" &>/dev/null; then return 1; fi
   
   print "  ${SAVE_PROJ_COR}project saved!${reset_cor}" >&1
   display_line_ "" "${SAVE_PROJ_COR}"
@@ -2240,7 +2242,7 @@ function remove_proj_() {
 
   unset_aliases_
 
-  update_setting_ $i "PUMP_PROJ_SHORT_NAME" "" # let this one
+  update_setting_ $i "PUMP_PROJ_SHORT_NAME" "" 1>/dev/null # let this one
   update_setting_ $i "PUMP_PROJ_FOLDER" "" &>/dev/null
   update_setting_ $i "PUMP_PROJ_REPO" "" &>/dev/null
   update_setting_ $i "PUMP_PROJ_SINGLE_MODE" "" &>/dev/null
@@ -2543,84 +2545,84 @@ function print_current_proj_() {
   display_line_ "" "$dark_gray_cor"
 
   if (( i > 0 )); then
-    print " [${solid_magenta_cor}PUMP_PROJ_SHORT_NAME_$i=${reset_cor}${PUMP_PROJ_SHORT_NAME[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PROJ_FOLDER_$i=${reset_cor}${PUMP_PROJ_FOLDER[${solid_magenta_cor}$i]}]"
-    print " [${solid_magenta_cor}PUMP_PROJ_REPO_$i=${reset_cor}${PUMP_PROJ_REPO[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PROJ_SINGLE_MODE_$i=${reset_cor}${PUMP_PROJ_SINGLE_MODE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PKG_MANAGER_$i=${reset_cor}${PUMP_PKG_MANAGER[$i]}]"
-    print " [${solid_magenta_cor}PUMP_RUN_$i=${reset_cor}${PUMP_RUN[$i]}]"
-    print " [${solid_magenta_cor}PUMP_RUN_STAGE_$i=${reset_cor}${PUMP_RUN_STAGE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_RUN_PROD_$i=${reset_cor}${PUMP_RUN_PROD[$i]}]"
-    print " [${solid_magenta_cor}PUMP_SETUP_$i=${reset_cor}${PUMP_SETUP[$i]}]"
-    print " [${solid_magenta_cor}PUMP_FIX_$i=${reset_cor}${PUMP_FIX[$i]}]"
-    print " [${solid_magenta_cor}PUMP_CLONE_$i=${reset_cor}${PUMP_CLONE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PRO_$i=${reset_cor}${PUMP_PRO[$i]}]"
-    print " [${solid_magenta_cor}PUMP_USE_$i=${reset_cor}${PUMP_USE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_CODE_EDITOR_$i=${reset_cor}${PUMP_CODE_EDITOR[$i]}]"
-    print " [${solid_magenta_cor}PUMP_COV_$i=${reset_cor}${PUMP_COV[$i]}]"
-    print " [${solid_magenta_cor}PUMP_OPEN_COV_$i=${reset_cor}${PUMP_OPEN_COV_[$i]}]"
-    print " [${solid_magenta_cor}PUMP_TEST_$i=${reset_cor}${PUMP_TEST[$i]}]"
-    print " [${solid_magenta_cor}PUMP_RETRY_TEST_$i=${reset_cor}${PUMP_RETRY_TEST[$i]}]"
-    print " [${solid_magenta_cor}PUMP_TEST_WATCH_$i=${reset_cor}${PUMP_TEST_WATCH[$i]}]"
-    print " [${solid_magenta_cor}PUMP_E2E_$i=${reset_cor}${PUMP_E2E[$i]}]"
-    print " [${solid_magenta_cor}PUMP_E2EUI_$i=${reset_cor}${PUMP_E2EUI[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PR_TEMPLATE_$i=${reset_cor}${PUMP_PR_TEMPLATE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PR_REPLACE_$i=${reset_cor}${PUMP_PR_REPLACE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PR_APPEND_$i=${reset_cor}${PUMP_PR_APPEND[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PR_RUN_TEST_$i=${reset_cor}${PUMP_PR_RUN_TEST[$i]}]"
-    print " [${solid_magenta_cor}PUMP_COMMIT_ADD_$i=${reset_cor}${PUMP_COMMIT_ADD[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PUSH_ON_REFIX_$i=${reset_cor}${PUMP_PUSH_ON_REFIX[$i]}]"
-    print " [${solid_magenta_cor}PUMP_GHA_INTERVAL_$i=${reset_cor}${PUMP_GHA_INTERVAL[$i]}]"
-    print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${PUMP_GHA_WORKFLOW[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${PUMP_PRINT_README[$i]}]"
-    print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${PUMP_JIRA_IN_PROGRESS[$i]}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${PUMP_JIRA_IN_REVIEW[$i]}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${PUMP_JIRA_DONE[$i]}]"
-    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
-    print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
-    print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_SHORT_NAME_$i=${reset_cor}${gray_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_FOLDER_$i=${reset_cor}${gray_cor}${PUMP_PROJ_FOLDER[${solid_magenta_cor}$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_REPO_$i=${reset_cor}${gray_cor}${PUMP_PROJ_REPO[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PROJ_SINGLE_MODE_$i=${reset_cor}${gray_cor}${PUMP_PROJ_SINGLE_MODE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PKG_MANAGER_$i=${reset_cor}${gray_cor}${PUMP_PKG_MANAGER[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_RUN_$i=${reset_cor}${gray_cor}${PUMP_RUN[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_RUN_STAGE_$i=${reset_cor}${gray_cor}${PUMP_RUN_STAGE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_RUN_PROD_$i=${reset_cor}${gray_cor}${PUMP_RUN_PROD[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_SETUP_$i=${reset_cor}${gray_cor}${PUMP_SETUP[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_FIX_$i=${reset_cor}${gray_cor}${PUMP_FIX[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_CLONE_$i=${reset_cor}${gray_cor}${PUMP_CLONE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PRO_$i=${reset_cor}${gray_cor}${PUMP_PRO[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_USE_$i=${reset_cor}${gray_cor}${PUMP_USE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_CODE_EDITOR_$i=${reset_cor}${gray_cor}${PUMP_CODE_EDITOR[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_COV_$i=${reset_cor}${gray_cor}${PUMP_COV[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_OPEN_COV_$i=${reset_cor}${gray_cor}${PUMP_OPEN_COV_[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_TEST_$i=${reset_cor}${gray_cor}${PUMP_TEST[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_RETRY_TEST_$i=${reset_cor}${gray_cor}${PUMP_RETRY_TEST[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_TEST_WATCH_$i=${reset_cor}${gray_cor}${PUMP_TEST_WATCH[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_E2E_$i=${reset_cor}${gray_cor}${PUMP_E2E[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_E2EUI_$i=${reset_cor}${gray_cor}${PUMP_E2EUI[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PR_TEMPLATE_$i=${reset_cor}${gray_cor}${PUMP_PR_TEMPLATE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PR_REPLACE_$i=${reset_cor}${gray_cor}${PUMP_PR_REPLACE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PR_APPEND_$i=${reset_cor}${gray_cor}${PUMP_PR_APPEND[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PR_RUN_TEST_$i=${reset_cor}${gray_cor}${PUMP_PR_RUN_TEST[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_COMMIT_ADD_$i=${reset_cor}${gray_cor}${PUMP_COMMIT_ADD[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PUSH_ON_REFIX_$i=${reset_cor}${gray_cor}${PUMP_PUSH_ON_REFIX[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_GHA_INTERVAL_$i=${reset_cor}${gray_cor}${PUMP_GHA_INTERVAL[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${gray_cor}${PUMP_GHA_WORKFLOW[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${gray_cor}${PUMP_PRINT_README[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${gray_cor}${PUMP_PKG_NAME[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_PROGRESS[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_REVIEW[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${gray_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${gray_cor}${PUMP_NVM_USE_V[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${gray_cor}${PUMP_DEFAULT_BRANCH[$i]}${reset_cor}]"
 
     return 0;
   fi
 
-  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}$CURRENT_PUMP_PROJ_SHORT_NAME]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}$CURRENT_PUMP_PROJ_FOLDER]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}$CURRENT_PUMP_PROJ_REPO]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}$CURRENT_PUMP_PKG_MANAGER]"
-  print " [${solid_pink_cor}CURRENT_PUMP_RUN=${reset_cor}$CURRENT_PUMP_RUN]"
-  print " [${solid_pink_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}$CURRENT_PUMP_RUN_STAGE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}$CURRENT_PUMP_RUN_PROD]"
-  print " [${solid_pink_cor}CURRENT_PUMP_SETUP=${reset_cor}$CURRENT_PUMP_SETUP]"
-  print " [${solid_pink_cor}CURRENT_PUMP_FIX=${reset_cor}$CURRENT_PUMP_FIX]"
-  print " [${solid_pink_cor}CURRENT_PUMP_CLONE=${reset_cor}$CURRENT_PUMP_CLONE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PRO=${reset_cor}$CURRENT_PUMP_PRO]"
-  print " [${solid_pink_cor}CURRENT_PUMP_USE=${reset_cor}$CURRENT_PUMP_USE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}$CURRENT_PUMP_CODE_EDITOR]"
-  print " [${solid_pink_cor}CURRENT_PUMP_COV=${reset_cor}$CURRENT_PUMP_COV]"
-  print " [${solid_pink_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}$CURRENT_PUMP_OPEN_COV]"
-  print " [${solid_pink_cor}CURRENT_PUMP_TEST=${reset_cor}$CURRENT_PUMP_TEST]"
-  print " [${solid_pink_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}$CURRENT_PUMP_RETRY_TEST]"
-  print " [${solid_pink_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}$CURRENT_PUMP_TEST_WATCH]"
-  print " [${solid_pink_cor}CURRENT_PUMP_E2E=${reset_cor}$CURRENT_PUMP_E2E]"
-  print " [${solid_pink_cor}CURRENT_PUMP_E2EUI=${reset_cor}$CURRENT_PUMP_E2EUI]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PR_TEMPLATE=${reset_cor}$CURRENT_PUMP_PR_TEMPLATE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}$CURRENT_PUMP_PR_REPLACE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}$CURRENT_PUMP_PR_APPEND]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}$CURRENT_PUMP_PR_RUN_TEST]"
-  print " [${solid_pink_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}$CURRENT_PUMP_COMMIT_ADD]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}$CURRENT_PUMP_PUSH_ON_REFIX]"
-  print " [${solid_pink_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}$CURRENT_PUMP_GHA_INTERVAL]"
-  print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}$CURRENT_PUMP_GHA_WORKFLOW"
-  print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}$CURRENT_PUMP_PRINT_README]"
-  print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
-  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS]"
-  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}$CURRENT_PUMP_JIRA_IN_REVIEW]"
-  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}$CURRENT_PUMP_JIRA_DONE]"
-  print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP]"
-  print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}$CURRENT_PUMP_NVM_USE_V]"
-  print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SHORT_NAME=${reset_cor}${gray_cor}$CURRENT_PUMP_PROJ_SHORT_NAME${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_FOLDER=${reset_cor}${gray_cor}$CURRENT_PUMP_PROJ_FOLDER${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_REPO=${reset_cor}${gray_cor}$CURRENT_PUMP_PROJ_REPO${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PROJ_SINGLE_MODE=${reset_cor}${gray_cor}$CURRENT_PUMP_PROJ_SINGLE_MODE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}${gray_cor}$CURRENT_PUMP_PKG_MANAGER${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN=${reset_cor}${gray_cor}$CURRENT_PUMP_RUN${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}${gray_cor}$CURRENT_PUMP_RUN_STAGE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}${gray_cor}$CURRENT_PUMP_RUN_PROD${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_SETUP=${reset_cor}${gray_cor}$CURRENT_PUMP_SETUP${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_FIX=${reset_cor}${gray_cor}$CURRENT_PUMP_FIX${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_CLONE=${reset_cor}${gray_cor}$CURRENT_PUMP_CLONE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PRO=${reset_cor}${gray_cor}$CURRENT_PUMP_PRO${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_USE=${reset_cor}${gray_cor}$CURRENT_PUMP_USE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}${gray_cor}$CURRENT_PUMP_CODE_EDITOR${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_COV=${reset_cor}${gray_cor}$CURRENT_PUMP_COV${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}${gray_cor}$CURRENT_PUMP_OPEN_COV${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_TEST=${reset_cor}${gray_cor}$CURRENT_PUMP_TEST${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}${gray_cor}$CURRENT_PUMP_RETRY_TEST${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}${gray_cor}$CURRENT_PUMP_TEST_WATCH${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_E2E=${reset_cor}${gray_cor}$CURRENT_PUMP_E2E${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_E2EUI=${reset_cor}${gray_cor}$CURRENT_PUMP_E2EUI${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_TEMPLATE=${reset_cor}${gray_cor}$CURRENT_PUMP_PR_TEMPLATE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}${gray_cor}$CURRENT_PUMP_PR_REPLACE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}${gray_cor}$CURRENT_PUMP_PR_APPEND${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}${gray_cor}$CURRENT_PUMP_PR_RUN_TEST${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}${gray_cor}$CURRENT_PUMP_COMMIT_ADD${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PUSH_ON_REFIX=${reset_cor}${gray_cor}$CURRENT_PUMP_PUSH_ON_REFIX${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}${gray_cor}$CURRENT_PUMP_GHA_INTERVAL${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}${gray_cor}$CURRENT_PUMP_GHA_WORKFLOW"
+  print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}${gray_cor}$CURRENT_PUMP_PRINT_README${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}${gray_cor}$CURRENT_PUMP_PKG_NAME${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_IN_REVIEW${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_DONE${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${gray_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}${gray_cor}$CURRENT_PUMP_NVM_USE_V${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}${gray_cor}$CURRENT_PUMP_DEFAULT_BRANCH${reset_cor}]"
 }
 
 function which_pro_index_pwd_() {
@@ -3840,7 +3842,7 @@ function del_files_() {
 
   local RET=0
 
-  for file in ${files[@]}; do
+  for file in "${files[@]}"; do
     ((count++))
 
     local a_file="" # abolute file path
@@ -3894,21 +3896,29 @@ function del() {
     print "  ${yellow_cor}del -s${reset_cor} : to skip confirmation"
     return 0;
   fi
-
-  setopt null_glob
-  if (( del_is_a )); then
-    setopt dot_glob
-  else
-    setopt no_dot_glob
-  fi
+  
+  rm -rf -- .DS_Store &>/dev/null
 
   local files=()
   local pattern=""
 
   if [[ -z "$1" ]]; then
+    setopt null_glob
+    if (( del_is_a )); then
+      setopt dot_glob
+    else
+      setopt no_dot_glob
+    fi
+
     # capture all files in current folder
-    rm -rf -- .DS_Store &>/dev/null
     files=(*)
+
+    unsetopt null_glob
+    if (( del_is_a )); then
+      unsetopt dot_glob
+    else
+      unsetopt no_dot_glob
+    fi
 
     if (( ${#files[@]} > 1 )); then
       files=("${(@f)$(choose_multiple_ "files to delete" "${files[@]}")}")
@@ -3916,15 +3926,9 @@ function del() {
   else
     # capture all arguments (quoted or not) as a single pattern
     pattern="$*"
+  
     # expand the pattern — if it's a glob, this expands to matches
     files=(${(z)~pattern})
-  fi
-
-  unsetopt null_glob
-    if (( del_is_a )); then
-    unsetopt dot_glob
-  else
-    unsetopt no_dot_glob
   fi
 
   # print "files[1] = ${files[1]}"
@@ -4123,7 +4127,7 @@ function refix() {
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-            update_setting_ $i "PUMP_PUSH_ON_REFIX" 1
+            update_setting_ $i "PUMP_PUSH_ON_REFIX" 1 &>/dev/null
             break;
           fi
         done
@@ -4769,7 +4773,7 @@ function pr() {
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-            update_setting_ $i "PUMP_PR_RUN_TEST" 1
+            update_setting_ $i "PUMP_PR_RUN_TEST" 1 &>/dev/null
             break;
           fi
         done
@@ -4816,7 +4820,7 @@ function pr() {
 
   if gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"; then
     if [[ -n "$jira_key" ]]; then
-      jira -r "$jira_key" 2>/dev/null
+      jira -r "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key" 2>/dev/null
     fi
     return 0;
   fi
@@ -5059,7 +5063,7 @@ function setup() {
     local pkg_manager="${PUMP_PKG_MANAGER[$i]}"
   
     local entry;
-    for entry in ${(f)scripts}; do
+    for entry in "${(f)scripts}"; do
       local name="${entry%%=*}"
       local cmd="${entry#*=}"
 
@@ -5560,7 +5564,7 @@ function clone() {
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 0 )); then
-      update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch
+      update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch &>/dev/null
     fi
   fi
 
@@ -5604,10 +5608,10 @@ function clone() {
 
   cd "$folder_to_clone"
 
-  local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
-  if [[ -n "$jira_key" ]]; then
-    jira -p "$jira_key" "$proj_arg" 2>/dev/null
-  fi
+  # local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
+  # if [[ -n "$jira_key" ]]; then
+  #   jira -p "$proj_arg" "$jira_key" 2>/dev/null
+  # fi
 
   local my_branch=$(git branch --show-current)
 
@@ -5684,9 +5688,9 @@ function clone() {
   #     confirm_ "always display the readme file for future branches in "$'\e[34m'$proj_arg$'\e[0m'" when available?" "always" "never"
   #     if (( $? == 130 || $? == 2 )); then return 1; fi
   #     if (( $? == 0 )); then
-  #       update_setting_ $i "PUMP_PRINT_README" 1
+  #       update_setting_ $i "PUMP_PRINT_README" 1 &>/dev/null
   #     else
-  #       update_setting_ $i "PUMP_PRINT_README" 0
+  #       update_setting_ $i "PUMP_PRINT_README" 0 &>/dev/null
   #     fi
   #   fi
   # fi
@@ -6157,7 +6161,7 @@ function recommit() {
             local i=0
             for i in {1..9}; do
               if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-                update_setting_ $i "PUMP_COMMIT_ADD" 1
+                update_setting_ $i "PUMP_COMMIT_ADD" 1 &>/dev/null
                 break;
               fi
             done
@@ -7542,7 +7546,7 @@ function gha() {
   if (( RET == 0 && found && ask_save && gha_is_a == 0 )); then
     # ask to save the workflow
     if confirm_ "save \"$workflow_arg\" as the default workflow for this project?"; then
-      update_setting_ $found "PUMP_GHA_WORKFLOW" "\"$workflow_arg\""
+      update_setting_ $found "PUMP_GHA_WORKFLOW" "\"$workflow_arg\"" &>/dev/null
     fi
   fi
 
@@ -7572,7 +7576,7 @@ function gha() {
 
 function co() {
   set +x
-  eval "$(parse_flags_ "co_" "alprexbcq" "" "$@")"
+  eval "$(parse_flags_ "co_" "alprexbcqm" "" "$@")"
   (( co_is_d )) && set -x
 
   if (( co_is_h )); then
@@ -7582,6 +7586,7 @@ function co() {
     print "  ${yellow_cor}co -l${reset_cor} : to list only local branches"
     print "  ${yellow_cor}co -pr${reset_cor} : to list pull requests instead (for quick code reviews)"
     print "  --"
+    print "  ${yellow_cor}co -m${reset_cor} : to switch to default branch"
     print "  ${yellow_cor}co -e <branch>${reset_cor} : to switch to an exact branch, no lookup"
     print "  ${yellow_cor}co -b <branch> ${reset_cor} : to create branch off of current branch"
     print "  ${yellow_cor}co <branch> <base_branch>${reset_cor} : to create branch off of a base branch"
@@ -7626,6 +7631,7 @@ function co() {
   if (( co_is_p || co_is_r )); then
     print " ${red_cor}fatal: invalid option${reset_cor}" >&2
     print " run ${yellow_cor}co -pr${reset_cor} : to select from pull requests instead of branches and detach HEAD"
+
     return 1;
   fi
 
@@ -7640,6 +7646,7 @@ function co() {
     else
       co -e "$branch_choice" $@
     fi
+
     return $?;
   fi
 
@@ -7652,6 +7659,7 @@ function co() {
     
     if [[ -z "$branch_choice" ]]; then
       co -a $@
+
       return $?;
     fi
 
@@ -7660,6 +7668,20 @@ function co() {
     else
       co -e "$branch_choice" $@
     fi
+
+    return $?;
+  fi
+
+  # co -m switch to default branch
+  if (( co_is_m )); then
+    local default_branch=$(get_default_branch_)
+    if [[ -z "$default_branch" ]]; then
+      print " fatal: cannot determine default branch" >&2
+      return 1;
+    fi
+
+    git switch "$default_branch" $@
+    
     return $?;
   fi
 
@@ -7679,6 +7701,7 @@ function co() {
     fi
 
     co "$branch" "$base_branch"
+
     return $?;
   fi
 
@@ -7692,14 +7715,14 @@ function co() {
     fi
 
     git switch "$branch" ${@:2}
-    RET=$?
-
-    return $RET;
+    
+    return $?;
   fi
 
   # co $1 or co (no arguments)
   if [[ -z "$2" || "$2" == --* ]]; then
     co -a $@
+
     return $?;
   fi
 
@@ -7723,10 +7746,10 @@ function co() {
 
   if ! git checkout -b "$branch" "$base_branch" ${@:3}; then return 1; fi
 
-  local jira_key=$(extract_jira_key_ "$branch")
-  if [[ -n "$jira_key" ]]; then
-    jira -p "$jira_key" 2>/dev/null
-  fi
+  # local jira_key=$(extract_jira_key_ "$branch")
+  # if [[ -n "$jira_key" ]]; then
+  #   jira -p "$jira_key" 2>/dev/null
+  # fi
 
   git config "branch.${branch}.gh-merge-base" "$base_branch"
   
@@ -8112,14 +8135,42 @@ function delb() {
   (( delb_is_d )) && set -x
 
   if (( delb_is_h )); then
-    print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>]${reset_cor} : to delete a branch locally "
+    print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to delete a branch locally "
     print "  ${yellow_cor}delb -r ${solid_yellow_cor}[<branch>]${reset_cor} : to also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : to include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation (cannot use with -r)"
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  local folder="$PWD"
+  local branch_arg=""
+
+  if [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+    else
+      print " fatal: not a valid folder argument: $2" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    
+    if [[ -n "$1" && $1 != -* ]]; then
+      branch_arg="$1"
+    else
+      print " fatal: not a valid branch argument" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+  
+  elif [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      branch_arg="$1"
+    fi
+  fi
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
 
   if (( delb_is_s && delb_is_r )); then
     print " ${red_cor}fatal: cannot use -s and -r together${reset_cor}" >&2
@@ -8127,15 +8178,13 @@ function delb() {
     return 1;
   fi
 
-  local branch_arg="$1"
   local deleted_branches=()
 
   if (( delb_is_r )); then
-    selected_branches=($(select_branches_ -r "$branch_arg" "$PWD" "$delb_is_a"))
+    selected_branches=($(select_branches_ -r "$branch_arg" "$folder" "$delb_is_a"))
   else
-    selected_branches=($(select_branches_ -l "$branch_arg" "$PWD" 1))
+    selected_branches=($(select_branches_ -l "$branch_arg" "$folder" 1))
   fi
-  
   if [[ -z "$selected_branches" ]]; then return 1; fi
 
   local RET=0
@@ -8143,7 +8192,7 @@ function delb() {
   for branch in ${selected_branches[@]}; do
     if (( ! delb_is_s || delb_is_r )); then
       local origin=$((( delb_is_r )) && echo "remote" || echo "local")
-      confirm_ "delete ${origin} branch: ${magenta_prompt_cor}$branch${reset_prompt_cor}?"
+      confirm_ "delete ${origin} branch: ${magenta_prompt_cor}${branch}${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then break; fi
       if (( RET == 1 )); then continue; fi
@@ -8154,10 +8203,10 @@ function delb() {
     if (( delb_is_r )); then
       local remote_name=$(get_remote_origin_)
 
-      git branch -D "$branch" &>/dev/null
-      git push --delete "$remote_name" "$branch"
+      git -C "$folder" branch -D "$branch" &>/dev/null
+      git -C "$folder" push --delete "$remote_name" "$branch"
     else
-      git branch -D "$branch"
+      git -C "$folder" branch -D "$branch"
     fi
     RET=$?
     if (( RET == 0 )); then
@@ -8239,11 +8288,11 @@ function pro() {
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display main project's settings"
+    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display top project's settings"
     print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to display all project's settings"
-    print "  ${yellow_cor}pro -t ${solid_yellow_cor}<name>${reset_cor} : to display a project's readme if available"
+    print "  ${yellow_cor}pro -t ${solid_yellow_cor}<name>${reset_cor} : to display project's readme if available"
     print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset node.js version for a project"
-    print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset a project's \"don't ask again\" settings"
+    print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset project's \"don't ask again\" settings"
     print "  --"
     pro -l
     return 0;
@@ -8331,17 +8380,15 @@ function pro() {
     
     proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
 
-    update_setting_ $i "PUMP_PR_RUN_TEST" "" &>/dev/null
-    update_setting_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
-    update_setting_ $i "PUMP_PUSH_ON_REFIX" "" &>/dev/null
-    update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
-    update_setting_ $i "PUMP_GHA_WORKFLOW" "" &>/dev/null
-    update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
-    update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
-    update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
-    update_setting_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
-    
-    print " successfully reset \"don't ask again\" settings for: ${green_cor}${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}"
+    update_setting_ $i "PUMP_PR_RUN_TEST" "" 2>/dev/null
+    update_setting_ $i "PUMP_COMMIT_ADD" "" 2>/dev/null
+    update_setting_ $i "PUMP_PUSH_ON_REFIX" "" 2>/dev/null
+    update_setting_ $i "PUMP_PRINT_README" "" 2>/dev/null
+    update_setting_ $i "PUMP_GHA_WORKFLOW" "" 2>/dev/null
+    update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" 2>/dev/null
+    update_setting_ $i "PUMP_NVM_USE_V" "" 2>/dev/null
+    update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 2>/dev/null
+    update_setting_ $i "PUMP_CODE_EDITOR" "" 2>/dev/null
     return $?;
   fi
 
@@ -8639,7 +8686,7 @@ function proj_handler() {
   shift
 
   set +x
-  eval "$(parse_flags_ "proj_handler_" "meincu" "" "$@")"
+  eval "$(parse_flags_ "proj_handler_" "ocmein" "" "$@")"
   (( proj_handler_is_d )) && set -x
 
   if ! check_proj_ -fm $i; then return 1; fi
@@ -8650,17 +8697,17 @@ function proj_handler() {
   local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
 
   if (( proj_handler_is_h )); then
-    print "  ${yellow_cor}$proj_cmd${reset_cor} : to open $proj_cmd"
-    (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd -m${reset_cor} : to open the $proj_cmd's default folder"
-    (( ! single_mode )) && print "  ${yellow_cor}$proj_cmd <folder>${reset_cor} : to open a $proj_cmd's folder"
-    (( single_mode )) && print "  ${yellow_cor}$proj_cmd <branch>${reset_cor} : to open $proj_cmd and switch to branch"
+    print "  ${yellow_cor}${proj_cmd}${reset_cor} : to open ${proj_cmd}"
+    (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} <folder>${reset_cor} : to open a ${proj_cmd}'s folder"
+    (( single_mode )) && print "  ${yellow_cor}${proj_cmd} <branch>${reset_cor} : to open ${proj_cmd} and switch to branch"
     print "  --"
-    print "  ${yellow_cor}$proj_cmd -e${reset_cor} : to edit ${proj_cmd}"
-    print "  ${yellow_cor}$proj_cmd -i${reset_cor} : to display main ${proj_cmd}'s settings"
-    print "  ${yellow_cor}$proj_cmd -c${reset_cor} : to display all ${proj_cmd}'s settings"
-    print "  ${yellow_cor}$proj_cmd -t${reset_cor} : to display ${proj_cmd}'s readme if available"
-    print "  ${yellow_cor}$proj_cmd -n${reset_cor} : to reset node.js version for $proj_cmd"
-    print "  ${yellow_cor}$proj_cmd -u${reset_cor} : to unset ${proj_cmd}'s \"don't ask again\" settings"
+    print "  ${yellow_cor}${proj_cmd} -o <jira_key>${reset_cor} : to open jira ticket"
+    print "  ${yellow_cor}${proj_cmd} -c <jira_key>${reset_cor} : to close jira ticket"
+    (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : to open ${proj_cmd}'s default folder"
+    print "  --"
+    print "  ${yellow_cor}${proj_cmd} -e${reset_cor} : to edit ${proj_cmd}"
+    print "  ${yellow_cor}${proj_cmd} -i${reset_cor} : to display top ${proj_cmd}'s settings"
+    print "  ${yellow_cor}${proj_cmd} -n${reset_cor} : to reset ${proj_cmd}'s node.js version"
     return 0;
   fi
   
@@ -8673,24 +8720,9 @@ function proj_handler() {
     pro -i "$proj_cmd"
     return $?
   fi
-  
-  if (( proj_handler_is_t )); then
-    pro -t "$proj_cmd"
-    return $?
-  fi
 
   if (( proj_handler_is_n )); then
     pro -n "$proj_cmd"
-    return $?
-  fi
-
-  if (( proj_handler_is_c )); then
-    pro -c "$proj_cmd"
-    return $?
-  fi
-
-  if (( proj_handler_is_u )); then
-    pro -u "$proj_cmd"
     return $?
   fi
 
@@ -8709,7 +8741,7 @@ function proj_handler() {
         folder_arg="$1"
       else
         print " fatal: not a valid folder argument: $1" >&2
-        print " run ${yellow_cor}$proj_cmd -h${reset_cor} : to see usage" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
         return 1;
       fi
     fi
@@ -8717,6 +8749,22 @@ function proj_handler() {
   elif (( proj_handler_is_m )); then
     if (( ! single_mode )); then
       folder_arg=$(get_default_folder_ "$proj_folder" 2>/dev/null)
+    fi
+  fi
+
+  if (( proj_handler_is_o )); then
+    if (( single_mode )); then
+      if [[ -z "$branch_arg" ]]; then
+        print " fatal: not a valid argument" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
+    else
+      if [[ -z "$folder_arg" ]]; then
+        print " fatal: not a valid argument" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
     fi
   fi
 
@@ -8733,28 +8781,91 @@ function proj_handler() {
     else
       local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
       if [[ -n "$dirs" ]]; then
-        local chosen_folder=($(choose_one_ -a "folder to open" "${dirs[@]}"))
-
-        if [[ -n "$chosen_folder" ]]; then
-          resolved_folder="${proj_folder}/${chosen_folder}"
+        folder_arg=($(choose_one_ -a "folder to open" "${dirs[@]}"))
+          
+        if [[ -n "$folder_arg" ]]; then
+          resolved_folder="${proj_folder}/${folder_arg}"
         fi
       fi
     fi
   fi
 
-  mkdir -p $resolved_folder
-  cd "$resolved_folder"
+  local jira_key=""
 
-  if [[ -z "$(ls "$resolved_folder")" ]]; then
-    print " project folder is empty" >&1
-    print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
-  else
-    if [[ -n "$branch_arg" ]]; then
-      co "$branch_arg"
+  if (( proj_handler_is_c )); then
+    if (( single_mode )); then
+      if [[ -z "$branch_arg" ]]; then
+        print " fatal: not a valid argument" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
+      jira_key=$(extract_jira_key_ "$branch_arg")
+    else
+      if [[ -z "$folder_arg" ]]; then
+        print " fatal: not a valid argument" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
+      jira_key=$(extract_jira_key_ "$folder_arg")
+    fi
+
+    if [[ -z "$jira_key" ]]; then
+      print " fatal: not a valid argument" >&2
+      print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+      return 1;
     fi
   fi
 
-  # pro $proj_cmd
+  local RET=0
+
+  if (( proj_handler_is_o )); then
+    # open jira ticket
+    if (( single_mode )); then
+      RET=1
+      if cd "$resolved_folder"; then
+        if co -m; then
+          co -b "$branch_arg"
+          RET=$?
+        fi
+      fi
+    else
+      clone "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key"
+      RET=$?
+    fi
+    if (( RET == 0)); then
+      jira -p "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key" 2>/dev/null
+      RET=$?
+    fi
+
+  elif (( proj_handler_is_c )); then
+    # close jira ticket
+    if (( single_mode )); then
+      delb "$branch_arg" "$resolved_folder"
+      RET=$?
+    else
+      del "$resolved_folder"
+      RET=$?
+    fi
+    if (( RET == 0 )); then
+      jira -c "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key" 2>/dev/null
+      RET=$?
+    fi
+
+  else
+    cd "$resolved_folder"
+    RET=$?
+
+    if (( RET == 0 )); then
+      if [[ -z "$(ls "$resolved_folder")" ]]; then
+        print " project folder is empty" >&1
+        print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
+      elif [[ -n "$branch_arg" ]]; then
+        co "$branch_arg"
+      fi
+    fi
+  fi
+
+  return $RET;
 }
 
 function stash() {
@@ -8877,7 +8988,7 @@ function __commit() {
         local i=0
         for i in {1..9}; do
           if [[ "$CURRENT_PUMP_PROJ_SHORT_NAME" == "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-            update_setting_ $i "PUMP_COMMIT_ADD" 1
+            update_setting_ $i "PUMP_COMMIT_ADD" 1 &>/dev/null
             break;
           fi
         done
