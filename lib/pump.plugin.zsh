@@ -6271,10 +6271,6 @@ function glog() {
       if [[ ! $1 =~ '^[0-9]+$' ]]; then
         branch_arg="$1"
       fi
-    else
-      print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}push -h${reset_cor} : to see usage" >&2
-      return 1;
     fi
     
     arg_count=2
@@ -6507,6 +6503,85 @@ function pushf() {
   return $RET;
 }
 
+function pull() {
+  set +x
+  eval "$(parse_flags_ "pull_" "to" "prqf" "$@")"
+  (( pull_is_d )) && set -x
+
+  if (( pull_is_h )); then
+    print "  ${yellow_cor}pull ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
+    print "  ${yellow_cor}pull -t${reset_cor} : to pull tags along with branches"
+    print "  ${yellow_cor}pull -to${reset_cor} : to pull tags only"
+    return 0;
+  fi
+
+  local folder="$PWD"
+  local branch_arg=""
+
+  local base_branch=""
+  local arg_count=0
+
+  if [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+    else
+      print " fatal: not a valid folder argument: $2" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    
+    if [[ -n "$1" && $1 != -* ]]; then
+      branch_arg="$1"
+    else
+      print " fatal: not a valid branch argument" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    
+    arg_count=2
+  
+  elif [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      branch_arg="$1"
+    fi
+    
+    arg_count=1
+  fi
+
+  shift $arg_count
+
+  if ! is_git_repo_ "$folder"; then return 1; fi
+
+  local remote_name=$(get_remote_origin_ "$folder")
+
+  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then return 1; fi
+
+  local RET=0
+
+  if (( pull_is_t )); then
+    git -C "$folder" pull $remote_name $branch_arg --tags $@
+    RET=$?
+    if (( pull_is_o )); then return $RET; fi
+  fi
+
+  git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
+  if (( $? != 0 )); then
+    git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
+    if (( $? != 0 )); then
+      git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
+      return $?;
+    fi
+  fi
+
+  if (( ! ${argv[(Ie)--quiet]} )); then
+    print ""
+    glog -ca "$branch_arg" "$folder" -1
+    # no pbcopy
+  fi
+}
+
 function dtag() {
   set +x
   eval "$(parse_flags_ "dtag_" "" "q" "$@")"
@@ -6570,94 +6645,6 @@ function dtag() {
   git -C "$proj_folder" push "$remote_name" --delete "$tag" 2>/dev/null
 
   return 0; # don't care if it fails to delete, consider success
-}
-
-function pull() {
-  set +x
-  eval "$(parse_flags_ "pull_" "to" "prqf" "$@")"
-  (( pull_is_d )) && set -x
-
-  if (( pull_is_h )); then
-    print "  ${yellow_cor}pull ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
-    print "  ${yellow_cor}pull -t${reset_cor} : to pull tags along with branches"
-    print "  ${yellow_cor}pull -to${reset_cor} : to pull tags only"
-    return 0;
-  fi
-
-  local folder="$PWD"
-  local branch_arg=""
-
-  local base_branch=""
-  local arg_count=0
-
-  if [[ -n "$2" && $2 != -* ]]; then
-    if [[ -d "$2" ]]; then
-      folder="$2"
-    else
-      print " fatal: not a valid folder argument: $2" >&2
-      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
-      return 1;
-    fi
-    
-    if [[ -n "$1" && $1 != -* ]]; then
-      branch_arg="$1"
-    else
-      print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
-      return 1;
-    fi
-    
-    arg_count=2
-  
-  elif [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      branch_arg="$1"
-    fi
-    
-    arg_count=1
-  fi
-
-  shift $arg_count
-
-  if ! is_git_repo_ "$folder"; then return 1; fi
-
-  if [[ -z "$branch_arg" ]]; then
-    branch_arg=$(git -C "$folder" branch --show-current)
-    if [[ -z "$branch_arg" ]]; then
-      print " current branch is detached, cannot push" >&2
-      return 1;
-    fi
-  fi
-
-  local default_branch=$(get_default_branch_ "$folder")
-  local remote_name=$(get_remote_origin_ "$folder")
-
-  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then return 1; fi
-
-  local RET=0
-
-  if (( pull_is_t )); then
-    git -C "$folder" pull $remote_name $branch_arg --tags $@
-    RET=$?
-    if (( pull_is_o )); then return $RET; fi
-  fi
-
-  git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
-  if (( $? != 0 )); then
-    git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
-    if (( $? != 0 )); then
-      git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
-      return $?;
-    fi
-  fi
-
-  if (( ! ${argv[(Ie)--quiet]} )); then
-    print ""
-    glog -ca "$branch_arg" "$folder" -1
-    # no pbcopy
-  fi
 }
 
 # tagging functions ===============================================
