@@ -6292,7 +6292,7 @@ function glog() {
   if [[ -z "$branch_arg" ]]; then
     branch_arg=$(git -C "$folder" branch --show-current)
     if [[ -z "$branch_arg" ]]; then
-      print " current branch is detached, cannot push" >&2
+      print " current branch is detached, cannot glog" >&2
       return 1;
     fi
   fi
@@ -6302,7 +6302,7 @@ function glog() {
 
   if (( glog_is_c )); then
     if [[ "$default_branch" != "$branch_arg" ]] || (( ! glog_is_a )); then
-      git --no-pager log --no-merges --oneline "${default_branch}..${branch_arg}" --no-decorate $@
+      git -C "$folder" --no-pager log --no-merges --oneline "${default_branch}..${branch_arg}" --no-decorate $@
     elif (( glog_is_a )); then
       git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative --no-decorate $@
     fi
