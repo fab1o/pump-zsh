@@ -6642,8 +6642,9 @@ function pull() {
   if (( RET != 0 )); then
     if (( ! pull_is_r )); then
       confirm_ "pull failed, try pull --rebase?"
-      if (( $? == 130 || $? == 2 )); then return 1; fi
-      if (( $? == 0 )); then
+      local _RET=$?
+      if (( _RET == 130 || _RET == 2 )); then return 1; fi
+      if (( _RET == 0 )); then
         pull_is_r=1
       fi
     fi
