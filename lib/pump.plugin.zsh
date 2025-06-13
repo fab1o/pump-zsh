@@ -7248,14 +7248,13 @@ function glr() {
   fi
 
   local folder="$PWD"
+  local branch_arg=""
 
   if [[ -n "$1" && $1 != -* ]]; then
     if [[ -d "$1" ]]; then
       folder="$1"
     else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}glr -h${reset_cor} : to see usage" >&2
-      return 1;
+      branch_arg="$1"
     fi
     shift
   fi
@@ -7272,7 +7271,9 @@ function glr() {
     link="https://github.com/$repo_name/tree/"
   fi
 
-  gum spin --title="loading..." -- git -C "$folder" branch -r --list "*$1*" --sort=authordate --format='%(authordate:format:%m-%d-%Y) %(align:22,left)%(authorname)%(end) %(refname:strip=3)' | sed \
+  gum spin --title="loading..." -- git -C "$folder" branch -r --list "*$branch_arg*" --sort=authordate \
+    --format='%(authordate:format:%m-%d-%Y) %(align:22,left)%(authorname)%(end) %(refname:strip=3)' \
+    | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e "s/\([^\ ]*\)$/\x1b[34m\x1b]8;;${link//\//\\/}\1\x1b\\\\\1\x1b]8;;\x1b\\\\\x1b[0m/"
 }
@@ -7289,21 +7290,22 @@ function gll() {
   fi
 
   local folder="$PWD"
+  local branch_arg=""
 
   if [[ -n "$1" && $1 != -* ]]; then
     if [[ -d "$1" ]]; then
       folder="$1"
     else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}gll -h${reset_cor} : to see usage" >&2
-      return 1;
+      branch_arg="$1"
     fi
     shift
   fi
 
   if ! is_git_repo_ "$folder"; then return 1; fi
 
-  git -C "$folder" branch --list "*$1*" --sort=authordate --format="%(authordate:format:%m-%d-%Y) %(align:22,left)%(authorname)%(end) %(refname:strip=2)" | sed \
+  git -C "$folder" branch --list "*$branch_arg*" --sort=authordate \
+    --format="%(authordate:format:%m-%d-%Y) %(align:22,left)%(authorname)%(end) %(refname:strip=2)" \
+    | sed \
     -e 's/\([0-9]*-[0-9]*-[0-9]*\)/\x1b[32m\1\x1b[0m/' \
     -e 's/\([^ ]*\)$/\x1b[34m\1\x1b[0m/'
 }
