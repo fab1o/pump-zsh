@@ -1204,14 +1204,14 @@ function check_proj_() {
     fi
   fi
 
-  if (( check_proj_is_j )); then
-    if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
+  # if (( check_proj_is_j )); then
+  #   if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
 
-    if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
-      print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
-      return 1;
-    fi
-  fi
+  #   if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
+  #     print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+  #     return 1;
+  #   fi
+  # fi
 }
 
 function check_proj_cmd_() {
@@ -2005,51 +2005,51 @@ function save_proj_repo_() {
   fi
 }
 
-function save_jira_() {
-  set +x
-  eval "$(parse_flags_ "save_jira_" "feaq" "" "$@")"
-  (( save_jira_is_d )) && set -x
+# function save_jira_() {
+#   set +x
+#   eval "$(parse_flags_ "save_jira_" "feaq" "" "$@")"
+#   (( save_jira_is_d )) && set -x
 
-  local i="$1"
-  local jira_proj="$2"
+#   local i="$1"
+#   local jira_proj="$2"
 
-  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
-    return 0;
-  fi
+#   if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
+#     return 0;
+#   fi
 
-  confirm_ "set a JIRA project for this project?"
-  local RET=$?
-  if (( RET == 130 || RET == 2 )); then return 130; fi
-  if (( RET == 0 )); then
-    if ! command -v acli &>/dev/null; then
-      print " acli is not installed" >&2
-      print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
-      return 1;
-    fi
-    local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
-    if [[ -z "$projects" ]]; then
-      print " no JIRA projects found" >&2
-      print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
-      return 1;
-    fi
+#   confirm_ "set a JIRA project for this project?"
+#   local RET=$?
+#   if (( RET == 130 || RET == 2 )); then return 130; fi
+#   if (( RET == 0 )); then
+#     if ! command -v acli &>/dev/null; then
+#       print " acli is not installed" >&2
+#       print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+#       return 1;
+#     fi
+#     local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
+#     if [[ -z "$projects" ]]; then
+#       print " no JIRA projects found" >&2
+#       print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+#       return 1;
+#     fi
 
-    jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
-    if [[ -z "$jira_proj" ]]; then return 1; fi
-  else
-    jira_proj=""
-  fi
+#     jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+#     if [[ -z "$jira_proj" ]]; then return 1; fi
+#   else
+#     jira_proj=""
+#   fi
 
-  update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+#   update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
 
-  if (( save_jira_is_q )); then return 0; fi
+#   if (( save_jira_is_q )); then return 0; fi
 
-  if (( save_jira_is_e )); then
-    clear_last_line_1_
-  fi
-  clear_last_line_1_
-  print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
-  print "" >&1
-}
+#   if (( save_jira_is_e )); then
+#     clear_last_line_1_
+#   fi
+#   clear_last_line_1_
+#   print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
+#   print "" >&1
+# }
 
 function save_pkg_manager_() {
   set +x
@@ -2155,7 +2155,7 @@ function save_proj_f_() {
 
     if ! save_pkg_manager_ -fa $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_cmd_ -f $i "$proj_cmd"; then return 1; fi
-    if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
+    # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
     if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME"; then return 1; fi
 
@@ -2243,7 +2243,8 @@ function save_proj_() {
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-  if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
+  
+  # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
   # if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
   #   if (( save_proj_is_e )); then
@@ -2441,6 +2442,8 @@ function remove_proj_() {
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_PROJ" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_IN_REVIEW" "" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_DONE" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
   update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
@@ -2484,6 +2487,8 @@ function set_current_proj_() {
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
   CURRENT_PUMP_JIRA_PROJ="${PUMP_JIRA_PROJ[$i]}"
   CURRENT_PUMP_JIRA_IN_PROGRESS="${PUMP_JIRA_IN_PROGRESS[$i]}"
+  CURRENT_PUMP_JIRA_IN_REVIEW="${PUMP_JIRA_IN_REVIEW[$i]}"
+  CURRENT_PUMP_JIRA_DONE="${PUMP_JIRA_DONE[$i]}"
   CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
   CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
@@ -2742,6 +2747,8 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${PUMP_PKG_NAME[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${PUMP_JIRA_PROJ[$i]}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${PUMP_JIRA_IN_PROGRESS[$i]}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${PUMP_JIRA_IN_REVIEW[$i]}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${PUMP_JIRA_DONE[$i]}]"
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}]"
     print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${PUMP_NVM_USE_V[$i]}]"
     print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${PUMP_DEFAULT_BRANCH[$i]}]"
@@ -2782,6 +2789,8 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}$CURRENT_PUMP_PKG_NAME]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_PROJ=${reset_cor}$CURRENT_PUMP_JIRA_PROJ]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}$CURRENT_PUMP_JIRA_IN_REVIEW]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}$CURRENT_PUMP_JIRA_DONE]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}$CURRENT_PUMP_NVM_USE_V]"
   print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}$CURRENT_PUMP_DEFAULT_BRANCH]"
@@ -3684,6 +3693,8 @@ function load_config_entry_() {
     PUMP_PKG_NAME
     PUMP_JIRA_PROJ
     PUMP_JIRA_IN_PROGRESS
+    PUMP_JIRA_IN_REVIEW
+    PUMP_JIRA_DONE
     PUMP_NVM_SKIP_LOOKUP
     PUMP_NVM_USE_V
     PUMP_DEFAULT_BRANCH
@@ -3840,6 +3851,12 @@ function load_config_entry_() {
         ;;
       PUMP_JIRA_IN_PROGRESS)
         PUMP_JIRA_IN_PROGRESS[$i]="$value"
+        ;;
+      PUMP_JIRA_IN_REVIEW)
+        PUMP_JIRA_IN_REVIEW[$i]="$value"
+        ;;
+      PUMP_JIRA_DONE)
+        PUMP_JIRA_DONE[$i]="$value"
         ;;
       PUMP_NVM_SKIP_LOOKUP)
         PUMP_NVM_SKIP_LOOKUP[$i]="$value"
@@ -4730,50 +4747,46 @@ function read_commits_() {
   local default_branch="$2"
 
   local pr_title=""
-  
+  local commit_message=""
+
   git --no-pager log --no-merges --pretty=format:'%H | %s' \
     "${default_branch}..${my_remote_branch}" | xargs -0 | while IFS= read -r line; do
     
     local commit_hash=$(echo "$line" | cut -d'|' -f1 | xargs)
-    local commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
+    commit_message="$(echo "$line" | cut -d'|' -f2- | xargs)"
 
-    commit_message="- $commit_hash - $commit_message"
+    local jira_key=""
+    local rest=""
+
+    jira_key=$(extract_jira_key_ "$commit_message")
+    if (( $? == 0 )); then
+      if [[ $commit_message =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
+        rest="${match[1]}"
+        rest="$(echo "$rest" | xargs)"
+      fi
+    fi
+
+    local types="fix|feat|docs|refactor|test|chore|style|revert"
+    if [[ $rest =~ "^[[:space:]]*(${(j:|:)${(s:|:)types}}):[[:space:]]*(.*)" ]]; then
+      rest="${match[2]}"
+    fi
+
+    if [[ -n "$jira_key" && -n "$rest" ]]; then
+      pr_title=$(echo "${jira_key} ${rest}" | xargs)
+    fi
 
     if (( read_commits_is_c )); then
-      echo "$commit_message"
-    fi
-    
-    if (( read_commits_is_t )); then
-      local ticket=""
-      local rest="$commit_message"
-
-      if [[ $rest =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
-        ticket="${match[1]}"
-        ticket="$(echo "$ticket" | xargs)"
-
-        if [[ $rest =~ [[:alnum:]]+-[[:digit:]]+(.*) ]]; then
-          rest="${match[1]}"
-          rest="$(echo "$rest" | xargs)"
-        fi
-      fi
-
-      local types="fix|feat|docs|refactor|test|chore|style|revert"
-      if [[ $rest =~ "^[[:space:]]*(${(j:|:)${(s:|:)types}}):[[:space:]]*(.*)" ]]; then
-        rest="${match[2]}"
-      fi
-
-      if [[ -n "$ticket" ]]; then
-        pr_title="${ticket} ${rest}"
-      else
-        pr_title="$rest"
-      fi
-      
-      pr_title="$(echo "$pr_title" | xargs)"
+      echo "- $commit_hash - $commit_message"
     fi
   done
 
   if (( read_commits_is_t )); then
+    if [[ -z "$pr_title" ]]; then
+      pr_title="$commit_message"
+    fi
+
     echo "$pr_title"
+    return 0;
   fi
 }
 
@@ -4833,6 +4846,34 @@ function pra() {
 
 }
 
+function extract_jira_key_() {
+  local text="$1"
+  local folder="${2:-$PWD}"
+
+  local jira_key=""
+
+  if [[ $text =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+    jira_key="${match[1]}"
+    jira_key="$(echo "$jira_key" | xargs)"
+  else
+    local folder_name="$(basename "$folder")"
+    if [[ $folder_name =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+      jira_key="${match[1]}"
+      jira_key="$(echo "$jira_key" | xargs)"
+
+      echo "$jira_key"
+      return 1;
+    fi
+  fi
+
+  if [[ -n "$jira_key" ]]; then
+    echo "$jira_key"
+    return 0;
+  fi
+
+  return 1;
+}
+
 function pr() {
   set +x
   eval "$(parse_flags_ "pr_" "sl" "" "$@")"
@@ -4853,7 +4894,7 @@ function pr() {
 
   if ! is_git_repo_; then return 1; fi
 
-  if gh pr view --web &>/dev/null; then return 0; fi
+  # if gh pr view --web &>/dev/null; then return 0; fi
 
   # local git_status=$(git status --porcelain 2>/dev/null)
   # if [[ -n "$git_status" ]]; then
@@ -4881,6 +4922,7 @@ function pr() {
 
   local pr_commit_msgs=("${(@f)$(read_commits_ -c "$my_remote_branch" "$default_branch")}")
   local pr_title=$(read_commits_ -t "$my_remote_branch" "$default_branch")
+  local jira_key=""
 
   if [[ -z "$pr_commit_msgs" || -z "$pr_title" ]]; then
     print " fatal: no commits found, cannot create pull request" >&2
@@ -4891,6 +4933,13 @@ function pr() {
   if (( $? == 130 )); then return 130; fi
 
   print " ${lightpurple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
+
+  jira_key=$(extract_jira_key_ "$pr_title")
+  if (( $? == 1 )); then
+    if [[ -n "$jira_key" ]]; then
+      pr_title="${jira_key} ${pr_title}"
+    fi
+  fi
 
   local pr_body="${(F)pr_commit_msgs}"
 
@@ -4936,11 +4985,12 @@ function pr() {
     test || return 1;
   fi
 
-  # debugging purposes
-  # print -- "${magenta_cor}Title:${reset_cor} $pr_title"
-  # print -- "${magenta_cor}Body:${reset_cor}"
-  # print -- "$pr_body"
-  # return 1;
+  print -- "debugging purposes:"
+  print -- "${magenta_cor}jira_key:${reset_cor} $jira_key"
+  print -- "${magenta_cor}Title:${reset_cor} $pr_title"
+  print -- "${magenta_cor}Body:${reset_cor}"
+  print -- "$pr_body"
+  return 1;
 
   if (( pr_is_l )); then
     local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
@@ -4967,7 +5017,11 @@ function pr() {
     fi
   fi
 
-  gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"
+  if gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"; then
+    if [[ -n "$jira_key" ]]; then
+      jira -r "$jira_key"
+    fi
+  fi
 }
 
 function run() {
@@ -5733,6 +5787,11 @@ function clone() {
 
   cd "$folder_to_clone"
 
+  local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
+  if [[ -n "$jira_key" ]]; then
+    jira -p "$jira_key" "$proj_arg"
+  fi
+
   # if (( $? == 0 )); then
   #   save_pump_working_ "$proj_arg"
   # fi
@@ -5823,12 +5882,16 @@ function clone() {
 
 function jira() {
   set +x
-  eval "$(parse_flags_ "jira_" "" "" "$@")"
+  eval "$(parse_flags_ "jira_" "scrp" "" "$@")"
   (( jira_is_d )) && set -x
 
   if (( jira_is_h )); then
-    print "  ${yellow_cor}jira${reset_cor} : to start working on a new JIRA ticket for current project"
-    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start working on a new JIRA ticket for a project"
+    print "  ${yellow_cor}jira${reset_cor} : to start working on a new jira ticket for current project"
+    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start working on a new jira ticket for a project"
+    print "  ${yellow_cor}jira -p <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"In Progress\""
+    print "  ${yellow_cor}jira -r <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"In Review\""
+    print "  ${yellow_cor}jira -c <key> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket to \"Close\" or \"Done\""
+    print "  ${yellow_cor}jira -s <key> <status> ${solid_yellow_cor}[<pro>]${reset_cor} : to update the status of a jira ticket (e.g. \"In Progress\", \"In Review\", \"Done\")"
     return 0;
   fi
 
@@ -5838,7 +5901,28 @@ function jira() {
     return 1;
   fi
 
-  local proj_arg="${1:-$CURRENT_PUMP_PROJ_SHORT_NAME}"
+  local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
+  local jira_key=""
+  local jira_status=""
+
+  if [[ -n "$3" ]]; then
+    jira_key="$1"
+    jira_status="$2"
+    proj_arg="$3"
+  elif [[ -n "$2" ]]; then
+    jira_key="$1"
+    if is_project_ "$2"; then
+      proj_arg="$2"
+    else
+      jira_status="$2"
+    fi
+  elif [[ -n "$1" ]]; then
+    if is_project_ "$1"; then
+      proj_arg="$1"
+    else
+      jira_key="$1"
+    fi
+  fi
   
   local i=$(find_proj_index_ -o "$proj_arg")
   if (( ! i )); then
@@ -5846,13 +5930,55 @@ function jira() {
     return 1;
   fi
 
-  if ! check_proj_ -jfm $i; then return 1; fi
+  if ! check_proj_ -fm $i; then return 1; fi
   
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
   local jira_proj="${PUMP_JIRA_PROJ[$i]}"
-  
-  local jira_status="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
+  local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
+  local jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"In Review"}"
+  local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
+
+  if (( jira_is_s || jira_is_r || jira_is_c || jira_is_p )); then
+    if [[ -z "$jira_key" ]]; then
+      print " missing key argument" >&2
+      print " run ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
+      return 1;
+    fi
+    if (( jira_is_s )); then
+      if [[ -z "$jira_status" ]]; then
+        print " missing status argument" >&2
+        print " run ${yellow_cor}jira -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
+    fi
+
+    if (( jira_is_p )); then
+      jira_status="$jira_in_progress"
+    elif (( jira_is_r )); then
+      jira_status="$jira_in_review"
+    elif (( jira_is_c )); then
+      jira_status="$jira_done"
+    fi
+
+    local output=$(acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
+    
+    if echo "$output" | grep -qE "Failure"; then
+      jira_status=$(input_from_ "Enter jira status (e.g. In Progress, In Review, Done)")
+      if [[ -n "$jira_status" ]] && ; then
+        acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes
+        if (( jira_is_p )); then
+          update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "$jira_status" &>/dev/null
+        elif (( jira_is_r )); then
+          update_setting_ $i "PUMP_JIRA_IN_REVIEW" "$jira_status" &>/dev/null
+        elif (( jira_is_c )); then
+          update_setting_ $i "PUMP_JIRA_DONE" "$jira_status" &>/dev/null
+        fi
+      fi
+    fi
+
+    return $?;
+  fi
 
   if (( single_mode )); then
     if [[ ! -d "$proj_folder" || -z "$(ls "$proj_folder" 2>/dev/null)" ]]; then
@@ -5871,43 +5997,35 @@ function jira() {
 
   local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
   if [[ -z "$projects" ]]; then
-    print " no JIRA projects found" >&2
+    print " no jira projects found" >&2
     print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
     return 1;
   fi
 
-  jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+  jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
   if [[ -z "$jira_proj" ]]; then return 1; fi
-  
+
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
-    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_status'))) AND \
+    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
     Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
-    print " no JIRA projects found" >&2
-    print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+    print " no jira projects found" >&2
+    # print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
     return 1;
   fi
 
   local ticket=""
-  ticket=$(choose_one_ "JIRA ticket to work on" "${(@f)$(printf "%s\n" "$tickets")}")
+  ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
   if [[ -z "$ticket" ]]; then return 1; fi
 
-  local key=${ticket%% *}
+  local jira_key=${ticket%% *}
 
-  acli jira workitem assign --key="$key" --assignee="@me" --yes
+  acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
-  local output=$(acli jira workitem transition --key="$key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
-  
-  if echo "$output" | grep -qE "Failure"; then
-    jira_status=$(input_from_ "Enter the name of the column on your JIRA board that corresponds to 'In Progress'")
-    if [[ -n "$jira_status" ]] && ; then
-      acli jira workitem transition --key="$key" --status="$jira_status" --yes
-      update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "$jira_status" &>/dev/null
-    fi
-  fi
+  jira -p "$jira_key" "$proj_arg"
 
   print ""
-  clone "$proj_arg" "$key"
+  clone "$proj_arg" "$jira_key"
 }
 
 function abort() {
@@ -7733,6 +7851,11 @@ function co() {
 
   if ! git checkout -b "$branch" "$base_branch" ${@:3}; then return 1; fi
 
+  local jira_key=$(extract_jira_key_ "$branch")
+  if [[ -n "$jira_key" ]]; then
+    jira -p "$jira_key"
+  fi
+
   # ll_add_node_
 
   git config "branch.${branch}.gh-merge-base" "$base_branch"
@@ -9445,6 +9568,8 @@ typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
 typeset -gA PUMP_JIRA_PROJ
 typeset -gA PUMP_JIRA_IN_PROGRESS
+typeset -gA PUMP_JIRA_IN_REVIEW
+typeset -gA PUMP_JIRA_IN_DONE
 typeset -gA PUMP_NVM_SKIP_LOOKUP
 typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
@@ -9483,6 +9608,8 @@ typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
 typeset -g CURRENT_PUMP_JIRA_PROJ=""
 typeset -g CURRENT_PUMP_JIRA_IN_PROGRESS=""
+typeset -g CURRENT_PUMP_JIRA_IN_REVIEW=""
+typeset -g CURRENT_PUMP_JIRA_DONE=""
 typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
 typeset -g CURRENT_PUMP_NVM_USE_V=""
 typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
