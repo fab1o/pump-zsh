@@ -5840,6 +5840,16 @@ function jira() {
       fi
     fi
 
+    local current_jira_status=$(acli jira workitem view "$jira_key" --fields status --json | jq -r '.fields.status.name')
+    if [[ -z "$current_jira_status" ]]; then
+      print " fatal: cannot find jira key: $jira_key" >&2
+      return 1;
+    fi
+
+    if [[ "$current_jira_status" == "$jira_done" || "$current_jira_status" == "$jira_status" ]]; then
+      return 0;
+    fi
+
     local output=$(acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
     
     if echo "$output" | grep -qE "Failure"; then
@@ -5885,6 +5895,8 @@ function jira() {
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
+  local RET=0
+
   if (( single_mode )); then
     fetch "$proj_folder" --quiet
     local branch="${${USER:0:1}:l}-$jira_key"
@@ -5892,9 +5904,11 @@ function jira() {
     cd "$proj_folder"
     if [[ -n "$find_branch" ]]; then
       co -e "$branch"
+      RET=$?
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
       co "$branch" "$default_branch"
+      RET=$?
     fi
   else
     if [[ -d "${proj_folder}/${jira_key}" ]]; then
@@ -5902,10 +5916,13 @@ function jira() {
     else
       print ""
       clone "$proj_arg" "$jira_key"
+      RET=$?
     fi
   fi
 
   jira -p "$proj_arg" "$jira_key"
+
+  return $RET;
 }
 
 function abort() {
@@ -8891,7 +8908,7 @@ function proj_handler() {
 
     if (( $? == 0 )); then
       jira -c "$proj_cmd" "$jira_key" 2>/dev/null
-      return $?;
+      return 0;
     fi
 
     return 1;
