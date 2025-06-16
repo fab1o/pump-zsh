@@ -1866,7 +1866,7 @@ function save_jira_() {
     return 1;
   fi
 
-  jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+  jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
   if [[ -z "$jira_proj" ]]; then return 1; fi
   # else
   #   jira_proj=""
@@ -5573,6 +5573,19 @@ function clone() {
     fi
   fi
 
+  if [[ -z "$folder_to_clone" ]]; then
+    local branch_folder="$branch_arg"
+    
+    if [[ -z "$branch_folder" ]]; then
+      branch_folder="$default_branch"
+    fi
+
+    branch_folder="${branch_folder//\\/-}"
+    branch_folder="${branch_folder//\//-}"
+
+    folder_to_clone="${proj_folder}/${branch_folder}"
+  fi
+
   if [[ -z "$branch_arg" ]]; then
     branch_arg="$default_branch"
   else
@@ -5591,12 +5604,11 @@ function clone() {
     print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
   fi
 
-  if [[ -z "$folder_to_clone" ]]; then
-    local branch_folder="${branch_arg//\\/-}"
-    branch_folder="${branch_folder//\//-}"
-
-    folder_to_clone="${proj_folder}/${branch_folder}"
-  fi
+  # if [[ -d "$folder_to_clone" && -n "$(ls "$folder_to_clone" 2>/dev/null)" ]]; then
+  #   print " fatal: folder is not empty: $folder_to_clone" >&2
+  #   print " clean the folder or run ${yellow_cor}$proj_arg -e${reset_cor} to edit project and switch to ${pink_cor}single mode${reset_cor}" >&2
+  #   return 1;
+  # fi
 
   rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
   if command -v gum &>/dev/null; then
@@ -5703,6 +5715,10 @@ function clone() {
 }
 
 function select_jira_key_() {
+  set +x
+  eval "$(parse_flags_ "select_jira_key_" "" "" "$@")"
+  (( select_jira_key_is_d )) && set -x
+
   local i="$1"
   local jira_proj="$2"
 
@@ -5711,6 +5727,8 @@ function select_jira_key_() {
     jira_proj="${PUMP_JIRA_PROJ[$i]}"
     if [[ -z "$jira_proj" ]]; then return 1; fi
   fi
+
+  local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
 
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
     (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
@@ -5829,6 +5847,10 @@ function jira() {
         elif (( jira_is_c )); then
           update_setting_ $i "PUMP_JIRA_DONE" "$jira_status" &>/dev/null
         fi
+
+        jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"$jira_in_progress"}"
+        jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"$jira_in_review"}"
+        jira_done="${PUMP_JIRA_DONE[$i]:-"$jira_done"}"
       fi
     fi
 
@@ -5850,18 +5872,31 @@ function jira() {
     fi
   fi
 
-  local jira_key=$(select_jira_key_ $i "$jira_proj")
-  if [[ -z "$jira_key" ]]; then return 1; fi
+  if [[ -z "$jira_key" ]]; ; then
+    jira_key=$(select_jira_key_ $i "$jira_proj")
+    if [[ -z "$jira_key" ]]; then return 1; fi
+  fi
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
   if (( single_mode )); then
+    fetch "$proj_folder" --quiet
+    local remote_name=$(get_remote_origin_ "$proj_folder")
+    local find_branch=$(git -C "$proj_folder" branch --all --list "*$jira_key" --format="%(refname:short)" | sed "s#^$remote_name/##" | grep -v 'detached')
     cd "$proj_folder"
-    local default_branch=$(get_default_branch_ "$proj_folder")
-    co "$jira_key" "$default_branch"
+    if [[ -n "$find_branch" ]]; then
+      co -e "$find_branch"
+    else
+      local default_branch=$(get_default_branch_ "$proj_folder")
+      co "$jira_key" "$default_branch"
+    fi
   else
-    print ""
-    clone "$proj_arg" "$jira_key"
+    if [[ -d "${proj_folder}/${jira_key}" ]]; then
+      cd "${proj_folder}/${jira_key}"
+    else
+      print ""
+      clone "$proj_arg" "$jira_key"
+    fi
   fi
 
   jira -p "$proj_arg" "$jira_key"
@@ -8714,12 +8749,12 @@ function proj_handler() {
   local proj_cmd="${PUMP_PROJ_SHORT_NAME[$i]}"
 
   if (( proj_handler_is_h )); then
-    print "  ${yellow_cor}${proj_cmd}${reset_cor} : to open ${proj_cmd}"
-    (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} <folder>${reset_cor} : to open a ${proj_cmd}'s folder"
-    (( single_mode )) && print "  ${yellow_cor}${proj_cmd} <branch>${reset_cor} : to open ${proj_cmd} and switch to branch"
+    print "  ${yellow_cor}${proj_cmd}${reset_cor} : to set and open ${proj_cmd}"
+    (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} <folder>${reset_cor} : to set ${proj_cmd} and open folder"
+    (( single_mode )) && print "  ${yellow_cor}${proj_cmd} <branch>${reset_cor} : to set/open ${proj_cmd} and switch to branch"
     print "  --"
-    print "  ${yellow_cor}${proj_cmd} -o ${solid_yellow_cor}<jira_key>${reset_cor} : to open a ${proj_cmd}'s ticket"
-    print "  ${yellow_cor}${proj_cmd} -c ${solid_yellow_cor}<jira_key>${reset_cor} : to close a ${proj_cmd}'s ticket"
+    print "  ${yellow_cor}${proj_cmd} -o ${solid_yellow_cor}[<jira_key>]${reset_cor} : to open a ${proj_cmd}'s ticket"
+    print "  ${yellow_cor}${proj_cmd} -c ${solid_yellow_cor}[<jira_key>]${reset_cor} : to close a ${proj_cmd}'s ticket"
     (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : to open ${proj_cmd}'s default folder"
     print "  --"
     print "  ${yellow_cor}${proj_cmd} -e${reset_cor} : to edit ${proj_cmd}"
@@ -8784,7 +8819,11 @@ function proj_handler() {
       local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
       
       if [[ -n "$dirs" ]]; then
-        folder_arg=($(choose_one_ -a "folder to open" "${dirs[@]}"))
+        local header="folder to open"
+        if (( proj_handler_is_c )); then
+          header="folder to close"
+        fi
+        folder_arg=($(choose_one_ -a "$header" "${dirs[@]}"))
           
         if [[ -n "$folder_arg" ]]; then
           resolved_folder="${proj_folder}/${folder_arg}"
@@ -8797,36 +8836,32 @@ function proj_handler() {
 
   if (( proj_handler_is_c || proj_handler_is_o )); then
     if (( single_mode )); then
-      if [[ -n "$branch_arg" ]]; then
-        jira_key=$(extract_jira_key_ "$branch_arg")
-
-        if [[ -z "$jira_key" ]]; then
-          print " fatal: not a valid argument" >&2
-          print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
-          return 1;
-        fi
-      else
-        local jira_key=$(select_jira_key_ $i)
-        if [[ -z "$jira_key" ]]; then return 1; fi
-      fi
+      _arg="$branch_arg"
     else
-      if [[ -z "$folder_arg" ]]; then
+      _arg="$folder_arg"
+      if (( proj_handler_is_c )) && [[ -z "$_arg" ]]; then
         print " fatal: not a valid argument" >&2
         print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
         return 1;
       fi
-      jira_key=$(extract_jira_key_ "$folder_arg")
+    fi
+
+    if [[ -n "$_arg" ]]; then
+      jira_key=$(extract_jira_key_ "$_arg")
 
       if [[ -z "$jira_key" ]]; then
         print " fatal: not a valid argument" >&2
         print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
         return 1;
       fi
+    else
+      local jira_key=$(select_jira_key_ $i)
+      if [[ -z "$jira_key" ]]; then return 1; fi
     fi
   fi
   
   if (( proj_handler_is_o )); then
-    jira "$proj_cmd"
+    jira "$proj_cmd" "$jira_key"
     return $?;
   fi
 
@@ -8836,6 +8871,7 @@ function proj_handler() {
     else
       del "$resolved_folder"
     fi
+
     if (( $? == 0 )); then
       jira -c "$proj_cmd" "$jira_key" 2>/dev/null
       return $?;
