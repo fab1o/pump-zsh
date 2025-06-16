@@ -5745,7 +5745,7 @@ function select_jira_key_() {
 
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
     (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
-    Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
+    Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
     print " no jira projects found" >&2
     print " make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
@@ -6708,8 +6708,7 @@ function pull() {
   fi
 
   local RET=0
-
-  local is_quiet=$([[ ${argv[(Ie)--quiet]} || $pull_is_q == 1 ]] && echo 1 || echo 0)
+  local is_quiet=$( (( ${argv[(Ie)--quiet]} || pull_is_q )) && echo 1 || echo 0)
 
   if (( pull_is_t )); then
     git -C "$folder" pull $remote_name $branch_arg --tags $@
