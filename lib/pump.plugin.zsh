@@ -3021,7 +3021,7 @@ function get_remote_branch_() {
       if (( get_remote_branch_is_f )); then
         echo "$remote_branch"
       else
-        echo "${remote_branch:t}"
+        echo "${remote_branch#refs/heads/}"
       fi
       return 0;
     fi
@@ -3037,7 +3037,7 @@ function get_remote_branch_() {
       if (( get_remote_branch_is_f )); then
         echo "$ref"
       else
-        echo "${ref:t}"
+        echo "$branch"
       fi
       return 0
     fi
