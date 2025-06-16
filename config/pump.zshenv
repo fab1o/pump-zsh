@@ -448,6 +448,19 @@ PUMP_PKG_NAME_9=
 
 # optional
 # default empty (will ask)
+# jira project code
+PUMP_JIRA_PROJ_1=
+PUMP_JIRA_PROJ_2=
+PUMP_JIRA_PROJ_3=
+PUMP_JIRA_PROJ_4=
+PUMP_JIRA_PROJ_5=
+PUMP_JIRA_PROJ_6=
+PUMP_JIRA_PROJ_7=
+PUMP_JIRA_PROJ_8=
+PUMP_JIRA_PROJ_9=
+
+# optional
+# default empty (will ask)
 # column name for the project in the Jira board
 PUMP_JIRA_IN_PROGRESS_1=
 PUMP_JIRA_IN_PROGRESS_2=

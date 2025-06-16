@@ -1037,14 +1037,14 @@ function check_proj_() {
     fi
   fi
 
-  # if (( check_proj_is_j )); then
-  #   if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
+  if (( check_proj_is_j )); then
+    if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
 
-  #   if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
-  #     print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
-  #     return 1;
-  #   fi
-  # fi
+    if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
+      print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      return 1;
+    fi
+  fi
 }
 
 function check_proj_cmd_() {
@@ -1838,51 +1838,51 @@ function save_proj_repo_() {
   fi
 }
 
-# function save_jira_() {
-#   set +x
-#   eval "$(parse_flags_ "save_jira_" "feaq" "" "$@")"
-#   (( save_jira_is_d )) && set -x
+function save_jira_() {
+  set +x
+  eval "$(parse_flags_ "save_jira_" "feaq" "" "$@")"
+  (( save_jira_is_d )) && set -x
 
-#   local i="$1"
-#   local jira_proj="$2"
+  local i="$1"
+  local jira_proj="$2"
 
-#   if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
-#     return 0;
-#   fi
+  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
+    return 0;
+  fi
 
-#   confirm_ "set a JIRA project for this project?"
-#   local RET=$?
-#   if (( RET == 130 || RET == 2 )); then return 130; fi
-#   if (( RET == 0 )); then
-#     if ! command -v acli &>/dev/null; then
-#       print " acli is not installed" >&2
-#       print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
-#       return 1;
-#     fi
-#     local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
-#     if [[ -z "$projects" ]]; then
-#       print " no JIRA projects found" >&2
-#       print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
-#       return 1;
-#     fi
+  # confirm_ "set a JIRA project for this project?"
+  # local RET=$?
+  # if (( RET == 130 || RET == 2 )); then return 130; fi
+  # if (( RET == 0 )); then
+  if ! command -v acli &>/dev/null; then
+    print " acli is not installed" >&2
+    print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
+    return 1;
+  fi
+  local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
+  if [[ -z "$projects" ]]; then
+    print " no jira projects found" >&2
+    print " make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+    return 1;
+  fi
 
-#     jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
-#     if [[ -z "$jira_proj" ]]; then return 1; fi
-#   else
-#     jira_proj=""
-#   fi
+  jira_proj=$(choose_one_ "JIRA project" "${(@f)$(printf "%s\n" "${projects}")}")
+  if [[ -z "$jira_proj" ]]; then return 1; fi
+  # else
+  #   jira_proj=""
+  # fi
 
-#   update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
 
-#   if (( save_jira_is_q )); then return 0; fi
+  if (( save_jira_is_q )); then return 0; fi
 
-#   if (( save_jira_is_e )); then
-#     clear_last_line_1_
-#   fi
-#   clear_last_line_1_
-#   print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
-#   print "" >&1
-# }
+  if (( save_jira_is_e )); then
+    clear_last_line_1_
+  fi
+  clear_last_line_1_
+  print "  ${SAVE_PROJ_COR}jira project:${reset_cor} ${jira_proj}" >&1
+  print "" >&1
+}
 
 function save_pkg_manager_() {
   set +x
@@ -1975,8 +1975,6 @@ function save_proj_f_() {
     update_setting_ $i "PUMP_PROJ_REPO" "$proj_repo" &>/dev/null
 
     if ! save_pkg_manager_ -fq $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-    # if ! save_proj_cmd_ -fe $i "$proj_cmd" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
-    # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
   else
     remove_proj_ $i
 
@@ -1988,7 +1986,6 @@ function save_proj_f_() {
 
     if ! save_pkg_manager_ -fa $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
     if ! save_proj_cmd_ -f $i "$proj_cmd"; then return 1; fi
-    # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
 
     if ! update_setting_ $i "PUMP_PROJ_SHORT_NAME" "$TEMP_PUMP_PROJ_SHORT_NAME" &>/dev/null; then return 1; fi
 
@@ -2076,17 +2073,6 @@ function save_proj_() {
   fi
 
   if ! save_pkg_manager_ $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}"; then return 1; fi
-  
-  # if ! save_jira_ $i "${PUMP_JIRA_PROJ[$i]}"; then return 1; fi
-
-  # if [[ -z "$TEMP_PUMP_PROJ_SHORT_NAME" ]]; then
-  #   if (( save_proj_is_e )); then
-  #     # editing a project, pass the old name
-  #     if ! save_proj_cmd_ $i "$proj_name" "${PUMP_PROJ_SHORT_NAME[$i]}"; then return 1; fi
-  #   else
-  #     if ! save_proj_cmd_ $i "$proj_name"; then return 1; fi
-  #   fi
-  # fi
 
   local pkg_name=$(get_pkg_name_ "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}")
   
@@ -2273,6 +2259,7 @@ function remove_proj_() {
   update_setting_ $i "CURRENT_PUMP_PUSH_ON_REFIX" "" &>/dev/null
   update_setting_ $i "PUMP_PRINT_README" "" &>/dev/null
   update_setting_ $i "PUMP_PKG_NAME" "" &>/dev/null
+  update_setting_ $i "PUMP_JIRA_PROJ" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_IN_REVIEW" "" &>/dev/null
   update_setting_ $i "PUMP_JIRA_DONE" "" &>/dev/null
@@ -2317,6 +2304,7 @@ function set_current_proj_() {
   CURRENT_PUMP_PUSH_ON_REFIX="${PUMP_PUSH_ON_REFIX[$i]}"
   CURRENT_PUMP_PRINT_README="${PUMP_PRINT_README[$i]}"
   CURRENT_PUMP_PKG_NAME="${PUMP_PKG_NAME[$i]}"
+  CURRENT_PUMP_JIRA_PROJ="${PUMP_JIRA_PROJ[$i]}"
   CURRENT_PUMP_JIRA_IN_PROGRESS="${PUMP_JIRA_IN_PROGRESS[$i]}"
   CURRENT_PUMP_JIRA_IN_REVIEW="${PUMP_JIRA_IN_REVIEW[$i]}"
   CURRENT_PUMP_JIRA_DONE="${PUMP_JIRA_DONE[$i]}"
@@ -2576,6 +2564,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${gray_cor}${PUMP_GHA_WORKFLOW[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${gray_cor}${PUMP_PRINT_README[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${gray_cor}${PUMP_PKG_NAME[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${gray_cor}${PUMP_JIRA_PROJ[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_PROGRESS[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_REVIEW[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
@@ -2617,7 +2606,8 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}${gray_cor}$CURRENT_PUMP_GHA_WORKFLOW"
   print " [${solid_pink_cor}CURRENT_PUMP_PRINT_README=${reset_cor}${gray_cor}$CURRENT_PUMP_PRINT_README${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}${gray_cor}$CURRENT_PUMP_PKG_NAME${reset_cor}]"
-  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_IN_PROGRESS${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_PROJ=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_PROJ${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}${gray_cor}$CURRENT_(${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_IN_REVIEW${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}${gray_cor}$CURRENT_PUMP_JIRA_DONE${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${gray_cor}$CURRENT_PUMP_NVM_SKIP_LOOKUP${reset_cor}]"
@@ -3501,6 +3491,7 @@ function load_config_entry_() {
     PUMP_PUSH_ON_REFIX
     PUMP_PRINT_README
     PUMP_PKG_NAME
+    PUMP_JIRA_PROJ
     PUMP_JIRA_IN_PROGRESS
     PUMP_JIRA_IN_REVIEW
     PUMP_JIRA_DONE
@@ -3651,6 +3642,9 @@ function load_config_entry_() {
         ;;
       PUMP_PKG_NAME)
         PUMP_PKG_NAME[$i]="$value"
+        ;;
+      PUMP_JIRA_PROJ)
+        PUMP_JIRA_PROJ[$i]="$value"
         ;;
       PUMP_JIRA_IN_PROGRESS)
         PUMP_JIRA_IN_PROGRESS[$i]="$value"
@@ -5216,7 +5210,7 @@ function revs() {
         print -l -- " ${red_cor}not deleted${reset_cor} $rev"
       fi
     done
-    
+
   else
     rev -e "$proj_arg" "${rev_choice//rev./}"
   fi
@@ -5708,6 +5702,35 @@ function clone() {
   
 }
 
+function select_jira_key_() {
+  local i="$1"
+  local jira_proj="$2"
+
+  if [[ -z "$jira_proj" ]]; then
+    if ! check_proj_ -j $i; then return 1; fi
+    jira_proj="${PUMP_JIRA_PROJ[$i]}"
+    if [[ -z "$jira_proj" ]]; then return 1; fi
+  fi
+
+  local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
+    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
+    Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
+  if [[ -z "$tickets" ]]; then
+    print " no jira projects found" >&2
+    print " make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
+    return 1;
+  fi
+
+  local ticket=""
+  ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
+  if [[ -z "$ticket" ]]; then return 1; fi
+
+  local jira_key=${ticket%% *}
+
+  echo "$jira_key"
+  return 0;
+}
+
 function jira() {
   set +x
   eval "$(parse_flags_ "jira_" "scrp" "" "$@")"
@@ -5768,6 +5791,7 @@ function jira() {
   local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
   local jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"In Review"}"
   local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
+  local jira_proj="${PUMP_JIRA_PROJ[$i]}"
 
   if (( jira_is_s || jira_is_r || jira_is_c || jira_is_p )); then
     if [[ -z "$jira_key" ]]; then
@@ -5826,31 +5850,8 @@ function jira() {
     fi
   fi
 
-  local projects=$(acli jira project list --recent --json | jq -r '.[].key' 2>/dev/null)
-  if [[ -z "$projects" ]]; then
-    print " no jira projects found" >&2
-    print " to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
-    return 1;
-  fi
-
-  local jira_proj=""
-  jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
-  if [[ -z "$jira_proj" ]]; then return 1; fi
-
-  local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
-    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
-    Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status" | awk 'NR > 1' 2>/dev/null)
-  if [[ -z "$tickets" ]]; then
-    print " no jira projects found" >&2
-    # print "  to make sure you are authenticated, run ${yellow_cor}acli jira auth login --web${reset_cor}" >&2
-    return 1;
-  fi
-
-  local ticket=""
-  ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
-  if [[ -z "$ticket" ]]; then return 1; fi
-
-  local jira_key=${ticket%% *}
+  local jira_key=$(select_jira_key_ $i "$jira_proj")
+  if [[ -z "$jira_key" ]]; then return 1; fi
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
@@ -5862,6 +5863,8 @@ function jira() {
     print ""
     clone "$proj_arg" "$jira_key"
   fi
+
+  jira -p "$proj_arg" "$jira_key"
 }
 
 function abort() {
@@ -8146,8 +8149,9 @@ function delb() {
   (( delb_is_d )) && set -x
 
   if (( delb_is_h )); then
-    print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to delete a branch locally "
-    print "  ${yellow_cor}delb -r ${solid_yellow_cor}[<branch>]${reset_cor} : to also delete remotely (excludes main branches)"
+    print "  ${yellow_cor}delb${reset_cor} : to delete a branch locally in current folder"
+    print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to delete a branch locally in folder"
+    print "  ${yellow_cor}delb -r${reset_cor} : to also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : to include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation (cannot use with -r)"
     return 0;
@@ -8155,13 +8159,14 @@ function delb() {
 
   local folder="$PWD"
   local branch_arg=""
-
+  local proj_arg=""
+  
   if [[ -n "$2" && $2 != -* ]]; then
     if [[ -d "$2" ]]; then
       folder="$2"
     else
-      print " fatal: not a valid folder argument: $2" >&2
-      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      print " fatal: not a valid folder argument" >&2
+      print " run ${yellow_cor}delb -h${reset_cor} : to see usage" >&2
       return 1;
     fi
     
@@ -8169,7 +8174,7 @@ function delb() {
       branch_arg="$1"
     else
       print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}pull -h${reset_cor} : to see usage" >&2
+      print " run ${yellow_cor}delb -h${reset_cor} : to see usage" >&2
       return 1;
     fi
   
@@ -8400,6 +8405,7 @@ function pro() {
     update_setting_ $i "PUMP_NVM_USE_V" "" 2>/dev/null
     update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 2>/dev/null
     update_setting_ $i "PUMP_CODE_EDITOR" "" 2>/dev/null
+    update_setting_ $i "PUMP_JIRA_PROJ" "" 2>/dev/null
     return $?;
   fi
 
@@ -8712,8 +8718,8 @@ function proj_handler() {
     (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} <folder>${reset_cor} : to open a ${proj_cmd}'s folder"
     (( single_mode )) && print "  ${yellow_cor}${proj_cmd} <branch>${reset_cor} : to open ${proj_cmd} and switch to branch"
     print "  --"
-    print "  ${yellow_cor}${proj_cmd} -o <jira_key>${reset_cor} : to open jira ticket"
-    print "  ${yellow_cor}${proj_cmd} -c <jira_key>${reset_cor} : to close jira ticket"
+    print "  ${yellow_cor}${proj_cmd} -o ${solid_yellow_cor}<jira_key>${reset_cor} : to open a ${proj_cmd}'s ticket"
+    print "  ${yellow_cor}${proj_cmd} -c ${solid_yellow_cor}<jira_key>${reset_cor} : to close a ${proj_cmd}'s ticket"
     (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : to open ${proj_cmd}'s default folder"
     print "  --"
     print "  ${yellow_cor}${proj_cmd} -e${reset_cor} : to edit ${proj_cmd}"
@@ -8763,22 +8769,6 @@ function proj_handler() {
     fi
   fi
 
-  if (( proj_handler_is_o )); then
-    if (( single_mode )); then
-      if [[ -z "$branch_arg" ]]; then
-        print " fatal: not a valid argument" >&2
-        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
-        return 1;
-      fi
-    else
-      if [[ -z "$folder_arg" ]]; then
-        print " fatal: not a valid argument" >&2
-        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
-        return 1;
-      fi
-    fi
-  fi
-
   local resolved_folder="$proj_folder"
 
   # resolve folder_arg
@@ -8789,8 +8779,10 @@ function proj_handler() {
   else
     if [[ -n "$folder_arg" ]]; then
       resolved_folder="${proj_folder}/${folder_arg}"
-    else
+    
+    elif (( ! proj_handler_is_o )); then
       local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+      
       if [[ -n "$dirs" ]]; then
         folder_arg=($(choose_one_ -a "folder to open" "${dirs[@]}"))
           
@@ -8803,14 +8795,20 @@ function proj_handler() {
 
   local jira_key=""
 
-  if (( proj_handler_is_c )); then
+  if (( proj_handler_is_c || proj_handler_is_o )); then
     if (( single_mode )); then
-      if [[ -z "$branch_arg" ]]; then
-        print " fatal: not a valid argument" >&2
-        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
-        return 1;
+      if [[ -n "$branch_arg" ]]; then
+        jira_key=$(extract_jira_key_ "$branch_arg")
+
+        if [[ -z "$jira_key" ]]; then
+          print " fatal: not a valid argument" >&2
+          print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+          return 1;
+        fi
+      else
+        local jira_key=$(select_jira_key_ $i)
+        if [[ -z "$jira_key" ]]; then return 1; fi
       fi
-      jira_key=$(extract_jira_key_ "$branch_arg")
     else
       if [[ -z "$folder_arg" ]]; then
         print " fatal: not a valid argument" >&2
@@ -8818,65 +8816,44 @@ function proj_handler() {
         return 1;
       fi
       jira_key=$(extract_jira_key_ "$folder_arg")
-    fi
 
-    if [[ -z "$jira_key" ]]; then
-      print " fatal: not a valid argument" >&2
-      print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
-      return 1;
+      if [[ -z "$jira_key" ]]; then
+        print " fatal: not a valid argument" >&2
+        print " run ${yellow_cor}${proj_cmd} -h${reset_cor} : to see usage" >&2
+        return 1;
+      fi
     fi
   fi
-
-  local RET=0
-
+  
   if (( proj_handler_is_o )); then
-    # open jira ticket
-    if (( single_mode )); then
-      RET=1
-      if cd "$resolved_folder"; then
-        if co -m; then
-          co -b "$branch_arg"
-          RET=$?
-        fi
-      fi
-    else
-      clone "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key"
-      RET=$?
-    fi
-    if (( RET == 0)); then
-      jira -p "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key" 2>/dev/null
-      RET=$?
-    fi
+    jira "$proj_cmd"
+    return $?;
+  fi
 
-  elif (( proj_handler_is_c )); then
-    # close jira ticket
+  if (( proj_handler_is_c )); then
     if (( single_mode )); then
       delb "$branch_arg" "$resolved_folder"
-      RET=$?
     else
       del "$resolved_folder"
-      RET=$?
     fi
-    if (( RET == 0 )); then
-      jira -c "$CURRENT_PUMP_PROJ_SHORT_NAME" "$jira_key" 2>/dev/null
-      RET=$?
+    if (( $? == 0 )); then
+      jira -c "$proj_cmd" "$jira_key" 2>/dev/null
+      return $?;
     fi
 
-  else
-    cd "$resolved_folder"
-    RET=$?
-
-    if (( RET == 0 )); then
-      if [[ -z "$(ls "$resolved_folder")" ]]; then
-        print " project folder is empty" >&1
-        print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
-      elif [[ -n "$branch_arg" ]]; then
-        co "$branch_arg"
-      fi
-    fi
+    return 1;
   fi
 
-  return $RET;
+  cd "$resolved_folder"
+
+  if (( $? == 0 )); then
+    if [[ -z "$(ls "$resolved_folder")" ]]; then
+      print " project folder is empty" >&1
+      print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
+    elif [[ -n "$branch_arg" ]]; then
+      co "$branch_arg"
+    fi
+  fi
 }
 
 function stash() {
@@ -9500,6 +9477,7 @@ typeset -gA PUMP_GHA_WORKFLOW
 typeset -gA PUMP_PUSH_ON_REFIX
 typeset -gA PUMP_PRINT_README
 typeset -gA PUMP_PKG_NAME
+typeset -gA PUMP_JIRA_PROJ
 typeset -gA PUMP_JIRA_IN_PROGRESS
 typeset -gA PUMP_JIRA_IN_REVIEW
 typeset -gA PUMP_JIRA_IN_DONE
@@ -9539,6 +9517,7 @@ typeset -g CURRENT_PUMP_GHA_WORKFLOW=""
 typeset -g CURRENT_PUMP_PUSH_ON_REFIX=""
 typeset -g CURRENT_PUMP_PRINT_README=""
 typeset -g CURRENT_PUMP_PKG_NAME=""
+typeset -g CURRENT_PUMP_JIRA_PROJ=""
 typeset -g CURRENT_PUMP_JIRA_IN_PROGRESS=""
 typeset -g CURRENT_PUMP_JIRA_IN_REVIEW=""
 typeset -g CURRENT_PUMP_JIRA_DONE=""
