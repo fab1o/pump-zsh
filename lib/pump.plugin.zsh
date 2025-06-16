@@ -5329,25 +5329,25 @@ function rev() {
 
   if [[ -d "$full_rev_folder" ]]; then
     print " opening review and pulling changes: ${green_cor}${pr_title:-$branch}${reset_cor}"
+    
+    cd "$full_rev_folder"
 
-    if ! git -C "$full_rev_folder" checkout $branch --quiet; then
-      if reseta "$full_rev_folder"; then
-        git -C "$full_rev_folder" checkout $branch --quiet
+    if ! git checkout "$branch" --quiet; then
+      if reseta; then
+        git checkout "$branch" --quiet
       else
         skip_setup=1
       fi
     fi
-    
-    cd "$full_rev_folder"
 
     if (( ! skip_setup )); then
-      local git_status=$(git -C "$full_rev_folder" status --porcelain 2>/dev/null)
+      local git_status=$(git status --porcelain 2>/dev/null)
       if [[ -n "$git_status" ]]; then
         skip_setup=1
         
         if confirm_ "review is not clean, erase your changes and match branch to pull request?"; then
-          if reseta "$full_rev_folder"; then
-            if ! pull "$full_rev_folder" --quiet; then
+          if reseta; then
+            if ! pull --quiet; then
               skip_setup=1
               already_merged=1
             fi
@@ -5359,7 +5359,7 @@ function rev() {
           return 1;
         fi
       else
-        if ! pull "$full_rev_folder" --quiet; then
+        if ! pull --quiet; then
           skip_setup=1
           already_merged=1
         fi
@@ -6709,6 +6709,8 @@ function pull() {
 
   local RET=0
 
+  local is_quiet=$([[ ${argv[(Ie)--quiet]} || $pull_is_q == 1 ]] && echo 1 || echo 0)
+
   if (( pull_is_t )); then
     git -C "$folder" pull $remote_name $branch_arg --tags $@
     RET=$?
@@ -6718,13 +6720,17 @@ function pull() {
   git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
   RET=$?
   if (( RET != 0 )); then
-    if (( ! pull_is_r )); then
+    if (( ! pull_is_r && ! is_quiet )); then
       confirm_ "pull failed, try pull --rebase?"
       local _RET=$?
       if (( _RET == 130 || _RET == 2 )); then return 1; fi
       if (( _RET == 0 )); then
         pull_is_r=1
       fi
+    fi
+
+    if (( is_quiet )); then
+      RET=0
     fi
 
     if (( pull_is_r )); then
@@ -6737,7 +6743,7 @@ function pull() {
     fi
   fi
 
-  if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
+  if (( RET == 0 && ! is_quiet )); then
     print ""
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
