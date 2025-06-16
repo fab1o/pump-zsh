@@ -5524,6 +5524,8 @@ function clone() {
   local temp_default_branch_1=""
   local temp_default_branch_2=""
 
+  local skip_clone=0
+
   if (( single_mode )); then
     rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
     if [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
@@ -5549,85 +5551,84 @@ function clone() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
 
+      branch_arg="${${USER:0:1}:l}-$branch_arg"
+
       rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
       if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
-        cd "$folder_to_clone"
-        return 0;
+        if is_git_repo_ "$folder_to_clone"; then
+          skip_clone=1
+        fi
       fi
     fi
   fi
 
-  local default_branch="${default_branch_arg:-$pump_default_branch}"
-
-  if [[ -z "$default_branch" ]]; then
-    default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg")
-    if (( $? == 130 || $? == 2 )); then return 130; fi
+  if (( ! skip_clone )); then
+    local default_branch="${default_branch_arg:-$pump_default_branch}"
 
     if [[ -z "$default_branch" ]]; then
-      local placeholder=$(get_default_branch_ "$proj_folder")
-      default_branch=$(input_branch_name_ "type the default branch" "$placeholder")
-      if [[ -z "$default_branch" ]]; then return 1; fi
-    fi
-  fi
+      default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg")
+      if (( $? == 130 || $? == 2 )); then return 130; fi
 
-  if [[ -z "$pump_default_branch" || "$default_branch" != "$pump_default_branch" ]]; then
-    confirm_ "save default branch ${green_prompt_cor}$default_branch${reset_prompt_cor} and don't ask again, unless it changes?"
-    local RET=$?
-    if (( RET == 130 || RET == 2 )); then return 130; fi
-    if (( RET == 0 )); then
-      update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch &>/dev/null
-    fi
-  fi
-
-  if [[ -z "$folder_to_clone" ]]; then
-    local branch_folder="$branch_arg"
-    
-    if [[ -z "$branch_folder" ]]; then
-      branch_folder="$default_branch"
+      if [[ -z "$default_branch" ]]; then
+        local placeholder=$(get_default_branch_ "$proj_folder")
+        default_branch=$(input_branch_name_ "type the default branch" "$placeholder")
+        if [[ -z "$default_branch" ]]; then return 1; fi
+      fi
     fi
 
-    branch_folder="${branch_folder//\\/-}"
-    branch_folder="${branch_folder//\//-}"
-
-    folder_to_clone="${proj_folder}/${branch_folder}"
-  fi
-
-  if [[ -z "$branch_arg" ]]; then
-    branch_arg="$default_branch"
-  else
-    branch_arg="${${USER:0:1}:l}-$branch_arg"
-    remote_branch=$(get_remote_branch_ "$branch_arg" "$proj_folder")
-
-    if [[ -n "$remote_branch" ]]; then
-      print " fatal: branch already exists on remote: $branch_arg" >&2
-      return 1;
+    if [[ -z "$pump_default_branch" || "$default_branch" != "$pump_default_branch" ]]; then
+      confirm_ "save default branch ${green_prompt_cor}$default_branch${reset_prompt_cor} and don't ask again, unless it changes?"
+      local RET=$?
+      if (( RET == 130 || RET == 2 )); then return 130; fi
+      if (( RET == 0 )); then
+        update_setting_ $i "PUMP_DEFAULT_BRANCH" $default_branch &>/dev/null
+      fi
     fi
-  fi
+
+    if [[ -z "$folder_to_clone" ]]; then
+      local branch_folder="$branch_arg"
+      
+      if [[ -z "$branch_folder" ]]; then
+        branch_folder="$default_branch"
+      fi
+
+      branch_folder="${branch_folder//\\/-}"
+      branch_folder="${branch_folder//\//-}"
+
+      folder_to_clone="${proj_folder}/${branch_folder}"
+    fi
+
+    if [[ -z "$branch_arg" ]]; then
+      branch_arg="$default_branch"
+    fi
   
-  if [[ "$branch_arg" != "$default_branch" ]]; then
-    print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
-  else
-    print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
-  fi
-
-  # if [[ -d "$folder_to_clone" && -n "$(ls "$folder_to_clone" 2>/dev/null)" ]]; then
-  #   print " fatal: folder is not empty: $folder_to_clone" >&2
-  #   print " clean the folder or run ${yellow_cor}$proj_arg -e${reset_cor} to edit project and switch to ${pink_cor}single mode${reset_cor}" >&2
-  #   return 1;
-  # fi
-
-  rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
-  if command -v gum &>/dev/null; then
-    if ! gum spin --title="cloning... $proj_repo on branch: $branch_arg" -- git clone "$proj_repo" "$folder_to_clone"; then
-      print " failed to clone: folder is not empty or no access rights: $proj_repo" >&2
-      return 1;
+    if [[ "$branch_arg" != "$default_branch" ]]; then
+      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
+    else
+      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
     fi
-  else
-    print " cloning... $proj_repo on branch: $branch_arg"
-    if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
-  fi
 
-  # local past_folder="$PWD"
+    branch_arg="${${USER:0:1}:l}-$branch_arg"
+
+    rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
+    if command -v gum &>/dev/null; then
+      if ! gum spin --title="cloning... $proj_repo on branch: $branch_arg" -- git clone "$proj_repo" "$folder_to_clone"; then
+        print " failed to clone: folder is not empty or no access rights: $proj_repo" >&2
+        return 1;
+      fi
+    else
+      print " cloning... $proj_repo on branch: $branch_arg"
+      if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
+    fi
+
+  fi # end if (( ! skip_clone ))
+
+  remote_branch=$(get_remote_branch_ -r "$branch_arg" "$proj_folder")
+
+  if [[ -n "$remote_branch" ]]; then
+    print " fatal: branch already exists on remote: $branch_arg" >&2
+    return 1;
+  fi
 
   cd "$folder_to_clone"
 
@@ -5639,7 +5640,13 @@ function clone() {
   local my_branch=$(git branch --show-current)
 
   if [[ "$branch_arg" != "$my_branch" ]]; then
-    git checkout -b "$branch_arg" --quiet
+    if ! git checkout -b "$branch_arg" --quiet &>/dev/null; then
+      git checkout "$branch_arg" --quiet
+    fi
+  fi
+
+  if (( skip_clone )); then
+    return 0;
   fi
 
   if [[ "$default_branch" != "$branch_arg" ]]; then
@@ -5911,13 +5918,8 @@ function jira() {
       RET=$?
     fi
   else
-    if [[ -d "${proj_folder}/${jira_key}" ]]; then
-      cd "${proj_folder}/${jira_key}"
-    else
-      print ""
-      clone "$proj_arg" "$jira_key"
-      RET=$?
-    fi
+    clone "$proj_arg" "$jira_key"
+    RET=$?
   fi
 
   jira -p "$proj_arg" "$jira_key"
