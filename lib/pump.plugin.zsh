@@ -6719,6 +6719,7 @@ function pull() {
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} )); then
+    print ""
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
