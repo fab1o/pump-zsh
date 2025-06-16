@@ -418,7 +418,7 @@ function choose_one_() {
 
 function choose_multiple_() {
   set +x
-  eval "$(parse_flags_ "choose_multiple_" "" "" "$@")"
+  eval "$(parse_flags_ "choose_multiple_" "a" "" "$@")"
   (( choose_multiple_is_d )) && set -x
 
   local header="$1"
@@ -3182,7 +3182,7 @@ function get_repo_name_() {
 
 function select_branches_() {
   set +x
-  eval "$(parse_flags_ "select_branches_" "talr" "" "$@")"
+  eval "$(parse_flags_ "select_branches_" "talre" "" "$@")"
   (( select_branches_is_d )) && set -x
 
   local searchText="$1"
@@ -3194,9 +3194,15 @@ function select_branches_() {
 
   local branch_results=()
 
+  if (( select_branches_is_e )); then
+    select_branches_is_t=1
+  else
+    searchText="*$searchText*"
+  fi
+
   if (( select_branches_is_a )); then
     fetch "$proj_folder" --quiet
-    branch_results=("${(@f)$(git -C "$proj_folder" branch --all --list "*$searchText*" --format="%(refname:short)" \
+    branch_results=("${(@f)$(git -C "$proj_folder" branch --all --list "$searchText" --format="%(refname:short)" \
       | sed "s#^$remote_name/##" \
       | grep -v 'detached' \
       | sort -fu
@@ -3208,7 +3214,7 @@ function select_branches_() {
       | sort -fu
     )}")
   else
-    branch_results=("${(@f)$(git -C "$proj_folder" branch --list "*$searchText*" --format="%(refname:short)" \
+    branch_results=("${(@f)$(git -C "$proj_folder" branch --list "$searchText" --format="%(refname:short)" \
       | grep -v 'detached' \
       | sort -fu
     )}")
@@ -5881,14 +5887,14 @@ function jira() {
 
   if (( single_mode )); then
     fetch "$proj_folder" --quiet
-    local remote_name=$(get_remote_origin_ "$proj_folder")
-    local find_branch=$(git -C "$proj_folder" branch --all --list "*$jira_key" --format="%(refname:short)" | sed "s#^$remote_name/##" | grep -v 'detached')
+    local branch="${${USER:0:1}:l}-$jira_key"
+    local find_branch=$(git -C "$proj_folder" branch --all --list "$branch" --format="%(refname:short)")
     cd "$proj_folder"
     if [[ -n "$find_branch" ]]; then
-      co -e "$find_branch"
+      co -e "$branch"
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
-      co "$jira_key" "$default_branch"
+      co "$branch" "$default_branch"
     fi
   else
     if [[ -d "${proj_folder}/${jira_key}" ]]; then
@@ -8180,7 +8186,7 @@ function prune() {
 
 function delb() {
   set +x
-  eval "$(parse_flags_ "delb_" "sra" "" "$@")"
+  eval "$(parse_flags_ "delb_" "sera" "" "$@")"
   (( delb_is_d )) && set -x
 
   if (( delb_is_h )); then
@@ -8189,6 +8195,7 @@ function delb() {
     print "  ${yellow_cor}delb -r${reset_cor} : to also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : to include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : to skip confirmation (cannot use with -r)"
+    print "  ${yellow_cor}delb -e${reset_cor} : to delete only if matches exact name"
     return 0;
   fi
 
@@ -8232,9 +8239,17 @@ function delb() {
   local deleted_branches=()
 
   if (( delb_is_r )); then
-    selected_branches=($(select_branches_ -r "$branch_arg" "$folder" "$delb_is_a"))
+    if (( delb_is_e )); then
+      selected_branches=($(select_branches_ -re "$branch_arg" "$folder" "$delb_is_a"))
+    else
+      selected_branches=($(select_branches_ -r "$branch_arg" "$folder" "$delb_is_a"))
+    fi
   else
-    selected_branches=($(select_branches_ -l "$branch_arg" "$folder" 1))
+    if (( delb_is_e )); then
+      selected_branches=($(select_branches_ -le "$branch_arg" "$folder" 1))
+    else
+      selected_branches=($(select_branches_ -l "$branch_arg" "$folder" 1))
+    fi
   fi
   if [[ -z "$selected_branches" ]]; then return 1; fi
 
@@ -8867,7 +8882,8 @@ function proj_handler() {
 
   if (( proj_handler_is_c )); then
     if (( single_mode )); then
-      delb "$branch_arg" "$resolved_folder"
+      co -m
+      delb -se "$branch_arg" "$resolved_folder"
     else
       del "$resolved_folder"
     fi
