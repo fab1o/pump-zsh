@@ -31,7 +31,7 @@
     "update_config": "zsh ./scripts/update_config.zsh",
     "watch": "npm-watch"
   },
-  "version": "0.3.4",
+  "version": "0.3.5",
   "watch": {
     "update": [
       "lib/*.*",
