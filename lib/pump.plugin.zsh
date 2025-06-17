@@ -3532,15 +3532,6 @@ function load_config_entry_() {
         PUMP_USE)
           value="node"
           ;;
-        PUMP_RUN)
-          value="${PUMP_PKG_MANAGER[$i]} ${run}dev"
-          ;;
-        PUMP_RUN_STAGE)
-          value="${PUMP_PKG_MANAGER[$i]} ${run}stage"
-          ;;
-        PUMP_RUN_PROD)
-          value="${PUMP_PKG_MANAGER[$i]} ${run}prod"
-          ;;
         PUMP_TEST)
           value="${PUMP_PKG_MANAGER[$i]} ${run}test"
           ;;
@@ -4852,11 +4843,11 @@ function run() {
 
   local proj_arg="$CURRENT_PUMP_PROJ_SHORT_NAME"
   local folder_arg=""
-  local _env="dev"
+  local env_mode="dev"
 
   if [[ -n "$3" ]]; then
     proj_arg="$1"
-    _env="$3"
+    env_mode="$3"
     folder_arg="$2"
   elif [[ -n "$2" ]]; then
     local i=$(find_proj_index_ "$1" 2>/dev/null)
@@ -4868,7 +4859,7 @@ function run() {
         local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
 
         if (( single_mode )); then
-          _env="$2";
+          env_mode="$2";
         else
           folder_arg="$2";
         fi
@@ -4877,7 +4868,7 @@ function run() {
       fi
     elif is_proj_folder_ "$1" &>/dev/null; then
       folder_arg="$1"
-      _env="$2"
+      env_mode="$2"
     else
       proj_arg="$1"
       folder_arg="$2"
@@ -4886,7 +4877,7 @@ function run() {
     if is_project_ "$1"; then
       proj_arg="$1"
     elif [[ "$1" == "dev" || "$1" == "stage" || "$1" == "prod" ]]; then
-      _env="$1"
+      env_mode="$1"
     elif is_proj_folder_ "$1" &>/dev/null; then
       folder_arg="$1"
     else
@@ -4902,29 +4893,23 @@ function run() {
 
   proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
 
-  if [[ "$_env" != "dev" && "$_env" != "stage" && "$_env" != "prod" ]]; then
+  if [[ "$env_mode" != "dev" && "$env_mode" != "stage" && "$env_mode" != "prod" ]]; then
     print " env is incorrect, valid options are: dev, stage or prod" >&2
     print " run ${yellow_cor}run -h${reset_cor} to see usage" >&2
     return 1;
-  fi
-
-  local _run="${PUMP_RUN[$i]}"
-
-  if [[ "$_env" == "stage" ]]; then
-    _run="${PUMP_RUN_STAGE[$i]}"
-  elif [[ "$_env" == "prod" ]]; then
-    _run="${PUMP_RUN_PROD[$i]}"
   fi
 
   if ! check_proj_ -fm $i; then return 1; fi
 
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+  local pkg_manager="${PUMP_PKG_MANAGER[$i]}"
+  local pump_run="${PUMP_RUN[$i]}"
 
-  if [[ -z "$_run" ]]; then
-    print " missing PUMP_RUN_$i" >&2
-    print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
-    return 1;
+  if [[ "$env_mode" == "stage" ]]; then
+    pump_run="${PUMP_RUN_STAGE[$i]}"
+  elif [[ "$env_mode" == "prod" ]]; then
+    pump_run="${PUMP_RUN_PROD[$i]}"
   fi
 
   local folder_to_execute="$PWD"
@@ -4952,18 +4937,41 @@ function run() {
   # debugging
   # print "proj_arg=$proj_arg"
   # print "folder_arg=$folder_arg"
-  # print "_env=$_env"
+  # print "env_mode=$env_mode"
   # print "folder_to_execute=$folder_to_execute"
   # print " --------"
 
   cd "$folder_to_execute"
 
-  print " running $_env on ${gray_cor}${folder_to_execute}${reset_cor}"
-  print " ${solid_pink_cor}${_run}${reset_cor}"
-  
-  if ! eval "$_run"; then
-    print " ${red_cor}failed to run PUMP_RUN_$i ${reset_cor}" >&2
-    print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
+  print " running $env_mode on ${gray_cor}${folder_to_execute}${reset_cor}"
+
+  if [[ -z "$pump_run" ]]; then
+    if [[ -n "$pkg_manager" ]]; then
+      local pkg_manager_run="$pkg_manager$([[ $pkg_manager == "yarn" ]] && echo "" || echo " run")"
+      local pump_run_env=$(get_script_from_pkg_json_ "$env_mode" "$folder")
+      if [[ -n "$pump_run_env" ]]; then
+        pump_run="$pkg_manager_run $env_mode"
+      else
+        local pump_run_start=$(get_script_from_pkg_json_ "start" "$folder")
+        if [[ -n "$pump_run_start" ]]; then
+          pump_run="$pkg_manager_run start"
+        else
+          print " fatal: no run script not found in package.json: ${yellow_cor}$pkg_manager_run $env_mode${reset_cor} or ${yellow_cor}$pkg_manager_run start${reset_cor}" >&2
+          return 1;
+        fi
+      fi
+    fi
+    print " ${solid_pink_cor}${pump_run}${reset_cor}"
+    
+    if ! eval "$pump_run"; then return 1; fi
+  else
+    print " ${solid_pink_cor}${pump_run}${reset_cor}"
+    
+    if ! eval "$pump_run"; then
+      print " ${red_cor}fatal: failed to run PUMP_RUN_$i ${reset_cor}" >&2
+      print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
+      return 1;
+    fi
   fi
 }
 
@@ -5006,13 +5014,13 @@ function setup() {
   fi
 
   proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
-
-  local _setup="${PUMP_SETUP[$i]}"
   
   if ! check_proj_ -fm $i; then return 1; fi
 
   local proj_folder="${PUMP_PROJ_FOLDER[$i]}"
   local single_mode="${PUMP_PROJ_SINGLE_MODE[$i]}"
+  local pkg_manager="${PUMP_PKG_MANAGER[$i]}"
+  local pump_setup="${PUMP_SETUP[$i]}"
 
   local folder_to_execute="$PWD"
 
@@ -5045,12 +5053,28 @@ function setup() {
   cd "$folder_to_execute"
 
   print " setting up ${gray_cor}${folder_to_execute}${reset_cor}"
-  print " ${solid_pink_cor}${_setup}${reset_cor}"
 
-  if ! eval "$_setup"; then
-    print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
-    print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
-    return 1;
+  if [[ -z "$pump_setup" ]]; then
+    if [[ -n "$pkg_manager" ]]; then
+      local pkg_manager_run="$pkg_manager$([[ $pkg_manager == "yarn" ]] && echo "" || echo " run")"
+      pump_setup=$(get_script_from_pkg_json_ "setup" "$folder")
+      if [[ -n "$pump_setup" ]]; then
+        pump_setup="$pkg_manager_run setup"
+      else
+        pump_setup="$pkg_manager install"
+      fi
+    fi
+    print " ${solid_pink_cor}${pump_setup}${reset_cor}"
+    
+    if ! eval "$pump_setup"; then return 1; fi
+  else
+    print " ${solid_pink_cor}${pump_setup}${reset_cor}"
+    
+    if ! eval "$pump_setup"; then
+      print " ${red_cor}fatal: failed to run PUMP_SETUP_$i ${reset_cor}" >&2
+      print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
+      return 1;
+    fi
   fi
 
   print ""
@@ -5264,8 +5288,8 @@ function rev() {
 
   proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
 
-  local _setup="${PUMP_SETUP[$i]}"
-  local _clone="${PUMP_CLONE[$i]}"
+  local pump_setup="${PUMP_SETUP[$i]}"
+  local pump_clone="${PUMP_CLONE[$i]}"
   local code_editor="${PUMP_CODE_EDITOR[$i]}"
 
   if ! check_proj_ -rfm $i; then return 1; fi
@@ -5397,12 +5421,12 @@ function rev() {
   fi
 
   if (( ! skip_setup )); then
-    if [[ -n "$_setup" ]]; then
+    if [[ -n "$pump_setup" ]]; then
       print " setting up ${gray_cor}${full_rev_folder}${reset_cor}"
-      print " ${solid_pink_cor}${_setup}${reset_cor}"
+      print " ${solid_pink_cor}${pump_setup}${reset_cor}"
 
-      if ! eval "$_setup"; then
-        print " ${red_cor}failed to run PUMP_SETUP_$i ${reset_cor}" >&2
+      if ! eval "$pump_setup"; then
+        print " ${red_cor}fatal: failed to run PUMP_SETUP_$i ${reset_cor}" >&2
         print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
       fi
     fi
@@ -5508,7 +5532,7 @@ function clone() {
 
   proj_arg="${PUMP_PROJ_SHORT_NAME[$i]}"
 
-  local _clone="${PUMP_CLONE[$i]}"
+  local pump_clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
   local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
 
@@ -5653,10 +5677,10 @@ function clone() {
     git config "branch.${branch_arg}.gh-merge-base" "$default_branch"
   fi
 
-  if [[ -n "$_clone" ]]; then
-    print " ${solid_pink_cor}$_clone ${reset_cor}"
-    if ! eval "$_clone"; then
-      print " ${red_cor}failed to run PUMP_CLONE_$i ${reset_cor}" >&2
+  if [[ -n "$pump_clone" ]]; then
+    print " ${solid_pink_cor}${pump_clone}${reset_cor}"
+    if ! eval "$pump_clone"; then
+      print " ${red_cor}fatal: failed to run PUMP_CLONE_$i ${reset_cor}" >&2
       print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
     fi
   fi

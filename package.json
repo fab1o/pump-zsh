@@ -20,7 +20,6 @@
   },
   "scripts": {
     "check_zshrc": "zsh ./scripts/check_zshrc.zsh",
-    "dev": "echo 'this is a dev script'",
     "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
     "install_deps": "bash ./scripts/install_deps.sh",
     "install_pump": "zsh ./scripts/install.zsh",
