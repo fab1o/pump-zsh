@@ -2442,8 +2442,8 @@ function get_node_versions_() {
   done
 
   if (( ${#matching_versions[@]} == 0 )); then
-    print " no matching node versions found for engine: $node_engine" 2>/dev/tty >&2
-    print " try to install a version with: nvm install" 2>/dev/tty >&2
+    print " warning: no matching node version found for engine: $node_engine" 2>/dev/tty >&2
+    print " run: ${yellow_cor}nvm install <version>${reset_cor} to install it" 2>/dev/tty >&2
     return 1;
   fi
 
