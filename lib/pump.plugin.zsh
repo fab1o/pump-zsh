@@ -1008,7 +1008,7 @@ function check_proj_() {
     if ! check_proj_repo_ -se $i "${PUMP_PROJ_REPO[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" ${@:2}; then return 1; fi
 
     if (( ! check_proj_is_q )) && [[ -z "${PUMP_PROJ_REPO[$i]}" ]]; then
-      print " missing repository uri for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " ${red_cor}missing repository uri for ${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&2
       print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} to edit project" >&2
       return 1;
     fi
@@ -1018,7 +1018,7 @@ function check_proj_() {
     if ! check_proj_folder_ -s $i "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_SHORT_NAME[$i]}" "${PUMP_PROJ_REPO[$i]}" ${@:2}; then return 1; fi
 
     if (( ! check_proj_is_q )) && [[ -z "${PUMP_PROJ_FOLDER[$i]}" || ! -d "${PUMP_PROJ_FOLDER[$i]}" ]]; then
-      print " missing project folder for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " ${red_cor}missing project folder for ${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&2
       print " run ${yellow_cor}${PUMP_PROJ_SHORT_NAME[$i]} -e${reset_cor} to edit project" >&2
       return 1;
     fi
@@ -1032,7 +1032,7 @@ function check_proj_() {
     if ! check_proj_pkg_manager_ -q $i "${PUMP_PKG_MANAGER[$i]}" "${PUMP_PROJ_FOLDER[$i]}" "${PUMP_PROJ_REPO[$i]}" ${@:2}; then return 1; fi
 
     if (( ! check_proj_is_q )) && [[ -z "${PUMP_PKG_MANAGER[$i]}" ]]; then
-      print " missing package manager for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " ${red_cor}missing package manager for ${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&2
       return 1;
     fi
   fi
@@ -1041,7 +1041,7 @@ function check_proj_() {
     if ! save_jira_ -aq $i "${PUMP_JIRA_PROJ[$i]}" ${@:2} 1>/dev/null; then return 1; fi
 
     if (( ! check_proj_is_q )) && [[ -z "${PUMP_JIRA_PROJ[$i]}" ]]; then
-      print " missing JIRA project for ${PUMP_PROJ_SHORT_NAME[$i]}" >&2
+      print " ${red_cor}missing jira project for ${PUMP_PROJ_SHORT_NAME[$i]}${reset_cor}" >&2
       return 1;
     fi
   fi
@@ -1073,7 +1073,11 @@ function check_proj_repo_() {
   local error_msg=""
 
   if [[ -z "$proj_repo" ]]; then
-    error_msg="project repository is missing for ${solid_blue_cor}$pkg_name${reset_cor}"
+    if [[ -n "$pkg_name" ]]; then
+      error_msg="project repository is missing for $pkg_name"
+    else
+      error_msg="project repository is missing"
+    fi
   else
     # check for duplicates across other indices
     if ! [[ "$proj_repo" =~ '^((git@[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?)|(https://[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?))$' ]]; then
@@ -1097,7 +1101,7 @@ function check_proj_repo_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
+    print "  ${red_cor}${error_msg}${reset_cor}" >&2
 
     if (( check_proj_repo_is_s )); then
       if save_proj_repo_ $i "$proj_folder" "$pkg_name" ${@:5}; then return 0; fi
@@ -1123,9 +1127,9 @@ function check_proj_folder_() {
 
   if [[ -z "$proj_folder" ]]; then
     if [[ -n "$pkg_name" ]]; then
-      error_msg="project folder is missing for ${solid_blue_cor}$pkg_name${reset_cor}: $proj_folder"
+      error_msg="project folder is missing for $pkg_name"
     else
-      error_msg="project folder is missing: $proj_folder"
+      error_msg="project folder is missing"
     fi
   else
     if (( check_proj_folder_is_s )); then
@@ -1135,7 +1139,7 @@ function check_proj_folder_() {
           #mkdir -p "$proj_folder" 2>/dev/null
         else
           if [[ -n "$pkg_name" ]]; then
-            error_msg="project folder doesn't exist for ${solid_blue_cor}$pkg_name${reset_cor}: $proj_folder"
+            error_msg="project folder doesn't exist for $pkg_name: $proj_folder"
           else
             error_msg="project folder doesn't exist: $proj_folder"
           fi
@@ -1165,7 +1169,7 @@ function check_proj_folder_() {
   done
 
   if [[ -n "$error_msg" ]]; then
-    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
+    print "  ${red_cor}${error_msg}${reset_cor}" >&2
 
     if (( check_proj_folder_is_s )); then
       if save_proj_folder_ -s $i "$pkg_name" "$proj_repo" ${@:5}; then return 0; fi
@@ -1200,7 +1204,7 @@ function check_proj_pkg_manager_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  ${yellow_cor}$error_msg${reset_cor}" >&2
+    print "  ${red_cor}${error_msg}${reset_cor}" >&2
 
     if (( check_proj_pkg_manager_is_s )); then
       if save_pkg_manager_ $i "$proj_folder" "$proj_repo" ${@:5}; then return 0; fi
@@ -3251,7 +3255,7 @@ function select_branches_() {
     if [[ -n "$searchText" ]]; then
       print -n " matching: $searchText" >&2
     fi
-    print "" >&2
+    print " known to git" >&2
     return 1;
   fi
 
@@ -3376,9 +3380,9 @@ function select_pr_() {
 
   if [[ -z "$pr_list" ]]; then
     if [[ -n "$proj_cmd" ]]; then
-      print " no pull requests found for $proj_cmd" >&2
+      print " no pull requests for $proj_cmd" >&2
     else
-      print " no pull requests found" >&2
+      print " no pull requests" >&2
     fi
     return 1;
   fi
@@ -3412,15 +3416,15 @@ function get_from_pkg_json_() {
   local key_name="${1:-"name"}"
   local folder="${2:-$PWD}"
 
-  folder="$(realpath -- "$folder" 2>/dev/null)"
+  local real_folder="$(realpath -- "$folder" 2>/dev/null)"
 
-  if [[ -z "$folder" ]]; then
+  if [[ -z "$real_folder" ]]; then
     print " fatal: not a valid folder: $folder" >&2
     return 1;
   fi
   
   local value="";
-  local file="${folder}/package.json"
+  local file="${real_folder}/package.json"
 
   if [[ -f "$file" ]]; then
     if command -v jq &>/dev/null; then
@@ -3440,15 +3444,15 @@ function get_script_from_pkg_json_() {
   local key_name="${1:-"name"}"
   local folder="${2:-$PWD}"
 
-  folder="$(realpath -- "$folder" 2>/dev/null)"
+  local real_folder="$(realpath -- "$folder" 2>/dev/null)"
 
-  if [[ -z "$folder" ]]; then
+  if [[ -z "$real_folder" ]]; then
     print " fatal: not a valid folder: $folder" >&2
     return 1;
   fi
   
   local value="";
-  local file="${folder}/package.json"
+  local file="${real_folder}/package.json"
 
   if [[ -f "$file" ]]; then
     if command -v jq &>/dev/null; then
@@ -4061,11 +4065,14 @@ function refix() {
   local last_commit_msg=$(git -C "$folder" --no-pager log -1 --pretty=format:'%s' | xargs -0)
   
   if [[ "$last_commit_msg" == Merge* ]]; then
-    print " fatal: last commit is a merge commit, create a new commit instead" >&2 
-    return 1;
+    last_commit_msg=$(input_from_ "commit message" "" 255)
+    if (( $? == 130 )); then return 130; fi
+    if [[ -z "$last_commit_msg" ]]; then return 1; fi
+
+    print " ${light_purple_prompt_cor}commit message:${reset_cor} $last_commit_msg" >&2
+  else
+    if ! git -C "$folder" reset --soft HEAD~1 1>/dev/null; then return 1; fi
   fi
-  
-  if ! git -C "$folder" reset --soft HEAD~1 1>/dev/null; then return 1; fi
 
   if command -v gum &>/dev/null; then
     # start spinning
@@ -4736,6 +4743,7 @@ function pr() {
 
   pr_title=$(input_name_ "pull request title" "$pr_title" 255)
   if (( $? == 130 )); then return 130; fi
+  if [[ -z "$pr_title" ]]; then return 1; fi
 
   print " ${light_purple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
 
@@ -8196,7 +8204,7 @@ function rebase() {
   fi
 
   if [[ "$branch_arg" == "$base_branch" ]]; then
-    print " fatal: cannot rebase, branches are the same: $branch_arg" >&2
+    print " fatal: cannot rebase, base branch is the same as branch argument: $branch_arg" >&2
     return 1;
   fi
 
@@ -8290,7 +8298,7 @@ function merge() {
   fi
 
   if [[ "$branch_arg" == "$base_branch" ]]; then
-    print " fatal: cannot merge, branches are the same: $branch_arg" >&2
+    print " fatal: cannot merge, base branch is the same as branch argument: $branch_arg" >&2
     return 1;
   fi
 
@@ -8705,7 +8713,7 @@ function pro() {
       fi
     done
 
-    print " fatal: no more slots available, please remove a project to add a new one" >&2
+    print " fatal: no more slots available, remove a project to add a new one" >&2
     print " run ${yellow_cor}pro -h${reset_cor} to see usage" >&2
     return 1;
   fi
@@ -9334,11 +9342,11 @@ function help() {
   print ""
   display_line_ "get started" "${gray_cor}"
   print ""
-  print "  1. set a project, type:${solid_blue_cor} pro${reset_cor}"
-  print "  2. clone project, type:${yellow_cor} clone${reset_cor}"
-  print "  3. setup project, type:${yellow_cor} setup${reset_cor}"
-  print "  4. run a project, type:${yellow_cor} run${reset_cor}"
-  print "  5. start new job, type:${blue_cor} jira${reset_cor}"
+  print "  1. set a project, run:${solid_blue_cor} pro -h${reset_cor} to see usage"
+  print "  2. clone project, run:${yellow_cor} clone -h${reset_cor} to see usage"
+  print "  3. setup project, run:${yellow_cor} setup -h${reset_cor} to see usage"
+  print "  4. run a project, run:${yellow_cor} run -h${reset_cor} to see usage"
+  print "  5. start new job, run:${blue_cor} jira -h${reset_cor} to see usage"
 
   if ! pause_output_; then return 0; fi
 
@@ -9397,7 +9405,7 @@ function help() {
 
   display_line_ "code review" "${cyan_cor}"
   print ""
-  printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a pull request for review"
+  printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a review"
   printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "revs" "list existing reviews"
 
   if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
@@ -9605,14 +9613,14 @@ function validate_proj_cmd_strict_() {
         return 0;
       fi
     fi
-    print "  ${yellow_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
+    print "  ${red_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
   local invalid_values=("pwd" "quit" "done")
 
   if [[ " ${invalid_values[*]} " == *" $proj_cmd "* ]]; then
-    print "  ${yellow_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
+    print "  ${red_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
@@ -9645,7 +9653,7 @@ function validate_proj_cmd_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "  ${yellow_cor}${error_msg}${reset_cor}" 2>/dev/tty
+    print "  ${red_cor}${error_msg}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
