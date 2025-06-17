@@ -464,41 +464,6 @@ function choose_multiple_() {
   trap - INT
 }
 
-function get_folders_() {
-  local folder="${1-$PWD}"
-
-  [[ ! -d "$folder" ]] && return 1
-
-  #dirs=("$folder"/*(/))
-  #dirs=("$folder"/*(N/om))  # o = sort by name, O = sort by name descending
-  #dirs=("$folder"/*(N/on))  # n = sort by time (newest last)
-  local dirs=("$folder"/*(/N/On))
-  local filtered=()
-
-  local dir=""
-  for dir in "${dirs[@]}"; do
-    [[ "${dir##*/}" != "revs" ]] && filtered+=("${dir##*/}")
-  done
-
-  local priorities=(dev develop release main master production stage staging trunk mainline default stable)
-
-  local name=""
-  for name in "${priorities[@]}"; do
-    if [[ " ${filtered[@]} " == *" $name "* ]]; then
-      echo "$name"
-    fi
-  done
-
-  for name in "${filtered[@]}"; do
-    if [[ ! " ${priorities[@]} " == *" $name "* ]]; then
-      echo "$name"
-    fi
-  done
-
-  # if ordered was an array
-  # printf '%s\n' "${ordered[@]}"
-}
-
 function check_config_file_() {
   local config_dir=$(dirname "$PUMP_CONFIG_FILE")
   local config_name=$(basename "$PUMP_CONFIG_FILE")
@@ -716,7 +681,7 @@ function find_proj_folder_() {
       fi
     fi
     
-    local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+    local dirs=("${(@f)$(fl "$proj_folder")}")
     if [[ -z "$dirs" ]]; then
       cd "${HOME:-/}"
     fi
@@ -4921,7 +4886,7 @@ function run() {
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
-        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+        local dirs=("${(@f)$(fl -p "$proj_folder")}")
         if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to run" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
@@ -5035,7 +5000,7 @@ function setup() {
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
-        local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+        local dirs=("${(@f)$(fl -p "$proj_folder")}")
         if [[ -n "$dirs" ]]; then
           local folder=$(choose_one_ -a "folder to setup" "${dirs[@]}")
           if [[ -z "$folder" ]]; then return 1; fi
@@ -9059,7 +9024,7 @@ function proj_handler() {
       resolved_folder="${proj_folder}/${folder_arg}"
     
     elif (( ! proj_handler_is_o )); then
-      local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
+      local dirs=("${(@f)$(fl -p "$proj_folder")}")
       
       if [[ -n "$dirs" ]]; then
         local header="folder to open"
@@ -9594,6 +9559,7 @@ function help() {
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "cl" "clear terminal"
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "colors" "display colors from 0 to 255"
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "del" "delete utility"
+  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "fl" "list folders"
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "help" "display this help"
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "hg <text>" "history | grep text"
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "kill <port>" "kill port"
@@ -9824,6 +9790,56 @@ typeset -g SAVE_PROJ_COR=""
 
 # General
 alias ll="ls -la"
+
+function fl() {
+  set +x
+  eval "$(parse_flags_ "fl_" "p" "" "$@")"
+  (( fl_is_d )) && set -x
+
+  if (( fl_is_h )); then
+    print "  ${yellow_cor}fl ${solid_yellow_cor}[<folder>]${reset_cor} : to list folders in <folder> or current folder"
+    print "  ${yellow_cor}fl -p${reset_cor} : to list folders in priority order"
+    return 0;
+  fi
+
+  local folder="${1-$PWD}"
+
+  [[ ! -d "$folder" ]] && return 1
+
+  #dirs=("$folder"/*(/))
+  #dirs=("$folder"/*(N/om))  # o = sort by name, O = sort by name descending
+  #dirs=("$folder"/*(N/on))  # n = sort by time (newest last)
+  local dirs=("$folder"/*(/N/On))
+  local filtered=()
+
+  local dir=""
+  for dir in "${dirs[@]}"; do
+    [[ "${dir##*/}" != "revs" ]] && filtered+=("${dir##*/}")
+  done
+
+  if (( fl_is_p )); then
+    local priorities=(dev develop release main master production stage staging trunk mainline default stable)
+
+    local name=""
+    for name in "${priorities[@]}"; do
+      if [[ " ${filtered[@]} " == *" $name "* ]]; then
+        echo "$name"
+      fi
+    done
+
+    for name in "${filtered[@]}"; do
+      if [[ ! " ${priorities[@]} " == *" $name "* ]]; then
+        echo "$name"
+      fi
+    done
+  else
+    for name in "${filtered[@]}"; do
+      echo "$name"
+    done
+  fi
+  # if ordered was an array
+  # printf '%s\n' "${ordered[@]}"
+}
 
 function hg() {
   if (( $# == 0 )); then
