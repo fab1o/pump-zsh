@@ -9214,7 +9214,7 @@ function __commit() {
   (( commit_is_d )) && set -x
 
   if (( commit_is_h )); then
-    print "  ${yellow_cor}${COMMIT1}${reset_cor} : to commit --no-verify (with conventional commits: https://www.conventionalcommits.org/)"
+    print "  ${yellow_cor}${COMMIT1}${reset_cor} : commit wizard (https://www.conventionalcommits.org/)"
     print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit  --no-verify --message"
     print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
     print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
@@ -9242,7 +9242,7 @@ function __commit() {
 
   if [[ -z "$1" ]]; then
     if ! command -v gum &>/dev/null; then
-      print " fatal: commit (with conventional commits) requires gum" >&2
+      print " fatal: commit wizard requires gum" >&2
       print " install gum:${blue_cor} https://github.com/charmbracelet/gum ${reset_cor}" >&2
       return 1;
     fi
@@ -9523,7 +9523,7 @@ function help() {
   display_line_ "git push" "${solid_cyan_cor}"
   print ""
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit (with conventional commits)"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit wizard"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push to $remote_name"
@@ -9581,9 +9581,9 @@ function help() {
 }
 
 function validate_proj_cmd_strict_() {
-  set +x
-  eval "$(parse_flags_ "validate_proj_cmd_strict_" "" "" "$@")"
-  (( validate_proj_cmd_strict_is_d )) && set -x
+  # set +x
+  # eval "$(parse_flags_ "validate_proj_cmd_strict_" "" "" "$@")"
+  # (( validate_proj_cmd_strict_is_d )) && set -x
 
   local proj_cmd="$1"
   local old_proj_cmd="${2:-$proj_cmd}"
@@ -9605,14 +9605,14 @@ function validate_proj_cmd_strict_() {
         return 0;
       fi
     fi
-    print "${yellow_cor}  project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
+    print "  ${yellow_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
-  local invalid_values=("pwd" "quit" "done" "-")
+  local invalid_values=("pwd" "quit" "done")
 
   if [[ " ${invalid_values[*]} " == *" $proj_cmd "* ]]; then
-    print "${yellow_cor}  project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
+    print "  ${yellow_cor}project name is reserved: ${proj_cmd}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
@@ -9621,7 +9621,7 @@ function validate_proj_cmd_strict_() {
 
 function validate_proj_cmd_() {
   local proj_cmd="$1"
-  local qty=$MAX_NAME_COUNT
+  local qty=${2:-$MAX_NAME_COUNT}
 
   local error_msg=""
 
@@ -9631,6 +9631,9 @@ function validate_proj_cmd_() {
     error_msg="project name is invalid: $qty max characters"
   elif ! [[ "$proj_cmd" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
     error_msg="project name is invalid: no special characters"
+  elif [[ $proj_cmd == -* ]]; then
+    error_msg="project name is invalid"
+    return 1;
   else
     # check for duplicates across other indices
     for j in {1..10}; do
@@ -9642,7 +9645,7 @@ function validate_proj_cmd_() {
   fi
 
   if [[ -n "$error_msg" ]]; then
-    print "${yellow_cor}  ${error_msg}${reset_cor}" 2>/dev/tty
+    print "  ${yellow_cor}${error_msg}${reset_cor}" 2>/dev/tty
     return 1;
   fi
 
