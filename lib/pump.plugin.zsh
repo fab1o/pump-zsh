@@ -2780,7 +2780,7 @@ function is_proj_folder_() {
     fi
 
     local pattern=$(printf "%q" "$file")
-    local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}*" \) -prune -o -maxdepth 1 -iname "${pattern}*" -print -quit 2>/dev/null)
+    local found_file=$(find "$folder" \( -path "*/.*" -a ! -iname "${pattern}" \) -prune -o -maxdepth 1 -iname "${pattern}*" -print -quit 2>/dev/null)
     
     if [[ -n "$found_file" ]]; then
       return 0;
@@ -8717,8 +8717,6 @@ function pro() {
         print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
       fi
       print ""
-    else
-      print " fatal: not a valid project argument" >&2
     fi
 
     print " run ${yellow_cor}pro -h${reset_cor} : to see usage" >&2
@@ -9137,8 +9135,6 @@ function help() {
 
   local remote_name=$(get_remote_origin_)
 
-  local project_cor=""
-
   if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
     print ""
     print -n "  project set to: ${solid_blue_cor}${CURRENT_PUMP_PROJ_SHORT_NAME}${reset_cor}"
@@ -9146,17 +9142,12 @@ function help() {
       print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
     print ""
-    project_cor="$solid_blue_cor"
-  else
-    print ""
-    print "  ${red_cor}no project is set${reset_cor} - to set a project, run:"
-    project_cor="${red_cor}"
   fi
 
   local spaces="14s"
 
   print ""
-  print "  get started:"
+  display_line_ "get started" "${gray_cor}"
   print ""
   print "  1. set a project, type:${solid_blue_cor} pro${reset_cor}"
   print "  2. clone project, type:${yellow_cor} clone${reset_cor}"
@@ -9166,16 +9157,16 @@ function help() {
 
   if ! pause_output_; then return 0; fi
 
-  display_line_ "set project" "${project_cor}"
+  display_line_ "set project" "${solid_blue_cor}"
   print ""
-  print " ${project_cor} pro ${reset_cor}\t\t = set project"
+  print " ${solid_blue_cor} pro ${reset_cor}\t\t = set project"
   if (( ${#PUMP_PROJ_SHORT_NAME} == 0 )); then
     pro -a
   else
     local i=0
     for i in {1..9}; do
       if [[ -n "${PUMP_PROJ_FOLDER[$i]}" && -n "${PUMP_PROJ_SHORT_NAME[$i]}" ]]; then
-        printf "  ${project_cor}%-$spaces${reset_cor} = %s \n" "${PUMP_PROJ_SHORT_NAME[$i]}" "set project to ${PUMP_PROJ_SHORT_NAME[$i]}"
+        printf "  ${solid_blue_cor}%-$spaces${reset_cor} = %s \n" "${PUMP_PROJ_SHORT_NAME[$i]}" "set project to ${PUMP_PROJ_SHORT_NAME[$i]}"
       fi
     done
   fi
@@ -9185,7 +9176,6 @@ function help() {
   display_line_ "setup & run" "${yellow_cor}"
   print ""
   printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "clone" "clone project or branch"
-  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "jira" "work on a jira ticket"
 
   local _setup="run \"setup\" script or package manager's install"
   local _run="${CURRENT_PUMP_RUN:-"run \"dev\" script"}"
@@ -9403,7 +9393,7 @@ function help() {
   printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "upgrade" "omz update + pump update"
 
   print ""
-  print "  add ${yellow_cor}-h${reset_cor} after any command to see more usage details"
+  print "  try ${yellow_cor}-h${reset_cor} after any command to see more usage details"
   print "  and visit: ${blue_cor}https://github.com/fab1o/pump-zsh/wiki${reset_cor}"
 }
 
