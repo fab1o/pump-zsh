@@ -4749,6 +4749,8 @@ function pr() {
   # print -- "$pr_body"
   # return 1;
 
+  push || return 1;
+
   if (( pr_is_l )); then
     local i=$(find_proj_index_ "$CURRENT_PUMP_PROJ_SHORT_NAME")
     (( i )) || return 1;
