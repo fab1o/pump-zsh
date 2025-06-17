@@ -3969,10 +3969,10 @@ function fix() {
 
   if [[ -n "$1" && $1 != -* ]]; then
     if [[ -d "$1" ]]; then
-      folder="$(realpath -- "$1" 2>/dev/null)"
+      folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}refix -h${reset_cor} to see usage" >&2
+      print " run ${yellow_cor}fix -h${reset_cor} to see usage" >&2
       return 1;
     fi
     shift
@@ -3986,16 +3986,15 @@ function fix() {
   cd "$folder"
 
   local pump_fix="$CURRENT_PUMP_FIX"
-  local RET=0;
+  local RET=1;
 
   if [[ -n "$pump_fix" ]]; then
     eval "$pump_fix"
     RET=$?
   else
     local pkg_manager="$CURRENT_PUMP_PKG_MANAGER$([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo " run")"
-    local js_pkg_managers=("npm" "yarn" "pnpm" "bun")
 
-    if [[ -n "$CURRENT_PUMP_PKG_MANAGER" && " ${js_pkg_managers[@]} " =~ " $CURRENT_PUMP_PKG_MANAGER " ]]; then
+    if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       local _fix=$(get_script_from_pkg_json_ "fix" "$folder")
       local _lint=$(get_script_from_pkg_json_ "lint" "$folder")
       local _format=$(get_script_from_pkg_json_ "format" "$folder")
@@ -4004,7 +4003,6 @@ function fix() {
         eval "$pkg_manager fix"
         RET=$?
       elif [[ -n "$_format" && -n "$_lint" ]]; then
-        RET=1
         if eval "$pkg_manager format"; then
           if eval "$pkg_manager lint"; then
             if eval "$pkg_manager format"; then
@@ -4012,6 +4010,12 @@ function fix() {
             fi
           fi
         fi
+      elif [[ -n "$_format" ]]; then
+        eval "$pkg_manager format"
+        RET=$?
+      elif [[ -n "$_lint" ]]; then
+        eval "$pkg_manager lint"
+        RET=$?
       else
         print " ${red_cor}fatal:${reset_cor} no fix, format or lint script defined in package.json" >&2
       fi
@@ -4074,54 +4078,38 @@ function refix() {
     if ! git -C "$folder" reset --soft HEAD~1 1>/dev/null; then return 1; fi
   fi
 
-  if command -v gum &>/dev/null; then
-    # start spinning
-    unsetopt monitor
-    unsetopt notify
-    pipe_name=$(mktemp -u)
-    mkfifo "$pipe_name" &>/dev/null
-    gum spin --title="refixing... \"$last_commit_msg\"" -- sh -c "read < $pipe_name" &
-    spin_pid=$!
-    # start spinning
-  else
-    print " refixing... \"$last_commit_msg\""
-  fi
+  # if command -v gum &>/dev/null; then
+  #   # start spinning
+  #   unsetopt monitor
+  #   unsetopt notify
+  #   pipe_name=$(mktemp -u)
+  #   mkfifo "$pipe_name" &>/dev/null
+  #   gum spin --title="refixing... \"$last_commit_msg\"" -- sh -c "read < $pipe_name" &
+  #   spin_pid=$!
+  #   # start spinning
+  # else
+  #   print " refixing... \"$last_commit_msg\""
+  # fi
 
-  local _pwd="$(pwd)"
+  fix "$folder" &>/dev/null
 
-  add-zsh-hook -d chpwd pump_chpwd_
-  cd "$folder"
+  # if command -v gum &>/dev/null; then
+  #   # reset spinning
+  #   print "   refixing... \"$last_commit_msg\""
+  #   echo "done" > "$pipe_name" &>/dev/null
+  #   rm "$pipe_name"
+  #   wait $spin_pid &>/dev/null
+  #   setopt notify
+  #   setopt monitor
+  #   # reset spinning
+  # fi
 
-  local RET=1
-
-  if $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null; then
-    if $CURRENT_PUMP_PKG_MANAGER run lint &>/dev/null; then
-      if $CURRENT_PUMP_PKG_MANAGER run format &>/dev/null; then
-        RET=0
-      fi
-    fi
-  fi
-
-  cd "$_pwd"
-  add-zsh-hook chpwd pump_chpwd_
-
-  if command -v gum &>/dev/null; then
-    # reset spinning
-    print "   refixing... \"$last_commit_msg\""
-    echo "done" > "$pipe_name" &>/dev/null
-    rm "$pipe_name"
-    wait $spin_pid &>/dev/null
-    setopt notify
-    setopt monitor
-    # reset spinning
-  fi
-
-  if (( RET != 0 )); then
-    $CURRENT_PUMP_PKG_MANAGER run lint --quiet --exit-on-fatal-error
+  if (( $? != 0 )); then
+    # $CURRENT_PUMP_PKG_MANAGER run lint --quiet --exit-on-fatal-error
     print "" >&2
-    print " ${red_cor}fatal: refix encountered an issue that cannot be auto-fixed${reset_cor}" >&2
-    reseta "$folder" --quiet &>/dev/null
-    pull "$folder" --quiet &>/dev/null
+    print " ${red_cor}fatal: refix encountered an issue${reset_cor}" >&2
+    # reseta "$folder" --quiet &>/dev/null
+    # pull "$folder" --quiet &>/dev/null
     return 1;
   fi
 
