@@ -4954,9 +4954,9 @@ function run() {
       else
         local pump_run_start=$(get_script_from_pkg_json_ "start" "$folder")
         if [[ -n "$pump_run_start" ]]; then
-          pump_run="$pkg_manager_run start"
+          pump_run="$pkg_manager start"
         else
-          print " fatal: no run script not found in package.json: ${yellow_cor}$pkg_manager_run $env_mode${reset_cor} or ${yellow_cor}$pkg_manager_run start${reset_cor}" >&2
+          print " fatal: no script not found in package.json: ${yellow_cor}$pkg_manager_run $env_mode${reset_cor} or ${yellow_cor}$pkg_manager start${reset_cor}" >&2
           return 1;
         fi
       fi
@@ -4968,7 +4968,11 @@ function run() {
     print " ${solid_pink_cor}${pump_run}${reset_cor}"
     
     if ! eval "$pump_run"; then
-      print " ${red_cor}fatal: failed to run PUMP_RUN_$i ${reset_cor}" >&2
+      if [[ "$env_mode" == "stage" || "$env_mode" == "prod" ]]; then
+        print " ${red_cor}fatal: failed to run PUMP_RUN_${env_mode:U}_$i ${reset_cor}" >&2
+      else
+        print " ${red_cor}fatal: failed to run PUMP_RUN_$i ${reset_cor}" >&2
+      fi
       print " edit your pump.zshenv config, then  ${yellow_cor}refresh${reset_cor}" >&2
       return 1;
     fi
@@ -9388,6 +9392,9 @@ function help() {
   local _run_prod="${CURRENT_PUMP_RUN_PROD:-"run \"prod\" script"}"
   if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
     _setup="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")setup or $CURRENT_PUMP_PKG_MANAGER install"
+    _run="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")dev or $CURRENT_PUMP_PKG_MANAGER start"
+    _run_stage="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")stage or $CURRENT_PUMP_PKG_MANAGER start"
+    _run_prod="$CURRENT_PUMP_PKG_MANAGER $([[ $CURRENT_PUMP_PKG_MANAGER == "yarn" ]] && echo "" || echo "run ")prod or $CURRENT_PUMP_PKG_MANAGER start"
   fi
 
   local max=53
