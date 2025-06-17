@@ -5578,8 +5578,6 @@ function clone() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
 
-      branch_arg="${${USER:0:1}:l}-$branch_arg"
-
       rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
       if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
         if is_git_repo_ "$folder_to_clone"; then
@@ -5624,18 +5622,18 @@ function clone() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
     fi
-
+    
     if [[ -z "$branch_arg" ]]; then
       branch_arg="$default_branch"
     fi
+    
+    branch_arg="${${USER:0:1}:l}-${branch_arg}"
   
-    if [[ "$branch_arg" != "$default_branch" ]]; then
+    if [[ "$branch_arg" != "${${USER:0:1}:l}-${default_branch}" ]]; then
       print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
     else
       print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
     fi
-
-    branch_arg="${${USER:0:1}:l}-$branch_arg"
 
     rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
     if command -v gum &>/dev/null; then
@@ -6005,7 +6003,7 @@ function renb() {
 
   if (( renb_is_h )); then
     print "  ${yellow_cor}renb <new_branch_name>${reset_cor} : to rename current branch locally"
-    print "  ${yellow_cor}renb -r${reset_cor} : to rename current branch remotelly as well as locally"
+    print "  ${yellow_cor}renb -r${reset_cor} : to also rename current branch remotelly"
     return 0;
   fi
 
