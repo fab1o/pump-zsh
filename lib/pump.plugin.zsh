@@ -1081,10 +1081,10 @@ function check_proj_repo_() {
     else
       if command -v gum &>/dev/null; then
         # so that the spinner can display, add to the end: 2>/dev/tty
-        gum spin --timeout=9s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet 2>/dev/tty
+        gum spin --timeout=9s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet --exit-code 2>/dev/tty
       else
         print " checking repository uri..." >&2
-        git ls-remote "${proj_repo}" --quiet
+        git ls-remote "${proj_repo}" --quiet --exit-code
       fi
       if (( $? != 0 )); then
         error_msg="repository uri is invalid or no access rights: $proj_repo"
@@ -7777,7 +7777,7 @@ function gha() {
 #   fi
 
 #   # check if it exists remotely (on origin)
-#   if git ls-remote --heads origin "$branch" | grep -q "$branch"; then
+#   if git ls-remote --heads origin "$branch" --exit-code | grep -q "$branch"; then
 #     return 0;
 #   fi
   
