@@ -6000,11 +6000,12 @@ function abort() {
 
 function renb() {
   set +x
-  eval "$(parse_flags_ "renb_" "" "" "$@")"
+  eval "$(parse_flags_ "renb_" "r" "" "$@")"
   (( renb_is_d )) && set -x
 
   if (( renb_is_h )); then
-    print "  ${yellow_cor}renb <new_branch_name>${reset_cor} : to rename current branch"
+    print "  ${yellow_cor}renb <new_branch_name>${reset_cor} : to rename current branch locally"
+    print "  ${yellow_cor}renb -r${reset_cor} : to rename current branch remotelly as well as locally"
     return 0;
   fi
 
@@ -6032,8 +6033,10 @@ function renb() {
     git config "branch.${new_name}.gh-merge-base" "$base_branch" &>/dev/null
     git config --remove-section "branch.${current_name}" &>/dev/null
 
-    if git push origin :"$current_name" --quiet; then
-      git push --set-upstream origin "$new_name"
+    if (( renb_is_r )); then
+      if git push origin :$current_name --quiet; then
+        git push --set-upstream origin "$new_name"
+      fi
     fi
   fi
 }
