@@ -8939,6 +8939,9 @@ function pro() {
       eval "$CURRENT_PUMP_PRO"
     fi
   fi
+
+  # fetch the project folder if possible
+  fetch --quiet 2>/dev/null
 }
 
 # project handler =========================================================
