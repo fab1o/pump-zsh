@@ -465,7 +465,7 @@ function choose_multiple_() {
 }
 
 function get_folders_() {
-  local folder="$1"
+  local folder="${1-$PWD}"
 
   [[ ! -d "$folder" ]] && return 1
 
