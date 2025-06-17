@@ -470,9 +470,9 @@ function get_folders_() {
   [[ ! -d "$folder" ]] && return 1
 
   #dirs=("$folder"/*(/))
-  #dirs=("$folder"/*(N/om))  # o = sort by modified time
-  #dirs=("$folder"/*(N/on))  # n = sort by name
-  local dirs=("$folder"/*(/N/on))
+  #dirs=("$folder"/*(N/om))  # o = sort by name, O = sort by name descending
+  #dirs=("$folder"/*(N/on))  # n = sort by time (newest last)
+  local dirs=("$folder"/*(/N/On))
   local filtered=()
 
   local dir=""
