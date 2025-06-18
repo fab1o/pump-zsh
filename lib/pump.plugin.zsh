@@ -966,6 +966,11 @@ function check_proj_() {
   
   local i="$1"
 
+  if [[ -z "$i" || $i -lt 1 || $i -gt 9 ]]; then
+    print " fatal: check_proj_ index is invalid: $i" >&2
+    return 1;
+  fi
+
   if (( check_proj_is_c )); then
     if ! check_proj_cmd_ $i "${PUMP_SHORT_NAME[$i]}" ${@:2}; then return 1; fi
   fi
@@ -1826,14 +1831,8 @@ function save_jira_() {
   local i="$1"
   local jira_proj="$2"
 
-  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then
-    return 0;
-  fi
+  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then return 0; fi
 
-  # confirm_ "set a JIRA project for this project?"
-  # local RET=$?
-  # if (( RET == 130 || RET == 2 )); then return 130; fi
-  # if (( RET == 0 )); then
   if ! command -v acli &>/dev/null; then
     print " acli is not installed" >&2
     print " install at: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
@@ -1848,9 +1847,6 @@ function save_jira_() {
 
   jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
   if [[ -z "$jira_proj" ]]; then return 1; fi
-  # else
-  #   jira_proj=""
-  # fi
 
   update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
 
@@ -2552,7 +2548,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${gray_cor}${PUMP_GHA_WORKFLOW[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${gray_cor}${PUMP_PRINT_README[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${gray_cor}${PUMP_PKG_NAME[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_$i=${reset_cor}${gray_cor}${PUMP_JIRA_PROJ[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_JIRA_PROJ_$i=${reset_cor}${gray_cor}${PUMP_JIRA_PROJ[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_PROGRESS[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_REVIEW[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
@@ -3008,7 +3004,7 @@ function get_remote_branch_() {
   # use it to check if branch exists in remote
   if (( get_remote_branch_is_r )); then
     local remote_name=$(get_remote_origin_ "$git_proj_folder")
-    local remote_branch=$(git -C "$git_proj_folder" ls-remote --heads "$remote_name" "$branch" | awk '{print $2}' 2>/dev/null)
+    local remote_branch=$(git -C "$git_proj_folder" ls-remote --heads $remote_name $branch | awk '{print $2}' 2>/dev/null)
     if [[ -n "$remote_branch" ]]; then
       if (( get_remote_branch_is_f )); then
         echo "$remote_branch"
@@ -4074,7 +4070,7 @@ function refix() {
   #   print " refixing... \"$last_commit_msg\""
   # fi
 
-  fix "$folder" &>/dev/null
+  fix "$folder" # &>/dev/null
 
   # if command -v gum &>/dev/null; then
   #   # reset spinning
@@ -5570,8 +5566,10 @@ function clone() {
     fi
   fi
 
+  local default_branch=""
+
   if (( ! skip_clone )); then
-    local default_branch="${default_branch_arg:-$pump_default_branch}"
+    default_branch="${default_branch_arg:-$pump_default_branch}"
 
     if [[ -z "$default_branch" ]]; then
       default_branch=$(get_clone_default_branch_ "$proj_repo" "$proj_folder" "$branch_arg")
@@ -5609,35 +5607,41 @@ function clone() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
     fi
-  
-    if [[ "$branch_arg" != "$default_branch" ]]; then
-      local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
-      if [[ -n "$jira_key" ]]; then
-        if [[ -z "$pump_no_monogram" ]]; then
-          confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
-          local _RET=$?
-          if (( _RET == 130 || _RET == 2 )); then return 1; fi
-          if (( _RET == 0 )); then
-            branch_arg="${${USER:0:1}:l}-${branch_arg}"
-            confirm_ "save preference to use initials and don't ask again?"
-          else
-            confirm_ "save preference to not use initials and don't ask again?"
-          fi
-          local _RET2=$?
-          if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
-          if (( _RET2 == 0 )); then
-            update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
-          fi
-        elif (( pump_no_monogram == 0 )); then
-          branch_arg="${${USER:0:1}:l}-${branch_arg}"
-        fi
-      fi
+  fi # end if (( ! skip_clone ))
 
-      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
-    else
-      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
+  if [[ "$branch_arg" != "$default_branch" ]]; then
+    local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
+    if [[ -n "$jira_key" ]]; then
+      if [[ -z "$pump_no_monogram" ]]; then
+        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
+        local _RET=$?
+        if (( _RET == 130 || _RET == 2 )); then return 1; fi
+        if (( _RET == 0 )); then
+          branch_arg="${${USER:0:1}:l}-${branch_arg}"
+          confirm_ "save preference to use initials and don't ask again?"
+        else
+          confirm_ "save preference to not use initials and don't ask again?"
+        fi
+        local _RET2=$?
+        if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+        if (( _RET2 == 0 )); then
+          update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+        fi
+      elif (( pump_no_monogram == 0 )); then
+        branch_arg="${${USER:0:1}:l}-${branch_arg}"
+      fi
     fi
 
+    if (( ! skip_clone )); then
+      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
+    fi
+  else
+    if (( ! skip_clone )); then
+      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
+    fi
+  fi
+
+  if (( ! skip_clone )); then
     rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
     if command -v gum &>/dev/null; then
       if ! gum spin --title="cloning... $proj_repo on branch: $branch_arg" -- git clone "$proj_repo" "$folder_to_clone"; then
@@ -5649,13 +5653,12 @@ function clone() {
       if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
     fi
 
-  fi # end if (( ! skip_clone ))
-
-  if [[ "$branch_arg" != "$default_branch" ]]; then
-    remote_branch=$(get_remote_branch_ -r "$branch_arg" "$proj_folder")
-    if [[ -n "$remote_branch" ]]; then
-      print " fatal: branch already exists on remote: $branch_arg" >&2
-      return 1;
+    if [[ "$branch_arg" != "$default_branch" ]]; then
+      remote_branch=$(get_remote_branch_ -r "$branch_arg" "$proj_folder")
+      if [[ -n "$remote_branch" ]]; then
+        print " fatal: branch already exists on remote: $branch_arg" >&2
+        return 1;
+      fi
     fi
   fi
 
@@ -5830,7 +5833,7 @@ function jira() {
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
 
-  if ! check_proj_ -fm $i; then return 1; fi
+  if ! check_proj_ -fmj $i; then return 1; fi
   
   local single_mode="${PUMP_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_FOLDER[$i]}"
@@ -6669,7 +6672,7 @@ function push() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  git -C "$folder" fetch "$remote_name" "$branch_arg" --quiet
+  git -C "$folder" fetch $remote_name $branch_arg --quiet &>/dev/null
   local RET=$?
 
   if (( push_is_t && push_is_f )); then
@@ -6690,7 +6693,7 @@ function push() {
   if (( RET == 0 )); then
     git -C "$folder" push --no-verify
   else
-    git -C "$folder" push --no-verify --set-upstream "$remote_name" "$branch_arg"
+    git -C "$folder" push --no-verify --set-upstream $remote_name $branch_arg
   fi
   RET=$?
 
@@ -6783,10 +6786,10 @@ function pushf() {
   local remote_name=$(get_remote_origin_ "$folder")
 
   if (( pushf_is_f )); then
-    git -C "$folder" push --no-verify --force "$remote_name" "$branch_arg" $@
+    git -C "$folder" push --no-verify --force $remote_name $branch_arg $@
     RET=$?
   else
-    git -C "$folder" push --no-verify --force-with-lease "$remote_name" "$branch_arg" $@
+    git -C "$folder" push --no-verify --force-with-lease $remote_name $branch_arg $@
     RET=$?
   fi
 
@@ -6862,7 +6865,7 @@ function pull() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  if ! git -C "$folder" fetch "$remote_name" "$branch_arg" --quiet 1>/dev/null; then
+  if ! git -C "$folder" fetch $remote_name $branch_arg --quiet; then
     return 1;
   fi
 
@@ -6870,12 +6873,12 @@ function pull() {
   local is_quiet=$( (( ${argv[(Ie)--quiet]} || pull_is_q )) && echo 1 || echo 0)
 
   if (( pull_is_t )); then
-    git -C "$folder" pull "$remote_name" "$branch_arg" --tags $@
+    git -C "$folder" pull $remote_name $branch_arg --tags $@
     RET=$?
     if (( pull_is_o )); then return $RET; fi
   fi
 
-  git -C "$folder" pull "$remote_name" "$branch_arg" $@ 2>/dev/null
+  git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
   RET=$?
   if (( RET != 0 )); then
     if (( ! pull_is_r && ! is_quiet )); then
@@ -6892,10 +6895,10 @@ function pull() {
     fi
 
     if (( pull_is_r )); then
-      git -C "$folder" pull "$remote_name" "$branch_arg" --rebase $@ 2>/dev/null
+      git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
       RET=$?
       if (( RET != 0 )); then
-        git -C "$folder" pull "$remote_name" "$branch_arg" --rebase --autostash $@
+        git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
         RET=$?
       fi
     fi
@@ -6962,15 +6965,15 @@ function dtag() {
     if [[ -z "$selected_tags" ]]; then return 1; fi
 
     for tag in "$selected_tags"; do
-      git -C "$proj_folder" tag "$remote_name" --delete "$tag" 2>/dev/null
-      git -C "$proj_folder" push "$remote_name" --delete "$tag" 2>/dev/null
+      git -C "$proj_folder" tag $remote_name --delete "$tag" 2>/dev/null
+      git -C "$proj_folder" push $remote_name --delete "$tag" 2>/dev/null
     done
 
     return 0;
   fi
 
-  git -C "$proj_folder" tag "$remote_name" --delete "$tag" 2>/dev/null
-  git -C "$proj_folder" push "$remote_name" --delete "$tag" 2>/dev/null
+  git -C "$proj_folder" tag $remote_name --delete "$tag" 2>/dev/null
+  git -C "$proj_folder" push $remote_name --delete "$tag" 2>/dev/null
 
   return 0; # don't care if it fails to delete, consider success
 }
@@ -8706,7 +8709,6 @@ function pro() {
   # pro -c [<name>] show project config
   if (( pro_is_c )); then
     local i=$(find_proj_index_ -f "$proj_arg"  "project to display config for")
-    (( i )) || return 1;
     [[ -n "$i" ]] || return 1;
     
     print_current_proj_ $i
