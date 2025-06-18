@@ -4118,7 +4118,7 @@ function refix() {
     fi
   fi
 
-  pushf "" "$folder"
+  pushf "$folder"
 }
 
 function covc() {
@@ -8153,7 +8153,7 @@ function rebase() {
   if ! is_folder_git_ "$folder"; then return 1; fi
 
   local base_branch=""
-  local branch_arg="$(git -C "$folder" branch --show-current)"
+  local branch_arg=""
 
   if [[ -n "$3" && $3 != -* ]]; then
     base_branch="$1"
@@ -8164,6 +8164,16 @@ function rebase() {
     (( arg_count++ ))
   else
     base_branch=$(git -C "$folder" config --get init.defaultBranch)
+  fi
+
+  if [[ -z "$branch_arg" ]]; then
+    branch_arg=$(git -C "$folder" branch --show-current)
+    if [[ -z "$branch_arg" ]]; then
+      print " current branch is detached, cannot rebase" >&2
+      return 1;
+    fi
+  else
+    if git -C "$folder" checkout "$branch_arg" --quiet; then return 1; fi
   fi
 
   if [[ -z "$base_branch" ]]; then
@@ -8247,7 +8257,7 @@ function merge() {
   if ! is_folder_git_ "$folder"; then return 1; fi
 
   local base_branch=""
-  local branch_arg="$(git -C "$folder" branch --show-current)"
+  local branch_arg=""
 
   if [[ -n "$3" && $3 != -* ]]; then
     base_branch="$1"
@@ -8258,6 +8268,16 @@ function merge() {
     (( arg_count++ ))
   else
     base_branch=$(git -C "$folder" config --get init.defaultBranch)
+  fi
+
+  if [[ -z "$branch_arg" ]]; then
+    branch_arg=$(git -C "$folder" branch --show-current)
+    if [[ -z "$branch_arg" ]]; then
+      print " current branch is detached, cannot merge" >&2
+      return 1;
+    fi
+  else
+    if git -C "$folder" checkout "$branch_arg" --quiet; then return 1; fi
   fi
 
   if [[ -z "$base_branch" ]]; then
@@ -8304,7 +8324,7 @@ function merge() {
   RET=$?
 
   if (( RET == 0 && merge_is_p )); then
-    push "$folder"
+    push "$branch_arg" "$folder"
     RET=$?
   fi
 
