@@ -435,6 +435,19 @@ PUMP_DEFAULT_BRANCH_8=
 PUMP_DEFAULT_BRANCH_9=
 
 # optional
+# default: empty (will ask)
+# 0 to use machine logged in user initial for the branch name when cloning and starting a job, 1 otherwise
+PUMP_NO_MONOGRAM_1=
+PUMP_NO_MONOGRAM_2=
+PUMP_NO_MONOGRAM_3=
+PUMP_NO_MONOGRAM_4=
+PUMP_NO_MONOGRAM_5=
+PUMP_NO_MONOGRAM_6=
+PUMP_NO_MONOGRAM_7=
+PUMP_NO_MONOGRAM_8=
+PUMP_NO_MONOGRAM_9=
+
+# optional
 # package.json name
 PUMP_PKG_NAME_1=
 PUMP_PKG_NAME_2=

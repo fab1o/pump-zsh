@@ -1049,6 +1049,7 @@ function check_proj_repo_() {
     if ! [[ "$proj_repo" =~ '^((git@[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?)|(https://[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+(\.git)?))$' ]]; then
       error_msg="project repository is invalid: $proj_repo"
     else
+      if [[ -z "$PWD" || "$PWD" == "."  ]]; then cd ~; fi
       if command -v gum &>/dev/null; then
         # so that the spinner can display, add to the end: 2>/dev/tty
         gum spin --timeout=9s --title="checking repository uri..." -- git ls-remote "${proj_repo}" --quiet --exit-code 2>/dev/tty
@@ -1056,6 +1057,7 @@ function check_proj_repo_() {
         print " checking repository uri..." >&2
         git ls-remote "${proj_repo}" --quiet --exit-code
       fi
+
       if (( $? != 0 )); then
         error_msg="repository uri is invalid or no access rights: $proj_repo"
         error_msg+="\n  - check if the repository exists"
@@ -1311,29 +1313,46 @@ function print_tree_() {
   echo $count
 }
 
+function exit_out_folder_() {
+  local folder="$1"
+  
+  while [[ "${PWD:A}/" == "${folder:A}/"* ]]; do
+    cd ..
+  done
+}
+
 function create_backup_proj_folder_() {
-  local proj_folder="$1"
+  local folder="$1"
 
-  local folder_name="$(basename "$proj_folder")"
-  local parent_folder="$(dirname "$proj_folder")"
-  local new_proj_folder="${parent_folder}/${folder_name}-backup"
+  local folder_name="$(basename "$folder")"
+  local parent_folder="$(dirname "$folder")"
+  local backup_folder="${parent_folder}/${folder_name}-backup-$(date +%H%M%S)"
 
-  if [[ ! -d "$new_proj_folder" ]]; then
-    mkdir -p "$new_proj_folder" &>/dev/null
-  fi
+  rm -rf "$backup_folder" &>/dev/null
+  mkdir -p "$backup_folder" &>/dev/null
+
+  local RET=1
 
   if command -v gum &>/dev/null; then
     gum spin --title="creating backup for ${folder_name}..." -- \
-      rsync -a --remove-source-files "${proj_folder}/" "${new_proj_folder}/"
+      rsync -a --remove-source-files "${folder}/" "${backup_folder}/"
+    RET=$?
     gum spin --title="cleaning ${folder_name}..." -- \
-      find "$proj_folder" -type d -empty -delete
+      find "$folder" -type d -empty -delete
   else
     print " creating backup for ${folder_name}..."
-    rsync -a --remove-source-files "${proj_folder}/" "${new_proj_folder}/"
-    find "$proj_folder" -type d -empty -delete
+    rsync -a --remove-source-files "${folder}/" "${backup_folder}/"
+    RET=$?
+    find "$folder" -type d -empty -delete
   fi
 
-  mkdir -p "$proj_folder" &>/dev/null
+  if (( RET == 0 )); then
+    mkdir -p "$folder" &>/dev/null
+    echo "$backup_folder"
+    return $RET;
+  fi
+
+  return 1;
 }
 
 function get_pkg_field_online_() {
@@ -1991,6 +2010,7 @@ function save_proj_() {
   print "" >&1
 
   local old_pkg_manager=""
+  local old_single_mode=""
   local refresh=0
 
   if (( save_proj_is_e )); then
@@ -2004,14 +2024,15 @@ function save_proj_() {
     if ! save_proj_repo_ -e $i "${PUMP_FOLDER[$i]}" "$proj_name" "${PUMP_REPO[$i]}"; then return 1; fi
     if ! save_proj_folder_ -e $i "$proj_name" "${PUMP_REPO[$i]}" "${PUMP_FOLDER[$i]}"; then return 1; fi
 
-    if is_git_repo_ "${PUMP_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
+    if is_folder_git_ "${PUMP_FOLDER[$i]}" &>/dev/null || is_folder_pkg_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
       PUMP_SINGLE_MODE[$i]=1
-    elif get_proj_for_git_ "${PUMP_FOLDER[$i]}" "$TEMP_PUMP_SHORT_NAME" &>/dev/null; then
+    elif get_proj_for_git_ "${PUMP_FOLDER[$i]}" &>/dev/null || get_proj_for_pkg_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
       PUMP_SINGLE_MODE[$i]=0
     fi
 
+    old_single_mode="${PUMP_SINGLE_MODE[$i]}"
+
     if ! save_proj_mode_ -e $i "${PUMP_SINGLE_MODE[$i]}" "${PUMP_FOLDER[$i]}"; then return 1; fi
-  
     if ! save_proj_cmd_ -e $i "$proj_name" "${PUMP_SHORT_NAME[$i]}"; then return 1; fi
   else
     # adding a new project
@@ -2024,9 +2045,9 @@ function save_proj_() {
       if ! save_proj_folder_ -a $i "$TEMP_PUMP_SHORT_NAME" "${PUMP_REPO[$i]}" "${PUMP_FOLDER[$i]}"; then return 1; fi
     done
 
-    if is_git_repo_ "${PUMP_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
+    if is_folder_git_ "${PUMP_FOLDER[$i]}" &>/dev/null || is_folder_pkg_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
       PUMP_SINGLE_MODE[$i]=1
-    elif get_proj_for_git_ "${PUMP_FOLDER[$i]}" "$TEMP_PUMP_SHORT_NAME" &>/dev/null; then
+    elif get_proj_for_git_ "${PUMP_FOLDER[$i]}" &>/dev/null || get_proj_for_pkg_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
       PUMP_SINGLE_MODE[$i]=0
     fi
 
@@ -2040,16 +2061,14 @@ function save_proj_() {
   if [[ -n "$pkg_name" ]]; then
     update_setting_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
   fi
-  
+
   if ! update_setting_ $i "PUMP_SHORT_NAME" "$TEMP_PUMP_SHORT_NAME" &>/dev/null; then return 1; fi
-  
+
   print "  ${SAVE_COR}project saved!${reset_cor}" >&1
   display_line_ "" "${SAVE_COR}"
   print "" >&1
-  
-  load_config_entry_ $i
 
-  local single_mode="${PUMP_SINGLE_MODE[$i]}"
+  load_config_entry_ $i
 
   if [[ ! -d "${PUMP_FOLDER[$i]}" ]]; then
     mkdir -p "${PUMP_FOLDER[$i]}"
@@ -2057,11 +2076,17 @@ function save_proj_() {
 
   local display_msg=1
 
-  if (( ! single_mode )); then
-    if is_git_repo_ "${PUMP_FOLDER[$i]}" &>/dev/null || is_proj_folder_ "${PUMP_FOLDER[$i]}" &>/dev/null; then
-      if create_backup_proj_folder_ "${PUMP_FOLDER[$i]}"; then
-        print " project must be cloned again as project mode has changed" >&1
-        print " run: ${yellow_cor}clone ${proj_cmd}${reset_cor}" >&1
+  if (( old_single_mode != ${PUMP_SINGLE_MODE[$i]} )); then
+    local git_proj_folder=$(get_proj_for_git_ "${PUMP_FOLDER[$i]}" 2>/dev/null)
+    local pkg_proj_folder=$(get_proj_for_pkg_ "${PUMP_FOLDER[$i]}" 2>/dev/null)
+    
+    if [[ -n "$git_proj_folder" || -n "$pkg_proj_folder" ]]; then
+      exit_out_folder_ "${PUMP_FOLDER[$i]}"
+      local backup_folder=$(create_backup_proj_folder_ "${PUMP_FOLDER[$i]}")
+      if [[ -n "$backup_folder" ]]; then
+        print " warning: ${PUMP_SHORT_NAME[$i]} must be cloned again as project mode has changed" >&1
+        print " backup folder: $backup_folder" >&1
+        print " run: ${yellow_cor}clone ${PUMP_SHORT_NAME[$i]}${reset_cor}" >&1
         display_msg=0
       fi
     fi
@@ -2227,6 +2252,7 @@ function remove_proj_() {
   update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
   update_setting_ $i "PUMP_NVM_USE_V" "" &>/dev/null
   update_setting_ $i "PUMP_DEFAULT_BRANCH" "" &>/dev/null
+  update_setting_ $i "PUMP_NO_MONOGRAM" "" &>/dev/null
 }
 
 function set_current_proj_() {
@@ -2272,6 +2298,7 @@ function set_current_proj_() {
   CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
   CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
   CURRENT_PUMP_DEFAULT_BRANCH="${PUMP_DEFAULT_BRANCH[$i]}"
+  CURRENT_PUMP_NO_MONOGRAM="${PUMP_NO_MONOGRAM[$i]}"
 
   set_aliases_ $i
 
@@ -2532,6 +2559,7 @@ function print_current_proj_() {
     print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${gray_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${gray_cor}${PUMP_NVM_USE_V[$i]}${reset_cor}]"
     print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${gray_cor}${PUMP_DEFAULT_BRANCH[$i]}${reset_cor}]"
+    print " [${solid_magenta_cor}PUMP_NO_MONOGRAM_$i=${reset_cor}${gray_cor}${PUMP_NO_MONOGRAM[$i]}${reset_cor}]"
 
     return 0;
   fi
@@ -2574,6 +2602,7 @@ function print_current_proj_() {
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_SKIP_LOOKUP}${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_USE_V}${reset_cor}]"
   print " [${solid_pink_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}${gray_cor}${CURRENT_PUMP_DEFAULT_BRANCH}${reset_cor}]"
+  print " [${solid_pink_cor}CURRENT_PUMP_NO_MONOGRAM=${reset_cor}${gray_cor}${CURRENT_PUMP_NO_MONOGRAM}${reset_cor}]"
 }
 
 function which_pro_index_pwd_() {
@@ -2725,7 +2754,7 @@ function find_proj_by_folder_() {
   return 1;
 }
 
-function is_proj_folder_() {
+function is_folder_pkg_() {
   local folder="${1:-$PWD}"
 
   if [[ -z "$folder" || ! -d "$folder" ]]; then
@@ -2762,7 +2791,7 @@ function get_default_folder_() {
   for dir in "${dirs[@]}"; do
     folder="${proj_folder}/${dir}"
     if [[ -d "$folder" ]]; then
-      if is_git_repo_ "$folder" &>/dev/null; then
+      if is_folder_git_ "$folder" &>/dev/null; then
         break;
       fi
     fi
@@ -2848,7 +2877,7 @@ function get_proj_for_pkg_() {
 
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  if is_git_repo_ "${proj_folder}" &>/dev/null; then
+  if is_folder_git_ "${proj_folder}" &>/dev/null; then
     pull "${proj_folder}" --quiet &>/dev/null
   fi
 
@@ -2871,7 +2900,7 @@ function get_proj_for_git_() {
 
   folder="$real_folder"
 
-  if is_git_repo_ "$folder" &>/dev/null; then
+  if is_folder_git_ "$folder" &>/dev/null; then
     echo "$folder"
     return 0;
   fi
@@ -2879,7 +2908,7 @@ function get_proj_for_git_() {
   local dirs=("main" "master" "stage" "staging" "prod" "production" "release" "dev" "develop" "trunk" "mainline" "default" "stable")
   local dir=""
   for dir in "${dirs[@]}"; do
-    if is_git_repo_ "${folder}/${dir}" &>/dev/null; then
+    if is_folder_git_ "${folder}/${dir}" &>/dev/null; then
       echo "${folder}/${dir}"
       return 0;
     fi
@@ -2892,7 +2921,7 @@ function get_proj_for_git_() {
 
   if [[ -n "$found_git" ]]; then
     local dir="${folder}/$(dirname "$found_git")"
-    if is_git_repo_ "$dir" &>/dev/null; then
+    if is_folder_git_ "$dir" &>/dev/null; then
       echo "$dir"
       return 0;
     fi
@@ -2907,7 +2936,7 @@ function get_proj_for_git_() {
   return 1;
 }
 
-function is_git_repo_() {
+function is_folder_git_() {
   local folder="${1:-$PWD}"
 
   folder="$(realpath -- "$folder" 2>/dev/null)"
@@ -3469,6 +3498,7 @@ function load_config_entry_() {
     PUMP_NVM_SKIP_LOOKUP
     PUMP_NVM_USE_V
     PUMP_DEFAULT_BRANCH
+    PUMP_NO_MONOGRAM
   )
 
   local key=""
@@ -3625,6 +3655,9 @@ function load_config_entry_() {
         ;;
       PUMP_DEFAULT_BRANCH)
         PUMP_DEFAULT_BRANCH[$i]="$value"
+        ;;
+      PUMP_NO_MONOGRAM)
+        PUMP_NO_MONOGRAM[$i]="$value"
         ;;
     esac
     # print "$i - key: [$key], value: [$value]"
@@ -3926,7 +3959,7 @@ function fix() {
     shift
   fi
 
-  if ! is_proj_folder_ "$folder"; then return 1; fi
+  if ! is_folder_pkg_ "$folder"; then return 1; fi
 
   local _pwd="$(pwd)"
 
@@ -4000,8 +4033,8 @@ function refix() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
-  if ! is_proj_folder_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
+  if ! is_folder_pkg_ "$folder"; then return 1; fi
 
   if [[ -z "$CURRENT_PUMP_SHORT_NAME" ]]; then
     print " fatal: project is not set" >&2
@@ -4104,8 +4137,8 @@ function covc() {
     return 1;
   fi
 
-  if ! is_proj_folder_; then return 1; fi
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if [[ -z "$CURRENT_PUMP_SHORT_NAME" ]]; then
     print " fatal: project is not set"
@@ -4156,7 +4189,7 @@ function covc() {
     cov_folder="$coverage_folder_multiple_mode"
   fi
 
-  if is_git_repo_ "$cov_folder" &>/dev/null; then
+  if is_folder_git_ "$cov_folder" &>/dev/null; then
     reseta "$cov_folder" --quiet &>/dev/null
   else
     gum spin --title="preparing branch... ${branch_arg}" -- rm -rf "$cov_folder"
@@ -4329,7 +4362,7 @@ function test() {
 
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   (eval "$CURRENT_PUMP_TEST" $@)
   local RET=$?
@@ -4367,7 +4400,7 @@ function cov() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     covc $@
@@ -4376,7 +4409,7 @@ function cov() {
 
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   (eval "$CURRENT_PUMP_COV" $@)
   local RET=$?
@@ -4421,7 +4454,7 @@ function testw() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   eval "$CURRENT_PUMP_TEST_WATCH" $@
 }
@@ -4437,7 +4470,7 @@ function e2e() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2E" --project="$1" ${@:2}
@@ -4457,7 +4490,7 @@ function e2eui() {
     return 0;
   fi
 
-  if ! is_proj_folder_; then return 1; fi
+  if ! is_folder_pkg_; then return 1; fi
 
   if [[ -n "$1" && $1 != -* ]]; then
     eval "$CURRENT_PUMP_E2EUI" --project="$1" ${@:2}
@@ -4478,7 +4511,7 @@ function add() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if [[ -n "$1" && $1 != -*  ]]; then
     git add "$1" ${@:2}
@@ -4561,7 +4594,7 @@ function pra() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   local prs=""
   if command -v gum &>/dev/null; then
@@ -4641,7 +4674,7 @@ function pr() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   # if gh pr view --web &>/dev/null; then return 0; fi
 
@@ -4825,7 +4858,7 @@ function run() {
       else
         folder_arg="$2"
       fi
-    elif is_proj_folder_ "$1" &>/dev/null; then
+    elif is_folder_pkg_ "$1" &>/dev/null; then
       folder_arg="$1"
       env_mode="$2"
     else
@@ -4837,7 +4870,7 @@ function run() {
       proj_arg="$1"
     elif [[ "$1" == "dev" || "$1" == "stage" || "$1" == "prod" ]]; then
       env_mode="$1"
-    elif is_proj_folder_ "$1" &>/dev/null; then
+    elif is_folder_pkg_ "$1" &>/dev/null; then
       folder_arg="$1"
     else
       proj_arg="$1"
@@ -4873,7 +4906,7 @@ function run() {
   if [[ -n "$folder_arg" ]]; then
     folder_to_execute="${proj_folder}/${folder_arg}"
   else
-    if [[ "$proj_arg" != "$CURRENT_PUMP_SHORT_NAME" ]] || ! is_proj_folder_ "$PWD" &>/dev/null; then
+    if [[ "$proj_arg" != "$CURRENT_PUMP_SHORT_NAME" ]] || ! is_folder_pkg_ "$PWD" &>/dev/null; then
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
@@ -4888,7 +4921,7 @@ function run() {
     fi
   fi
 
-  if ! is_proj_folder_ "$folder_to_execute"; then return 1; fi
+  if ! is_folder_pkg_ "$folder_to_execute"; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
@@ -4960,7 +4993,7 @@ function setup() {
   elif [[ -n "$1" ]]; then
     if is_project_ "$1"; then
       proj_arg="$1"
-    elif is_proj_folder_ "$1" &>/dev/null; then
+    elif is_folder_pkg_ "$1" &>/dev/null; then
       folder_arg="$1"
     else
       proj_arg="$1"
@@ -4984,7 +5017,7 @@ function setup() {
   if [[ -n "$folder_arg" ]]; then
     folder_to_execute="${proj_folder}/${folder_arg}"
   else
-    if [[ "$proj_arg" != "$CURRENT_PUMP_SHORT_NAME" ]] || ! is_proj_folder_ "$PWD" &>/dev/null; then
+    if [[ "$proj_arg" != "$CURRENT_PUMP_SHORT_NAME" ]] || ! is_folder_pkg_ "$PWD" &>/dev/null; then
       if (( single_mode )); then
         folder_to_execute="$proj_folder"
       else
@@ -4999,7 +5032,7 @@ function setup() {
     fi
   fi
 
-  if ! is_proj_folder_ "$folder_to_execute"; then return 1; fi
+  if ! is_folder_pkg_ "$folder_to_execute"; then return 1; fi
 
   # debugging
   # print "proj_arg=$proj_arg"
@@ -5485,6 +5518,7 @@ function clone() {
   local pump_clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
   local pump_default_branch="${PUMP_DEFAULT_BRANCH[$i]}"
+  local pump_no_monogram="${PUMP_NO_MONOGRAM[$i]}"
 
   if ! check_proj_ -rfm -q $i; then return 1; fi
 
@@ -5503,7 +5537,7 @@ function clone() {
   if (( single_mode )); then
     rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
     if [[ -n "$(ls -A "$proj_folder" 2>/dev/null)" ]]; then
-      print " cannot clone because project is set to ${purple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
+      print " cannot clone because $proj_arg is set to ${purple_cor}single mode${reset_cor} and folder is not empty: $proj_folder" >&2
       print " clean the folder or run ${yellow_cor}$proj_arg -e${reset_cor} to edit project and switch to ${pink_cor}multiple mode${reset_cor}" >&2
       return 1;
     fi
@@ -5527,7 +5561,7 @@ function clone() {
 
       rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
       if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
-        if is_git_repo_ "$folder_to_clone"; then
+        if is_folder_git_ "$folder_to_clone"; then
           skip_clone=1
         fi
       fi
@@ -5575,7 +5609,25 @@ function clone() {
     fi
   
     if [[ "$branch_arg" != "$default_branch" ]]; then
-      branch_arg="${${USER:0:1}:l}-${branch_arg}"
+      if [[ -z "$pump_no_monogram" ]]; then
+        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
+        local _RET=$?
+        if (( _RET == 130 || _RET == 2 )); then return 1; fi
+        if (( _RET == 0 )); then
+          branch_arg="${${USER:0:1}:l}-${branch_arg}"
+          confirm_ "save preference to use initials and don't ask again?"
+        else
+          confirm_ "save preference to not use initials and don't ask again?"
+        fi
+        local _RET2=$?
+        if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+        if (( _RET2 == 0 )); then
+          update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+        fi
+      elif (( pump_no_monogram == 0 )); then
+        branch_arg="${${USER:0:1}:l}-${branch_arg}"
+      fi
+
       print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
     else
       print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
@@ -5863,12 +5915,21 @@ function jira() {
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
+  # start the work by ether creating a new branch or new folder/clone
   local RET=0
 
   if (( single_mode )); then
     fetch "$proj_folder" --quiet
-    
-    local branch="${${USER:0:1}:l}-$jira_key"
+
+    local branch="$jira_key"
+
+    confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${jira_key}${reset_prompt_cor}?"
+    local _RET=$?
+    if (( _RET == 130 || _RET == 2 )); then return 1; fi
+    if (( _RET == 0 )); then
+      branch="${${USER:0:1}:l}-${jira_key}"
+    fi
+
     local find_branch=$(git -C "$proj_folder" branch --all --list "$branch" --format="%(refname:short)")
     
     cd "$proj_folder"
@@ -5922,7 +5983,7 @@ function abort() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if ! GIT_EDITOR=true git -C "$folder" rebase --abort $@ &>/dev/null; then
     if ! GIT_EDITOR=true git -C "$folder" merge --abort $@ &>/dev/null; then
@@ -5952,7 +6013,7 @@ function renb() {
     return 1;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   local current_name=$(git branch --show-current)
   if [[ -z "$current_name" ]]; then
@@ -6017,7 +6078,7 @@ function chp() {
     return 1;
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
   
   git -C "$folder" cherry-pick "$hash_arg" ${@:2}
 }
@@ -6045,7 +6106,7 @@ function chc() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   GIT_EDITOR=true git -C "$folder" cherry-pick --continue $@ &>/dev/null
 }
@@ -6073,7 +6134,7 @@ function mc() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" add .
   local RET=$?
@@ -6109,7 +6170,7 @@ function rc() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" add .
   local RET=$?
@@ -6145,7 +6206,7 @@ function cont() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" add .
   local RET=$?
@@ -6173,7 +6234,7 @@ function reset1() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   git --no-pager log -1 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -6191,7 +6252,7 @@ function reset2() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   git --no-pager log -2 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -6209,7 +6270,7 @@ function reset3() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   git --no-pager log -3 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -6227,7 +6288,7 @@ function reset4() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   git --no-pager log -4 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -6245,7 +6306,7 @@ function reset5() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   git --no-pager log -5 --oneline
   git log -1 --pretty=format:'%s' | pbcopy
@@ -6264,7 +6325,7 @@ function repush() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if (( repush_is_x )); then
     if ! recommit -s --quiet 1>/dev/null; then return 1; fi
@@ -6286,7 +6347,7 @@ function recommit() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   local git_status=$(git status --porcelain 2>/dev/null)
   if [[ -z "$git_status" ]]; then
@@ -6382,7 +6443,7 @@ function fetch() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   local RET=0
 
@@ -6448,7 +6509,7 @@ function gconf() {
     fi
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   echo "${yellow_cor}== ${scope_arg} config ==${reset_cor}"
 
@@ -6507,7 +6568,7 @@ function glog() {
 
   shift $arg_count
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if [[ -z "$branch_arg" ]]; then
     branch_arg=$(git -C "$folder" branch --show-current)
@@ -6584,7 +6645,7 @@ function push() {
 
   shift $arg_count
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if [[ -z "$branch_arg" ]]; then
     branch_arg=$(git -C "$folder" branch --show-current)
@@ -6682,7 +6743,7 @@ function pushf() {
 
   shift $arg_count
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if [[ -z "$branch_arg" ]]; then
     branch_arg=$(git -C "$folder" branch --show-current)
@@ -6788,7 +6849,7 @@ function pull() {
 
   shift $arg_count
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   local remote_name=$(get_remote_origin_ "$folder")
 
@@ -7038,7 +7099,7 @@ function release() {
   proj_folder=$(get_proj_for_git_ "$proj_folder")
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  if ! is_proj_folder_ "$proj_folder"; then return 1; fi
+  if ! is_folder_pkg_ "$proj_folder"; then return 1; fi
 
   local my_branch="$(git -C "$proj_folder" branch --show-current)"
 
@@ -7237,7 +7298,7 @@ function tag() {
   proj_folder=$(get_proj_for_git_ "$proj_folder")
   if [[ -z "$proj_folder" ]]; then return 1; fi
 
-  if ! is_proj_folder_ "$proj_folder"; then return 1; fi
+  if ! is_folder_pkg_ "$proj_folder"; then return 1; fi
   
   prune "$proj_folder" &>/dev/null
 
@@ -7365,7 +7426,7 @@ function restore() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" restore --quiet .
 }
@@ -7397,7 +7458,7 @@ function clean() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
   
   git -C "$folder" clean -fd --quiet
 }
@@ -7429,7 +7490,7 @@ function discard() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" reset HEAD .
   clean "$folder"
@@ -7464,7 +7525,7 @@ function reseta() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if (( reseta_is_o )); then
     local remote_name=$(get_remote_origin_ "$folder")
@@ -7505,7 +7566,7 @@ function glr() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   fetch "$folder" --quiet
 
@@ -7547,7 +7608,7 @@ function gll() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" branch --list "*$branch_arg*" --sort=authordate \
     --format="%(authordate:format:%m-%d-%Y) %(align:22,left)%(authorname)%(end) %(refname:strip=2)" \
@@ -7646,7 +7707,7 @@ function gha() {
     gha_interval="${PUMP_GHA_INTERVAL[$i]}"
     gha_workflow="${PUMP_GHA_WORKFLOW[$i]}"
   else
-    if ! is_git_repo_; then return 1; fi
+    if ! is_folder_git_; then return 1; fi
 
     proj_folder="$(pwd)"
     local remote_name=$(get_remote_origin_)
@@ -7756,7 +7817,7 @@ function co() {
   local proj_arg="$CURRENT_PUMP_SHORT_NAME"
   local proj_folder="$PWD"
 
-  if ! is_git_repo_; then; return 1; fi
+  if ! is_folder_git_; then; return 1; fi
 
   local RET=0
 
@@ -7968,7 +8029,7 @@ function back() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   git -C "$folder" switch - $@
 }
@@ -7984,7 +8045,7 @@ function dev() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   for ref in refs/{heads,remotes/{origin,upstream}}/{dev,devel,develop,development}; do
     if git show-ref -q --verify $ref; then
@@ -8008,7 +8069,7 @@ function main() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   for ref in refs/{heads,remotes/{origin,upstream}}/{main,trunk,mainline,default,stable,master}; do
     if git show-ref -q --verify $ref; then
@@ -8032,7 +8093,7 @@ function prod() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   for ref in refs/{heads,remotes/{origin,upstream}}/{prod,production}; do
     if git show-ref -q --verify $ref; then
@@ -8056,7 +8117,7 @@ function stage() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   for ref in refs/{heads,remotes/{origin,upstream}}/{stage,staging}; do
     if git show-ref -q --verify $ref; then
@@ -8096,7 +8157,7 @@ function rebase() {
     fi
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   local base_branch=""
   local branch_arg="$(git -C "$folder" branch --show-current)"
@@ -8190,7 +8251,7 @@ function merge() {
     fi
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   local base_branch=""
   local branch_arg="$(git -C "$folder" branch --show-current)"
@@ -8280,7 +8341,7 @@ function prune() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   # delete all local tags
   # git tag -l | xargs git tag -d 1>/dev/null
@@ -8382,7 +8443,7 @@ function delb() {
     fi
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   if (( delb_is_s && delb_is_r )); then
     print " ${red_cor}fatal: cannot use -s and -r together${reset_cor}" >&2
@@ -8462,7 +8523,7 @@ function st() {
     shift
   fi
 
-  if ! is_git_repo_ "$folder"; then return 1; fi
+  if ! is_folder_git_ "$folder"; then return 1; fi
 
   # -sb is equivalent to git status -sb
   git -C "$folder" status $@
@@ -8609,6 +8670,7 @@ function pro() {
     update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" "" 2>/dev/null
     update_setting_ $i "PUMP_NVM_USE_V" "" 2>/dev/null
     update_setting_ $i "PUMP_DEFAULT_BRANCH" "" 2>/dev/null
+    update_setting_ $i "PUMP_NO_MONOGRAM" "" 2>/dev/null
     update_setting_ $i "PUMP_CODE_EDITOR" "" 2>/dev/null
     update_setting_ $i "PUMP_JIRA_PROJ" "" 2>/dev/null
 
@@ -8801,7 +8863,7 @@ function pro() {
     proj_arg=$(find_proj_by_folder_)
 
     if [[ -z "$proj_arg" ]]; then # didn't find project based on pwd
-      if ! is_proj_folder_ &>/dev/null; then
+      if ! is_folder_pkg_ &>/dev/null; then
         return 1;
       fi
 
@@ -9068,7 +9130,7 @@ function stash() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if (( stash_is_v )); then
     git stash show -p stash@{${1:-0}}
@@ -9104,7 +9166,7 @@ function pop() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if (( pop_is_a )); then
     local stashes=()
@@ -9165,7 +9227,7 @@ function __commit() {
     return 0;
   fi
 
-  if ! is_git_repo_; then return 1; fi
+  if ! is_folder_git_; then return 1; fi
 
   if (( commit_is_a || CURRENT_PUMP_COMMIT_ADD )); then
     git add .
@@ -9685,6 +9747,7 @@ typeset -gA PUMP_JIRA_IN_DONE
 typeset -gA PUMP_NVM_SKIP_LOOKUP
 typeset -gA PUMP_NVM_USE_V
 typeset -gA PUMP_DEFAULT_BRANCH
+typeset -gA PUMP_NO_MONOGRAM
 
 # ========================================================================
 export CURRENT_PUMP_SHORT_NAME=""
@@ -9725,6 +9788,7 @@ typeset -g CURRENT_PUMP_JIRA_DONE=""
 typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
 typeset -g CURRENT_PUMP_NVM_USE_V=""
 typeset -g CURRENT_PUMP_DEFAULT_BRANCH=""
+typeset -g CURRENT_PUMP_NO_MONOGRAM=""
 
 typeset -g MULTIPLE_MODE=0
 typeset -g SINGLE_MODE=1
