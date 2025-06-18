@@ -3774,7 +3774,7 @@ function upgrade() {
 
 function del_file_() {
   eval "$(parse_flags_ "del_file_" "s" "" "$@")"
-  (( del_file_d )) && set -x
+  (( del_file_is_d )) && set -x
 
   local count="$1"
   local file="$2"
@@ -3790,7 +3790,7 @@ function del_file_() {
     fi
   fi
 
-  if (( ! del_file_s && count <= 3 )) && [[ "${file:t}" != ".DS_Store" ]]; then;
+  if (( ! del_file_is_s && count <= 3 )) && [[ "${file:t}" != ".DS_Store" ]]; then;
     confirm_ "delete $type: ${blue_prompt_cor}$file${reset_prompt_cor}?"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
@@ -3822,7 +3822,7 @@ function del_file_() {
 
 function del_files_() {
   eval "$(parse_flags_ "del_files_" "as" "" "$@")"
-  (( del_files_d )) && set -x
+  (( del_files_is_d )) && set -x
 
   local dont_ask=0
   local count=0
@@ -3841,7 +3841,7 @@ function del_files_() {
       file=$(realpath -- "$file" 2>/dev/null)
     fi
 
-    if (( ! del_files_s && count > 3 )); then
+    if (( ! del_files_is_s && count > 3 )); then
       if (( dont_ask == 0 )); then
         dont_ask=1;
         confirm_ "delete all: ${blue_prompt_cor}${(j:, :)files[$count,-1]}${reset_prompt_cor}?"
@@ -3851,7 +3851,7 @@ function del_files_() {
         elif (( RET == 1 )); then
           count=0
         else
-          del_files_s=1
+          del_files_is_s=1
         fi
       else
         count=0
@@ -3859,13 +3859,21 @@ function del_files_() {
     fi
 
     if [[ -n "$file" ]]; then
-      del_file_ $count "$file"
+      if (( del_files_is_s )); then
+        del_file_ -s $count "$file"
+      else
+        del_file_ $count "$file"
+      fi
       RET=$?
       if (( RET == 130 )); then break; fi
     fi
 
     if [[ -n "$a_file" ]]; then
-      del_file_ $count "$a_file"
+      if (( del_files_is_s )); then
+        del_file_ -s $count "$a_file"
+      else
+        del_file_ $count "$a_file"
+      fi
       RET=$?
       if (( RET == 130 )); then break; fi
     fi
@@ -9099,7 +9107,7 @@ function proj_handler() {
       jira_key=$(extract_jira_key_ "$what_arg" "$resolved_folder")
 
       if [[ -z "$jira_key" ]]; then
-        print " fatal: not a valid argument" >&2
+        print " fatal: argument is not a jira ticket: $what_arg" >&2
         print " run ${yellow_cor}${proj_cmd} -h${reset_cor} to see usage" >&2
         return 1;
       fi
@@ -9859,6 +9867,8 @@ function fl() {
   # o	Sort in ascending order (default)
   # O	Sort in reverse order
   # N	Return an array, not a string
+
+  unsetopt dot_glob
 
   if (( fl_is_o && fl_is_n )); then
     dirs=("$folder"/*(N/on))
