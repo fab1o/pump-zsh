@@ -27,8 +27,8 @@ function pump_git_super_status() {
       SYMBOL=":"
     fi
 
-    if [[ -n "$CURRENT_PUMP_PROJ_SHORT_NAME" ]]; then
-      PUMP_PROJ="%{$fg[blue]%}$CURRENT_PUMP_PROJ_SHORT_NAME⟣%{$reset_color%}"
+    if [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
+      PUMP_PROJ="%{$fg[blue]%}$CURRENT_PUMP_SHORT_NAME⟣%{$reset_color%}"
     fi
 
     echo " ${PUMP_PROJ}${ZSH_THEME_GIT_PROMPT_PREFIX_COLOR}${COLOR}${SYMBOL}${ZSH_THEME_GIT_PROMPT_PREFIX}${GIT_BRANCH}${ZSH_THEME_GIT_PROMPT_SUFFIX_COLOR}${ZSH_THEME_GIT_PROMPT_SUFFIX}%{${reset_color}%}"

@@ -4,7 +4,7 @@
 # plugins=(git-prompt pump)
 
 PROMPT="%(?:%{$fg_bold[green]%}%1{$PROMPT%}:%{$fg_bold[red]%}%1{$PROMPT%}) %{$fg[cyan]%}%c%{$reset_color%}"
-PROMPT+=' %{$fg[blue]%}$CURRENT_PUMP_PROJ_SHORT_NAME⟣%{$reset_color%}$(git_super_status) ' 
+PROMPT+=' %{$fg[blue]%}$CURRENT_PUMP_SHORT_NAME⟣%{$reset_color%}$(git_super_status) ' 
 
 ZSH_THEME_GIT_PROMPT_SEPARATOR="%{$fg_bold[blue]%}|%{$reset_color%}"
 ZSH_THEME_GIT_PROMPT_BRANCH="%{$fg_bold[blue]%}"

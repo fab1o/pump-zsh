@@ -59,7 +59,7 @@
             "style": "folder"
           },
           "style": "plain",
-          "template": "<b>{{ .Env.CURRENT_PUMP_PROJ_SHORT_NAME }}⟣</b>",
+          "template": "<b>{{ .Env.CURRENT_PUMP_SHORT_NAME }}⟣</b>",
           "type": "path"
         },
         {

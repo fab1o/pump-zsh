@@ -101,7 +101,7 @@ To use Pump with **Oh My Posh**:
 Pump-zsh exports environment variables that can be used in your prompt customization:
 
 ```sh
-CURRENT_PUMP_PROJ_SHORT_NAME # indicates the current set project
+CURRENT_PUMP_SHORT_NAME # indicates the current set project
 PUMP_TIME_TOOK # time took to run last command
 ```
 
