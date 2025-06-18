@@ -5922,8 +5922,10 @@ function jira() {
 
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
-  # start the work by ether creating a new branch or new folder/clone
+  # start the work by transitioning the ticket
+  jira -p "$proj_arg" "$jira_key"
 
+  # then ether create a new branch or new folder/clone
   if (( single_mode )); then
     fetch "$proj_folder" --quiet
 
@@ -5948,13 +5950,11 @@ function jira() {
       branch_name="${${USER:0:1}:l}-${jira_key}"
     fi
 
-    local RET=0
     local find_branch=$(git -C "$proj_folder" branch --all --list "$branch_name" --format="%(refname:short)")
 
     if [[ -n "$find_branch" ]]; then
       cd "$proj_folder"
       co -e "$branch_name"
-      RET=$?
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
       
@@ -5966,17 +5966,12 @@ function jira() {
 
       cd "$proj_folder"
       co "$branch_name" "$default_branch"
-      RET=$?
     fi
-
   else
     clone "$proj_arg" "$jira_key"
-    RET=$?
   fi
 
-  jira -p "$proj_arg" "$jira_key"
-
-  return $RET;
+  return $?;
 }
 
 function abort() {
@@ -9120,19 +9115,14 @@ function proj_handler() {
   fi
 
   if (( proj_handler_is_c )); then
+    jira -c "$proj_cmd" "$jira_key"
     if (( single_mode )); then
       co -m
       delb -se "$branch_arg" "$resolved_folder"
     else
       del "$resolved_folder"
     fi
-
-    if (( $? == 0 )); then
-      jira -c "$proj_cmd" "$jira_key"
-      return 0;
-    fi
-
-    return 1;
+    return $?;
   fi
 
   cd "$resolved_folder"
