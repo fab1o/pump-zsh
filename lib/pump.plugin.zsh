@@ -8890,7 +8890,7 @@ function pro() {
   fi
 
   # fetch the project folder if possible
-  fetch --quiet 2>/dev/null &!
+  fetch --quiet 2>/dev/null
 }
 
 # project handler =========================================================
