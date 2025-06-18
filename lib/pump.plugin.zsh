@@ -4805,7 +4805,7 @@ function pr() {
 
   if gh pr create --assignee="@me" --title="$pr_title" --body="$pr_body" --web --head="$my_branch"; then
     if [[ -n "$jira_key" ]]; then
-      jira -r "$CURRENT_PUMP_SHORT_NAME" "$jira_key" 2>/dev/null
+      jira -r "$CURRENT_PUMP_SHORT_NAME" "$jira_key"
     fi
     return 0;
   fi
@@ -9126,7 +9126,7 @@ function proj_handler() {
     fi
 
     if (( $? == 0 )); then
-      jira -c "$proj_cmd" "$jira_key" 2>/dev/null
+      jira -c "$proj_cmd" "$jira_key"
       return 0;
     fi
 
