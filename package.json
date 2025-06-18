@@ -21,6 +21,7 @@
   "scripts": {
     "check_zshrc": "zsh ./scripts/check_zshrc.zsh",
     "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
+    "fix": "echo 'fix'",
     "install_deps": "bash ./scripts/install_deps.sh",
     "install_pump": "zsh ./scripts/install.zsh",
     "start": "echo 'this is a start script'",

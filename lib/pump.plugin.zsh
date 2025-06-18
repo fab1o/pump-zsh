@@ -4118,7 +4118,7 @@ function refix() {
     fi
   fi
 
-  pushf $@
+  pushf "" "$folder"
 }
 
 function covc() {
@@ -6333,7 +6333,7 @@ function repush() {
     if ! recommit --quiet 1>/dev/null; then return 1; fi
   fi
   
-  pushf $@
+  pushf
 }
 
 function recommit() {
@@ -6579,7 +6579,7 @@ function glog() {
 
   if (( glog_is_c )); then
     if (( glog_is_a )); then
-      git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative --no-decorate $@
+      git -C "$folder" --no-pager log "$branch_arg" HEAD --oneline --graph --date=relative --no-decorate $@
     else
       if [[ -n "$default_branch" && -n "$branch_arg" && "$default_branch" != "$branch_arg" ]]; then
         git -C "$folder" --no-pager log --no-merges --oneline "${default_branch}..${branch_arg}" --no-decorate $@
@@ -6589,9 +6589,9 @@ function glog() {
   fi
 
   if (( glog_is_a )); then
-    git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative $@
+    git -C "$folder" --no-pager log "$branch_arg" HEAD --oneline --graph --date=relative $@
   else
-    git -C "$folder" --no-pager log $branch_arg HEAD --oneline --graph --date=relative -n 10 $@
+    git -C "$folder" --no-pager log "$branch_arg" HEAD --oneline --graph --date=relative -n 10 $@
   fi
 }
 
@@ -6625,10 +6625,6 @@ function push() {
     
     if [[ -n "$1" && $1 != -* ]]; then
       branch_arg="$1"
-    else
-      print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}push -h${reset_cor} to see usage" >&2
-      return 1;
     fi
     
     arg_count=2
@@ -6655,7 +6651,10 @@ function push() {
     fi
   fi
 
-  fetch "$folder" --quiet
+  local remote_name=$(get_remote_origin_ "$folder")
+
+  git -C "$folder" fetch "$remote_name" "$branch_arg" --quiet
+  local RET=$?
 
   if (( push_is_t && push_is_f )); then
     git -C "$folder" push --no-verify --tags --force
@@ -6668,14 +6667,16 @@ function push() {
   fi
 
   if (( push_is_f )); then
-    pushf "$folder" "$branch_arg"
+    pushf "$branch_arg" "$folder"
     return $?;
   fi
 
-  local remote_name=$(get_remote_origin_ "$folder")
-
-  git -C "$folder" push --no-verify --set-upstream $remote_name $branch_arg
-  local RET=$?
+  if (( RET == 0 )); then
+    git -C "$folder" push --no-verify
+  else
+    git -C "$folder" push --no-verify --set-upstream "$remote_name" "$branch_arg"
+  fi
+  RET=$?
 
   if (( RET != 0 && quiet == 0 )); then
     if confirm_ "failed, try push force with lease?"; then
@@ -6723,10 +6724,6 @@ function pushf() {
     
     if [[ -n "$1" && $1 != -* ]]; then
       branch_arg="$1"
-    else
-      print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}pushf -h${reset_cor} to see usage" >&2
-      return 1;
     fi
     
     arg_count=2
@@ -6770,10 +6767,10 @@ function pushf() {
   local remote_name=$(get_remote_origin_ "$folder")
 
   if (( pushf_is_f )); then
-    git -C "$folder" push --no-verify --force $remote_name $branch_arg $@
+    git -C "$folder" push --no-verify --force "$remote_name" "$branch_arg" $@
     RET=$?
   else
-    git -C "$folder" push --no-verify --force-with-lease $remote_name $branch_arg $@
+    git -C "$folder" push --no-verify --force-with-lease "$remote_name" "$branch_arg" $@
     RET=$?
   fi
 
@@ -6829,10 +6826,6 @@ function pull() {
     
     if [[ -n "$1" && $1 != -* ]]; then
       branch_arg="$1"
-    else
-      print " fatal: not a valid branch argument" >&2
-      print " run ${yellow_cor}pull -h${reset_cor} to see usage" >&2
-      return 1;
     fi
     
     arg_count=2
@@ -6853,7 +6846,7 @@ function pull() {
 
   local remote_name=$(get_remote_origin_ "$folder")
 
-  if ! git -C "$folder" fetch $remote_name $branch_arg $@; then
+  if ! git -C "$folder" fetch "$remote_name" "$branch_arg" --quiet 1>/dev/null; then
     return 1;
   fi
 
@@ -6861,12 +6854,12 @@ function pull() {
   local is_quiet=$( (( ${argv[(Ie)--quiet]} || pull_is_q )) && echo 1 || echo 0)
 
   if (( pull_is_t )); then
-    git -C "$folder" pull $remote_name $branch_arg --tags $@
+    git -C "$folder" pull "$remote_name" "$branch_arg" --tags $@
     RET=$?
     if (( pull_is_o )); then return $RET; fi
   fi
 
-  git -C "$folder" pull $remote_name $branch_arg $@ 2>/dev/null
+  git -C "$folder" pull "$remote_name" "$branch_arg" $@ 2>/dev/null
   RET=$?
   if (( RET != 0 )); then
     if (( ! pull_is_r && ! is_quiet )); then
@@ -6883,10 +6876,10 @@ function pull() {
     fi
 
     if (( pull_is_r )); then
-      git -C "$folder" pull $remote_name $branch_arg --rebase $@ 2>/dev/null
+      git -C "$folder" pull "$remote_name" "$branch_arg" --rebase $@ 2>/dev/null
       RET=$?
       if (( RET != 0 )); then
-        git -C "$folder" pull $remote_name $branch_arg --rebase --autostash $@
+        git -C "$folder" pull "$remote_name" "$branch_arg" --rebase --autostash $@
         RET=$?
       fi
     fi
@@ -8217,7 +8210,7 @@ function rebase() {
   RET=$?
 
   if (( RET == 0 && rebase_is_p )); then
-    pushf "$folder"
+    pushf "$branch_arg" "$folder"
     RET=$?
   fi
 
