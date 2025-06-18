@@ -2648,14 +2648,16 @@ function get_projects_() {
 
 function find_proj_index_() {
   set +x
-  eval "$(parse_flags_ "find_proj_index_" "zoe" "" "$@")"
+  eval "$(parse_flags_ "find_proj_index_" "fzoe" "" "$@")"
   (( find_proj_index_is_d )) && set -x
 
   local proj_arg="$1"
-  local default_index="$2"
+  local header="${2:-project}"
+  
+  local default_index=0
 
   if [[ -z "$proj_arg" ]]; then
-    if [[ -n "$default_index" ]]; then
+    if (( find_proj_index_is_f )); then
       echo "$default_index"
       return 0;
     fi
@@ -2668,7 +2670,7 @@ function find_proj_index_() {
         return 1;
       fi
 
-      proj_arg=$(choose_one_ "project" "${projects[@]}")
+      proj_arg=$(choose_one_ "$header" "${projects[@]}")
       if [[ -z "$proj_arg" ]]; then return 130; fi
     else
       print " missing project argument" >&2
@@ -2694,7 +2696,7 @@ function find_proj_index_() {
       return 1;
     fi
 
-    proj_arg=$(choose_one_ "project" "${projects[@]}")
+    proj_arg=$(choose_one_ "$header" "${projects[@]}")
     if [[ -z "$proj_arg" ]]; then return 1; fi
 
     for i in {1..9}; do
@@ -4146,7 +4148,7 @@ function covc() {
     return 1;
   fi
 
-  local i=$(find_proj_index_ "$CURRENT_PUMP_SHORT_NAME")
+  local i=$(find_proj_index_ "$CURRENT_PUMP_SHORT_NAME"  "project to compare coverage with")
   (( i )) || return 1;
 
   if ! check_proj_ -r $i; then return 1; fi 
@@ -4777,7 +4779,7 @@ function pr() {
   push || return 1;
 
   if (( pr_is_l )); then
-    local i=$(find_proj_index_ "$CURRENT_PUMP_SHORT_NAME")
+    local i=$(find_proj_index_ "$CURRENT_PUMP_SHORT_NAME"  "project to create pull request for")
     (( i )) || return 1;
     
     if ! check_proj_ -r $i; then return 1; fi
@@ -4877,7 +4879,7 @@ function run() {
     fi
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to run")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -5000,7 +5002,7 @@ function setup() {
     fi
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to setup")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -5174,7 +5176,7 @@ function revs() {
     return 1;
   fi
 
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to list reviews for")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -5267,7 +5269,7 @@ function rev() {
     fi
   fi
 
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg"  "project to open review for")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -5510,7 +5512,7 @@ function clone() {
     if [[ -z "$proj_arg" ]]; then return 1; fi
   fi
 
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to clone")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -5609,23 +5611,26 @@ function clone() {
     fi
   
     if [[ "$branch_arg" != "$default_branch" ]]; then
-      if [[ -z "$pump_no_monogram" ]]; then
-        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
-        local _RET=$?
-        if (( _RET == 130 || _RET == 2 )); then return 1; fi
-        if (( _RET == 0 )); then
+      local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
+      if [[ -n "$jira_key" ]]; then
+        if [[ -z "$pump_no_monogram" ]]; then
+          confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
+          local _RET=$?
+          if (( _RET == 130 || _RET == 2 )); then return 1; fi
+          if (( _RET == 0 )); then
+            branch_arg="${${USER:0:1}:l}-${branch_arg}"
+            confirm_ "save preference to use initials and don't ask again?"
+          else
+            confirm_ "save preference to not use initials and don't ask again?"
+          fi
+          local _RET2=$?
+          if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+          if (( _RET2 == 0 )); then
+            update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+          fi
+        elif (( pump_no_monogram == 0 )); then
           branch_arg="${${USER:0:1}:l}-${branch_arg}"
-          confirm_ "save preference to use initials and don't ask again?"
-        else
-          confirm_ "save preference to not use initials and don't ask again?"
         fi
-        local _RET2=$?
-        if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
-        if (( _RET2 == 0 )); then
-          update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
-        fi
-      elif (( pump_no_monogram == 0 )); then
-        branch_arg="${${USER:0:1}:l}-${branch_arg}"
       fi
 
       print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
@@ -5655,11 +5660,6 @@ function clone() {
   fi
 
   cd "$folder_to_clone"
-
-  # local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
-  # if [[ -n "$jira_key" ]]; then
-  #   jira -p "$proj_arg" "$jira_key" 2>/dev/null
-  # fi
 
   local my_branch=$(git branch --show-current)
   if [[ "$branch_arg" != "$my_branch" ]]; then
@@ -5825,13 +5825,17 @@ function jira() {
     fi
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to run jira for")
   if (( ! i )); then return 1; fi
+
+  proj_arg="${PUMP_SHORT_NAME[$i]}"
 
   if ! check_proj_ -fm $i; then return 1; fi
   
   local single_mode="${PUMP_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_FOLDER[$i]}"
+  local pump_no_monogram="${PUMP_NO_MONOGRAM[$i]}"
+
   local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
   local jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"In Review"}"
   local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
@@ -5916,37 +5920,49 @@ function jira() {
   acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
 
   # start the work by ether creating a new branch or new folder/clone
-  local RET=0
 
   if (( single_mode )); then
     fetch "$proj_folder" --quiet
 
-    local branch="$jira_key"
+    local branch_name="$jira_key"
 
-    confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${jira_key}${reset_prompt_cor}?"
-    local _RET=$?
-    if (( _RET == 130 || _RET == 2 )); then return 1; fi
-    if (( _RET == 0 )); then
-      branch="${${USER:0:1}:l}-${jira_key}"
+    if [[ -z "$pump_no_monogram" ]]; then
+      confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
+      local _RET=$?
+      if (( _RET == 130 || _RET == 2 )); then return 1; fi
+      if (( _RET == 0 )); then
+        branch_name="${${USER:0:1}:l}-${jira_key}"
+        confirm_ "save preference to use initials and don't ask again?"
+      else
+        confirm_ "save preference to not use initials and don't ask again?"
+      fi
+      local _RET2=$?
+      if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+      if (( _RET2 == 0 )); then
+        update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+      fi
+    elif (( pump_no_monogram == 0 )); then
+      branch_name="${${USER:0:1}:l}-${jira_key}"
     fi
 
-    local find_branch=$(git -C "$proj_folder" branch --all --list "$branch" --format="%(refname:short)")
-    
-    cd "$proj_folder"
-    
+    local RET=0
+    local find_branch=$(git -C "$proj_folder" branch --all --list "$branch_name" --format="%(refname:short)")
+
     if [[ -n "$find_branch" ]]; then
-      co -e "$branch"
+      cd "$proj_folder"
+      co -e "$branch_name"
       RET=$?
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
       
       if [[ -z "$default_branch" ]]; then
         print " could not determine default branch for project: $proj_arg" >&2
-        print " run ${yellow_cor}co $branch <default_branch>${reset_cor} to create a new branch" >&2
+        print " run ${yellow_cor}co $branch_name <default_branch>${reset_cor} to create a new branch" >&2
         return 1;
       fi
 
-      co "$branch" "$default_branch"
+      cd "$proj_folder"
+      co "$branch_name" "$default_branch"
       RET=$?
     fi
 
@@ -6917,8 +6933,10 @@ function dtag() {
     tag="$1"
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to delete tag")
   if (( ! i )); then return 1; fi
+  
+  proj_arg="${PUMP_SHORT_NAME[$i]}"
 
   if ! check_proj_ -f $i; then return 1; fi
   
@@ -6987,7 +7005,7 @@ function drelease() {
     tag="$1"
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to delete release")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -7080,7 +7098,7 @@ function release() {
     tag="$1"
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to create release")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -7279,7 +7297,7 @@ function tag() {
     tag="$1"
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to create tag")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -7348,7 +7366,7 @@ function tags() {
     n="$1"
   fi
   
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg" "project to list tags")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -7684,7 +7702,7 @@ function gha() {
   local found=0
 
   if [[ -n "$proj_arg" ]]; then
-    local i=$(find_proj_index_ -o "$proj_arg")
+    local i=$(find_proj_index_ -o "$proj_arg" "project to check workflow")
     if (( ! i )); then return 1; fi
 
     proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -7988,11 +8006,6 @@ function co() {
   if [[ -z "$base_branch" ]]; then return 1; fi
 
   if ! git checkout -b "$branch_arg" "$base_branch" ${@:3}; then return 1; fi
-
-  # local jira_key=$(extract_jira_key_ "$branch_arg")
-  # if [[ -n "$jira_key" ]]; then
-  #   jira -p "$jira_key" 2>/dev/null
-  # fi
 
   git config "branch.${branch_arg}.gh-merge-base" "$base_branch"
   
@@ -8621,7 +8634,7 @@ function pro() {
       proj_arg="${CURRENT_PUMP_SHORT_NAME}"
     fi
 
-    local i=$(find_proj_index_ -oe "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg" "project to display settings for")
     (( i )) || return 1;
 
     local pro_i_cor="${blue_cor}"
@@ -8643,7 +8656,7 @@ function pro() {
       proj_arg="${CURRENT_PUMP_SHORT_NAME}"
     fi
 
-    local i=$(find_proj_index_ -oe "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg" "project to display readme for")
     (( i )) || return 1;
 
     proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -8670,7 +8683,7 @@ function pro() {
 
   # pro -u [<name>] reset project settings
   if (( pro_is_u )); then
-    local i=$(find_proj_index_ -oe "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg"  "project to reset settings for")
     (( i )) || return 1;
     
     proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -8692,7 +8705,8 @@ function pro() {
 
   # pro -c [<name>] show project config
   if (( pro_is_c )); then
-    local i=$(find_proj_index_ "$proj_arg" 0)
+    local i=$(find_proj_index_ -f "$proj_arg"  "project to display config for")
+    (( i )) || return 1;
     [[ -n "$i" ]] || return 1;
     
     print_current_proj_ $i
@@ -8701,7 +8715,7 @@ function pro() {
 
   # pro -e <name> edit project
   if (( pro_is_e )); then
-    local i=$(find_proj_index_ -oe "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg"  "project to edit")
     (( i )) || return 1;
 
     proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -8753,7 +8767,7 @@ function pro() {
       return $?;
     fi
 
-    local i=$(find_proj_index_ "$proj_arg")
+    local i=$(find_proj_index_ "$proj_arg"  "project to remove")
     (( i )) || return 1;
 
     local refresh=0;
@@ -8775,7 +8789,7 @@ function pro() {
 
   # pro -n <name> set node.js version for a project
   if (( pro_is_n )); then
-    local i=$(find_proj_index_ -oe "$proj_arg")
+    local i=$(find_proj_index_ -oe "$proj_arg"  "project to set node.js version for")
     (( i )) || return 1;
 
     proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -8928,7 +8942,7 @@ function pro() {
   fi
 
   # pro <name>
-  local i=$(find_proj_index_ -o "$proj_arg")
+  local i=$(find_proj_index_ -o "$proj_arg"  "project to set")
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
@@ -9070,21 +9084,22 @@ function proj_handler() {
   fi
 
   local jira_key=""
+  local what_arg=""
 
   if (( proj_handler_is_c || proj_handler_is_o )); then
     if (( single_mode )); then
-      _arg="$branch_arg"
+      what_arg="$branch_arg"
     else
-      _arg="$folder_arg"
-      if (( proj_handler_is_c )) && [[ -z "$_arg" ]]; then
+      what_arg="$folder_arg"
+      if (( proj_handler_is_c )) && [[ -z "$what_arg" ]]; then
         print " fatal: not a valid argument" >&2
         print " run ${yellow_cor}${proj_cmd} -h${reset_cor} to see usage" >&2
         return 1;
       fi
     fi
 
-    if [[ -n "$_arg" ]]; then
-      jira_key=$(extract_jira_key_ "$_arg")
+    if [[ -n "$what_arg" ]]; then
+      jira_key=$(extract_jira_key_ "$what_arg" "$resolved_folder")
 
       if [[ -z "$jira_key" ]]; then
         print " fatal: not a valid argument" >&2
