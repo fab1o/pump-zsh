@@ -1225,7 +1225,7 @@ function choose_mode_() {
   print "   ideal for small projects with a limited number of branches" >&2
   print "" >&2
 
-  local default=$((( mode )) && echo "single" || echo "multiple")
+  local default=$( (( mode )) && echo "single" || echo "multiple" )
 
   confirm_ "manage the project with ${pink_prompt_cor}multiple${reset_prompt_cor} or ${purple_prompt_cor}single${reset_prompt_cor} mode?" "multiple" "single" "$default"
   local RET=$?
@@ -8460,7 +8460,7 @@ function delb() {
   local branch=""
   for branch in "${selected_branches[@]}"; do
     if (( ! delb_is_s || delb_is_r )); then
-      local origin=$((( delb_is_r )) && echo "remote" || echo "local")
+      local origin=$( (( delb_is_r )) && echo "remote" || echo "local" )
       confirm_ "delete ${origin} branch: ${magenta_prompt_cor}${branch}${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then break; fi
