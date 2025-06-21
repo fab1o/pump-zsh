@@ -5913,27 +5913,42 @@ function jira() {
       return 0;
     fi
 
-    local output=$(acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
-    
-    if echo "$output" | grep -qE "Failure"; then
-      jira_status=$(input_from_ "Enter jira status (e.g. In Progress, In Review, Done)")
-      if [[ -n "$jira_status" ]] && ; then
-        acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes
-        if (( jira_is_p )); then
-          update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "$jira_status" &>/dev/null
-        elif (( jira_is_r )); then
-          update_setting_ $i "PUMP_JIRA_IN_REVIEW" "$jira_status" &>/dev/null
-        elif (( jira_is_c )); then
-          update_setting_ $i "PUMP_JIRA_DONE" "$jira_status" &>/dev/null
-        fi
+    local RET=0
 
-        jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"$jira_in_progress"}"
-        jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"$jira_in_review"}"
-        jira_done="${PUMP_JIRA_DONE[$i]:-"$jira_done"}"
+    local current_jira_assignee=$(acli jira workitem view "$jira_key" --fields="assignee" --json | jq -r '.fields.assignee.emailAddress // empty')
+    local current_user=$(acli jira auth status | awk -F': ' '/Email:/ { print $2 }' 2>/dev/null)
+    
+    if [[ "$current_jira_assignee" != "$current_user" ]]; then
+      confirm_ "are you sure you want to transition work item: ${green_prompt_cor}${jira_key}${reset_prompt_cor} to status: ${green_prompt_cor}${jira_status}${reset_prompt_cor}?"
+      RET=$?
+      if (( RET == 130 || RET == 2 )); then return 1; fi
+    fi
+    
+    if (( RET == 0 )); then
+      local output=$(acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes 2>&1 | tee /dev/tty)
+      RET=$?
+      if echo "$output" | grep -qE "Failure"; then
+        jira_status=$(input_from_ "Enter jira status (e.g. In Progress, In Review, Done)")
+        if [[ -n "$jira_status" ]] && ; then
+          acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes
+          RET=$?
+          if (( jira_is_p )); then
+            update_setting_ $i "PUMP_JIRA_IN_PROGRESS" "$jira_status" &>/dev/null
+          elif (( jira_is_r )); then
+            update_setting_ $i "PUMP_JIRA_IN_REVIEW" "$jira_status" &>/dev/null
+          elif (( jira_is_c )); then
+            update_setting_ $i "PUMP_JIRA_DONE" "$jira_status" &>/dev/null
+          fi
+
+          jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"$jira_in_progress"}"
+          jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"$jira_in_review"}"
+          jira_done="${PUMP_JIRA_DONE[$i]:-"$jira_done"}"
+        fi
       fi
     fi
 
-    return $?;
+    return $RET;
+  
   fi # end of transitioning status
 
   if (( single_mode )); then
