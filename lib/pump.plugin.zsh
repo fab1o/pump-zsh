@@ -5654,7 +5654,12 @@ function clone() {
     fi
 
     if (( ! skip_clone )); then
-      print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
+      local remote_branch=$(get_remote_branch_ "$branch_arg" "$folder_to_clone")
+      if [[ -n "$remote_branch" ]]; then
+        print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
+      else
+        print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
+      fi
     fi
   else
     if (( ! skip_clone )); then
@@ -5680,14 +5685,14 @@ function clone() {
   local my_branch=$(git -C "$folder_to_clone" branch --show-current)
   if [[ "$branch_arg" != "$my_branch" ]]; then
     if [[ "$branch_arg" != "$default_branch" ]]; then
-      local remote_branch=$(get_remote_branch_ -r "$branch_arg" "$folder_to_clone")
+      local remote_branch=$(get_remote_branch_ "$branch_arg" "$folder_to_clone")
       if [[ -n "$remote_branch" ]]; then
         git -C "$folder_to_clone" checkout "$remote_branch" &>/dev/null
       fi      
     fi
     if ! git -C "$folder_to_clone" checkout -b "$branch_arg" &>/dev/null; then
       if (( ! clone_is_e )); then
-        print " ${yellow_cor}warning: did not create a new branch because it already exists: $branch_arg${reset_cor}" >&2
+        print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
       fi
       if ! git -C "$folder_to_clone" checkout "$branch_arg" &>/dev/null; then
         print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
@@ -5737,7 +5742,7 @@ function clone() {
 
   print " • run ${yellow_cor}rev${reset_cor} to open a review"
   print " • run ${yellow_cor}help${reset_cor} to see more options"
-  
+
   return $RET;
   
   # README FUNCTIONALITY AFTER CLONING HAS BEEN DISABLED
@@ -5990,8 +5995,9 @@ function jira() {
 
   # then ether create a new branch or new folder/clone
   if (( single_mode )); then
+    cd "$proj_folder"
     if (( open_existing_work )); then
-      co -e "$branch_found" --quiet
+      co -e "$branch_found"
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
       
@@ -8037,10 +8043,11 @@ function co() {
     return 1;
   fi
 
-  local remote_branch="$(get_remote_branch_ "$branch_arg")"
+  local remote_branch=$(get_remote_branch_ "$branch_arg")
 
   if [[ -n "$remote_branch" ]]; then
-    print " fatal: branch already exists on remote: $branch_arg" >&2
+    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
+    git -C "$folder_to_clone" checkout "$remote_branch" ${@:3}
     return 1;
   fi
 
@@ -8052,11 +8059,21 @@ function co() {
   local base_branch="$(select_branch_ -at "$base_branch_arg" "base branch")"
   if [[ -z "$base_branch" ]]; then return 1; fi
 
-  if ! git checkout -b "$branch_arg" "$base_branch" ${@:3}; then return 1; fi
+  local RET=0  
 
-  git config "branch.${branch_arg}.gh-merge-base" "$base_branch"
+  if ! git checkout -b "$branch_arg" "$base_branch" ${@:3}; then
+    RET=1;
+    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
+    if ! git checkout "$branch_arg" ${@:3}; then
+      print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
+    fi
+  fi
+
+  if (( RET == 0 )); then
+    git config "branch.${branch_arg}.gh-merge-base" "$base_branch"
+  fi
   
-  return 0;
+  return $RET;
 }
 
 function back() {
