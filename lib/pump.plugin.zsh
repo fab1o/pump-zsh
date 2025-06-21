@@ -5087,7 +5087,7 @@ function setup() {
   fi
 
   print ""
-  print " next thing you may wanna do:"
+  print " next thing to do:"
 
   local pkg_json="package.json"
   if [[ -f $pkg_json ]]; then
@@ -5471,7 +5471,7 @@ function rev() {
 
 function clone() {
   set +x
-  eval "$(parse_flags_ "clone_" "" "" "$@")"
+  eval "$(parse_flags_ "clone_" "e" "" "$@")"
   (( clone_is_d )) && set -x
 
   if (( clone_is_h )); then
@@ -5686,7 +5686,9 @@ function clone() {
       fi      
     fi
     if ! git -C "$folder_to_clone" checkout -b "$branch_arg" &>/dev/null; then
-      print " ${yellow_cor}warning: did not create a new branch because it already exists: $branch_arg${reset_cor}" >&2
+      if (( ! clone_is_e )); then
+        print " ${yellow_cor}warning: did not create a new branch because it already exists: $branch_arg${reset_cor}" >&2
+      fi
       if ! git -C "$folder_to_clone" checkout "$branch_arg" &>/dev/null; then
         print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
         RET=1
@@ -5719,7 +5721,7 @@ function clone() {
   print " default branch is: ${green_cor}$(git config --get init.defaultBranch)${reset_cor}"
   
   print ""
-  print " next thing you may wanna do:"
+  print " next thing to do:"
 
   local pkg_manager="${PUMP_PKG_MANAGER[$i]}"
 
@@ -5948,6 +5950,7 @@ function jira() {
   fi
 
   local branch_name=""
+  local open_existing_work=0
   local branch_found="$(select_branch_ -ai "$jira_key" "" "$proj_folder" 2>/dev/null)"
 
   if [[ -n "$branch_found" ]]; then
@@ -5956,6 +5959,7 @@ function jira() {
     if (( _RET == 130 || _RET == 2 )); then return 1; fi
     if (( _RET == 0 )); then
       branch_name="$branch_found"
+      open_existing_work=1
     fi
   fi
 
@@ -5986,9 +5990,8 @@ function jira() {
 
   # then ether create a new branch or new folder/clone
   if (( single_mode )); then
-    if [[ "$branch_name" == "$branch_found" ]]; then
-      co -e "$branch_name" --quiet
-      RET=$?
+    if (( open_existing_work )); then
+      co -e "$branch_found" --quiet
     else
       local default_branch=$(get_default_branch_ "$proj_folder")
       
@@ -6003,8 +6006,13 @@ function jira() {
     fi
 
   else
-    clone "$proj_arg" "$branch_name"
-    RET=$?
+    # multiple mode
+    if (( open_existing_work )); then
+      clone -e "$proj_arg" "$branch_found"
+    else
+      clone "$proj_arg" "$branch_name"
+      RET=$?
+    fi
   fi
 
   if (( RET == 0 )); then
