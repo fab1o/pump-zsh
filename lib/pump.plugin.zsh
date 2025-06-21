@@ -1831,7 +1831,8 @@ function save_jira_() {
   local i="$1"
   local jira_proj="$2"
 
-  if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then return 0; fi
+  # returned saved jira project
+  # if (( save_jira_is_a )) && [[ -n "$jira_proj" ]]; then return 0; fi
 
   if ! command -v acli &>/dev/null; then
     print " acli is not installed" >&2
@@ -1848,7 +1849,9 @@ function save_jira_() {
   jira_proj=$(choose_one_ "jira project" "${(@f)$(printf "%s\n" "${projects}")}")
   if [[ -z "$jira_proj" ]]; then return 1; fi
 
-  update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+  # saving the jira project
+  # update_setting_ $i "PUMP_JIRA_PROJ" "$jira_proj" &>/dev/null
+  PUMP_JIRA_PROJ[$i]="$jira_proj"
 
   if (( save_jira_is_q )); then return 0; fi
 
@@ -3256,7 +3259,7 @@ function select_branches_() {
 
 function select_branch_() {
   set +x
-  eval "$(parse_flags_ "select_branch_" "talr" "" "$@")"
+  eval "$(parse_flags_ "select_branch_" "talri" "" "$@")"
   (( select_branch_is_d )) && set -x
 
   local searchText="$1"
@@ -3314,7 +3317,17 @@ function select_branch_() {
 
   local branch_choice=""
 
-  if [[ ${#filtered_branches[@]} -gt 20 ]]; then
+  # return immediately if only one branch is found, if not, return 1
+  if (( select_branch_is_i )); then
+    if (( ${#filtered_branches[@]} == 1 )); then
+      branch_choice="${filtered_branches[1]}"
+      echo "$branch_choice"
+      return 0;
+    fi
+    return 1;
+  fi
+
+  if (( ${#filtered_branches[@]} > 20 )); then
     if (( select_branch_is_t )); then
       branch_choice=$(filter_one_ -a "$header" $filtered_branches)
     else
@@ -5539,6 +5552,7 @@ function clone() {
   local temp_default_branch_2=""
 
   local skip_clone=0
+  local user_typed_name=0
 
   if (( single_mode )); then
     rm -rf -- "${proj_folder}/.DS_Store" &>/dev/null
@@ -5550,13 +5564,14 @@ function clone() {
 
     folder_to_clone="$proj_folder"
   else
-    local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
+    local git_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
 
-    if [[ -n "$working_proj_folder" ]]; then
+    if [[ -n "$git_proj_folder" ]]; then
       if [[ -z "$branch_arg" ]]; then
         branch_arg=$(input_branch_name_ "feature branch name")
         if [[ -z "$branch_arg" ]]; then return 1; fi
 
+        user_typed_name=1
         print " ${purple_cor}feature branch name:${reset_cor} $branch_arg"
       fi
 
@@ -5566,10 +5581,8 @@ function clone() {
       folder_to_clone="${proj_folder}/${branch_folder}"
 
       rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
-      if [[ -d "$folder_to_clone" && -n "$(ls -A "$folder_to_clone" 2>/dev/null)" ]]; then
-        if is_folder_git_ "$folder_to_clone"; then
-          skip_clone=1
-        fi
+      if is_folder_git_ "$folder_to_clone" &>/dev/null; then
+        skip_clone=1
       fi
     fi
   fi
@@ -5619,7 +5632,7 @@ function clone() {
 
   if [[ "$branch_arg" != "$default_branch" ]]; then
     local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
-    if [[ -n "$jira_key" ]]; then
+    if [[ -n "$jira_key" ]] && (( user_typed_name )); then
       if [[ -z "$pump_no_monogram" ]]; then
         confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
         local _RET=$?
@@ -5660,27 +5673,31 @@ function clone() {
       print " cloning... $proj_repo on branch: $branch_arg"
       if ! git clone --quiet "$proj_repo" "$folder_to_clone"; then return 1; fi
     fi
+  fi
 
+  local RET=0
+
+  local my_branch=$(git -C "$folder_to_clone" branch --show-current)
+  if [[ "$branch_arg" != "$my_branch" ]]; then
     if [[ "$branch_arg" != "$default_branch" ]]; then
-      remote_branch=$(get_remote_branch_ -r "$branch_arg" "$proj_folder")
+      local remote_branch=$(get_remote_branch_ -r "$branch_arg" "$folder_to_clone")
       if [[ -n "$remote_branch" ]]; then
-        print " fatal: branch already exists on remote: $branch_arg" >&2
-        return 1;
+        git -C "$folder_to_clone" checkout "$remote_branch" &>/dev/null
+      fi      
+    fi
+    if ! git -C "$folder_to_clone" checkout -b "$branch_arg" &>/dev/null; then
+      print " ${yellow_cor}warning: did not create a new branch because it already exists: $branch_arg${reset_cor}" >&2
+      if ! git -C "$folder_to_clone" checkout "$branch_arg" &>/dev/null; then
+        print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
+        RET=1
       fi
     fi
   fi
 
   cd "$folder_to_clone"
 
-  local my_branch=$(git branch --show-current)
-  if [[ "$branch_arg" != "$my_branch" ]]; then
-    if ! git checkout -b "$branch_arg" --quiet &>/dev/null; then
-      git checkout "$branch_arg" --quiet &>/dev/null
-    fi
-  fi
-
   if (( skip_clone )); then
-    return 0;
+    return $RET;
   fi
 
   if [[ "$default_branch" != "$branch_arg" ]]; then
@@ -5719,6 +5736,7 @@ function clone() {
   print " • run ${yellow_cor}rev${reset_cor} to open a review"
   print " • run ${yellow_cor}help${reset_cor} to see more options"
   
+  return $RET;
   
   # README FUNCTIONALITY AFTER CLONING HAS BEEN DISABLED
   # if [[ -z "$print_readme" ]] || (( print_readme )); then # display readme file
@@ -5768,10 +5786,9 @@ function select_jira_key_() {
     if [[ -z "$jira_proj" ]]; then return 1; fi
   fi
 
-  local jira_in_progress="${PUMP_JIRA_IN_PROGRESS[$i]:-"In Progress"}"
+  local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
 
-  local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND \
-    (status='Blocked' OR status='To Do' OR status='Code Review' OR status='In Review' OR status='$jira_in_progress'))) AND \
+  local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND status!='$jira_done')) AND \
     Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
     print " no jira projects found" >&2
@@ -5811,7 +5828,7 @@ function jira() {
   fi
 
   # do not assign CURRENT_PUMP_SHORT_NAME here, because user must define it
-  # as we cannot determine if a jira ticket belongs to current project with correct statutes
+  # as we cannot determine if a jira ticket belongs to current project with correct status
   local proj_arg=""
   local jira_key=""
   local jira_status=""
@@ -5841,7 +5858,11 @@ function jira() {
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
 
-  if ! check_proj_ -fmj $i; then return 1; fi
+  if [[ -z "$jira_key" ]]; then
+    if ! check_proj_ -fmj $i; then return 1; fi
+  else
+    if ! check_proj_ -fm $i; then return 1; fi
+  fi
   
   local single_mode="${PUMP_SINGLE_MODE[$i]}"
   local proj_folder="${PUMP_FOLDER[$i]}"
@@ -5852,6 +5873,7 @@ function jira() {
   local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
   local jira_proj="${PUMP_JIRA_PROJ[$i]}"
 
+  # transitioning status
   if (( jira_is_s || jira_is_r || jira_is_c || jira_is_p )); then
     if [[ -z "$jira_key" ]]; then
       print " missing key argument" >&2
@@ -5875,7 +5897,7 @@ function jira() {
       fi
     fi
 
-    local current_jira_status=$(acli jira workitem view "$jira_key" --fields status --json | jq -r '.fields.status.name')
+    local current_jira_status=$(acli jira workitem view "$jira_key" --fields="status" --json | jq -r '.fields.status.name')
     if [[ -z "$current_jira_status" ]]; then
       print " fatal: cannot find jira key: $jira_key" >&2
       return 1;
@@ -5906,20 +5928,18 @@ function jira() {
     fi
 
     return $?;
-  fi
+  fi # end of transitioning status
 
   if (( single_mode )); then
-    if [[ ! -d "$proj_folder" || -z "$(ls "$proj_folder" 2>/dev/null)" ]]; then
-      print " cannot run jira before cloning the project" >&2
-      print " run ${yellow_cor}clone -h${reset_cor} to see usage" >&2
-      return 1;
+    if ! is_folder_git_ "$proj_folder" &>/dev/null; then
+      clone "$proj_arg" "$jira_key"
+      return $?;
     fi
   else
-    local working_proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
-    if [[ -z "$working_proj_folder" || ! -d "$working_proj_folder" || -z "$(ls "$working_proj_folder" 2>/dev/null)" ]]; then
-      print " cannot run jira before cloning the project" >&2
-      print " run ${yellow_cor}clone -h${reset_cor} to see usage" >&2
-      return 1;
+    proj_folder=$(get_proj_for_git_ "$proj_folder" "$proj_arg" 2>/dev/null)
+    if [[ -z "$proj_folder" ]]; then
+      clone "$proj_arg" "$jira_key"
+      return $?;
     fi
   fi
 
@@ -5928,42 +5948,46 @@ function jira() {
     if [[ -z "$jira_key" ]]; then return 1; fi
   fi
 
-  acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
+  local open_work=0
+  local branch_found="$(select_branch_ -ai "$jira_key" "" "$proj_folder")"
 
-  # start the work by transitioning the ticket
-  jira -p "$proj_arg" "$jira_key"
+  if [[ -n "$branch_found" ]]; then
+    confirm_ "branch found: ${green_prompt_cor}${branch_found}${reset_prompt_cor}, open branch or create a new one?" "open" "create new";
+    local _RET=$?
+    if (( _RET == 130 || _RET == 2 )); then return 1; fi
+    if (( _RET == 0 )); then
+      open_work=1
+    fi
+  fi
 
   # then ether create a new branch or new folder/clone
   if (( single_mode )); then
-    fetch "$proj_folder" --quiet
+    local branch_name=""
 
-    local branch_name="$jira_key"
-
-    if [[ -z "$pump_no_monogram" ]]; then
-      confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
-      local _RET=$?
-      if (( _RET == 130 || _RET == 2 )); then return 1; fi
-      if (( _RET == 0 )); then
-        branch_name="${${USER:0:1}:l}-${jira_key}"
-        confirm_ "save preference to use initials and don't ask again?"
-      else
-        confirm_ "save preference to not use initials and don't ask again?"
-      fi
-      local _RET2=$?
-      if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
-      if (( _RET2 == 0 )); then
-        update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
-      fi
-    elif (( pump_no_monogram == 0 )); then
-      branch_name="${${USER:0:1}:l}-${jira_key}"
-    fi
-
-    local find_branch=$(git -C "$proj_folder" branch --all --list "$branch_name" --format="%(refname:short)")
-
-    if [[ -n "$find_branch" ]]; then
-      cd "$proj_folder"
-      co -e "$branch_name"
+    if (( open_work )); then
+      co -e "$branch_found" --quiet
     else
+      branch_name="$jira_key"
+
+      if [[ -z "$pump_no_monogram" ]]; then
+        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
+        local _RET=$?
+        if (( _RET == 130 || _RET == 2 )); then return 1; fi
+        if (( _RET == 0 )); then
+          branch_name="${${USER:0:1}:l}-${jira_key}"
+          confirm_ "save preference to use initials and don't ask again?"
+        else
+          confirm_ "save preference to not use initials and don't ask again?"
+        fi
+        local _RET2=$?
+        if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+        if (( _RET2 == 0 )); then
+          update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+        fi
+      elif (( pump_no_monogram == 0 )); then
+        branch_name="${${USER:0:1}:l}-${jira_key}"
+      fi
+
       local default_branch=$(get_default_branch_ "$proj_folder")
       
       if [[ -z "$default_branch" ]]; then
@@ -5972,12 +5996,21 @@ function jira() {
         return 1;
       fi
 
-      cd "$proj_folder"
       co "$branch_name" "$default_branch"
     fi
+
   else
-    clone "$proj_arg" "$jira_key"
+    if (( open_work )); then
+      clone "$proj_arg" "$branch_found"
+    else
+      clone "$proj_arg" "$jira_key"
+    fi
   fi
+
+  acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
+
+  # start the work by transitioning the ticket
+  jira -p "$proj_arg" "$jira_key"
 
   return $?;
 }
@@ -9070,17 +9103,17 @@ function proj_handler() {
   else
     if [[ -n "$folder_arg" ]]; then
       resolved_folder="${proj_folder}/${folder_arg}"
-    
+
     elif (( ! proj_handler_is_o )); then
       local dirs=("${(@f)$(fl -qp "$proj_folder")}")
-      
+
       if [[ -n "$dirs" ]]; then
         local header="folder to open"
         if (( proj_handler_is_c )); then
           header="folder to close"
         fi
         folder_arg=($(choose_one_ -a "$header" "${dirs[@]}"))
-          
+
         if [[ -n "$folder_arg" ]]; then
           resolved_folder="${proj_folder}/${folder_arg}"
         fi
