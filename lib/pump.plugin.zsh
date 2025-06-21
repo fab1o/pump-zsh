@@ -3844,7 +3844,9 @@ function del_files_() {
   local RET=0
 
   for file in "${files[@]}"; do
-    ((count++))
+    if (( ! del_files_is_s )); then
+      ((count++))
+    fi
 
     local a_file="" # abolute file path
 
@@ -3854,7 +3856,7 @@ function del_files_() {
       file=$(realpath -- "$file" 2>/dev/null)
     fi
 
-    if (( ! del_files_is_s && count > 3 )); then
+    if (( count > 3 )); then
       if (( dont_ask == 0 )); then
         dont_ask=1;
         confirm_ "delete all: ${blue_prompt_cor}${(j:, :)files[$count,-1]}${reset_prompt_cor}?"
@@ -5692,7 +5694,7 @@ function clone() {
     fi
     if ! git -C "$folder_to_clone" checkout -b "$branch_arg" &>/dev/null; then
       if (( ! clone_is_e )); then
-        print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
+        print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}"
       fi
       if ! git -C "$folder_to_clone" checkout "$branch_arg" &>/dev/null; then
         print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
@@ -5905,11 +5907,12 @@ function jira() {
 
     local current_jira_status=$(acli jira workitem view "$jira_key" --fields="status" --json | jq -r '.fields.status.name')
     if [[ -z "$current_jira_status" ]]; then
-      print " fatal: cannot find jira key: $jira_key" >&2
+      print " fatal: cannot find work item: $jira_key" >&2
       return 1;
     fi
 
     if [[ "$current_jira_status" == "$jira_done" || "$current_jira_status" == "$jira_status" ]]; then
+      print " work item: $jira_key is already in status: ${green_cor}${current_jira_status}${reset_cor}"
       return 0;
     fi
 
@@ -5919,7 +5922,7 @@ function jira() {
     local current_user=$(acli jira auth status | awk -F': ' '/Email:/ { print $2 }' 2>/dev/null)
     
     if [[ "$current_jira_assignee" != "$current_user" ]]; then
-      confirm_ "are you sure you want to transition work item: ${green_prompt_cor}${jira_key}${reset_prompt_cor} to status: ${green_prompt_cor}${jira_status}${reset_prompt_cor}?"
+      confirm_ "transition work item ${jira_key} to status: ${green_prompt_cor}${jira_status}${reset_prompt_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 1; fi
     fi
@@ -5974,7 +5977,7 @@ function jira() {
   local branch_found="$(select_branch_ -ai "$jira_key" "" "$proj_folder" 2>/dev/null)"
 
   if [[ -n "$branch_found" ]]; then
-    confirm_ "branch found for work item: ${green_prompt_cor}${branch_found}${reset_prompt_cor}, open branch or create a new one?" "open" "create new";
+    confirm_ "branch found for work item: ${green_prompt_cor}${branch_found}${reset_prompt_cor}, open branch or create a new one?" "open" "create new"
     local _RET=$?
     if (( _RET == 130 || _RET == 2 )); then return 1; fi
     if (( _RET == 0 )); then
@@ -6014,7 +6017,7 @@ function jira() {
     if (( open_existing_work )); then
       co -e "$branch_found"
     else
-      local default_branch=$(get_default_branch_ "$proj_folder")
+      local default_branch=$(get_default_branch_ "$proj_folder" 2>/dev/null)
       
       if [[ -z "$default_branch" ]]; then
         print " could not determine default branch for project: $proj_arg" >&2
@@ -7939,8 +7942,11 @@ function co() {
     fi
 
     local current_branch=$(git branch --show-current)
-    local branch_choice="$(select_branch_ -at "$branch_arg" "branch" "$PWD" "$current_branch")"
-    if [[ -z "$branch_choice" ]]; then return 1; fi
+    local branch_choice="$(select_branch_ -at "$branch_arg" "branch to switch" "$PWD" "$current_branch")"
+    if [[ -z "$branch_choice" ]]; then
+      print " run ${yellow_cor}co -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
 
     if [[ -n "$branch_arg" ]]; then
       co -e "$branch_choice" ${@:2}
@@ -7961,7 +7967,7 @@ function co() {
     local branch_choice=""
     # 2>/dev/null because we call co -a later
     local current_branch=$(git branch --show-current)
-    branch_choice="$(select_branch_ -lt "$branch_arg" "branch" "$PWD" "$current_branch" 2>/dev/null)"
+    branch_choice="$(select_branch_ -lt "$branch_arg" "branch to switch" "$PWD" "$current_branch" 2>/dev/null)"
     if (( $? == 130 )); then return 1; fi
     
     if [[ -z "$branch_choice" ]]; then
@@ -8061,7 +8067,7 @@ function co() {
   local remote_branch=$(get_remote_branch_ "$branch_arg")
 
   if [[ -n "$remote_branch" ]]; then
-    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
+    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}"
     git -C "$folder_to_clone" checkout "$remote_branch" ${@:3}
     return 1;
   fi
@@ -8078,7 +8084,7 @@ function co() {
 
   if ! git checkout -b "$branch_arg" "$base_branch" ${@:3}; then
     RET=1;
-    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}" >&2
+    print " ${yellow_cor}warning: did not create a new branch because it already exists: ${branch_arg}${reset_cor}"
     if ! git checkout "$branch_arg" ${@:3}; then
       print " ${red_cor}fatal: failed to checkout branch: $branch_arg" >&2
     fi
@@ -8574,9 +8580,26 @@ function delb() {
   if [[ -z "$selected_branches" ]]; then return 1; fi
 
   local RET=0
+  local count=0
+  local dont_ask=0
 
   local branch=""
   for branch in "${selected_branches[@]}"; do
+    if (( ! delb_is_s && ! delb_is_r )); then
+      (( count++ ))
+    fi
+    if (( dont_ask == 0 && count > 3 )); then
+      dont_ask=1;
+      confirm_ "delete all: ${blue_prompt_cor}${(j:, :)selected_branches[$count,-1]}${reset_prompt_cor}?"
+      RET=$?
+      if (( RET == 130 )); then
+        break;
+      elif (( RET == 1 )); then
+        count=0
+      else
+        delb_is_s=1
+      fi
+    fi
     if (( ! delb_is_s || delb_is_r )); then
       local origin=$( (( delb_is_r )) && echo "remote" || echo "local" )
       confirm_ "delete ${origin} branch: ${magenta_prompt_cor}${branch}${reset_prompt_cor}?"
