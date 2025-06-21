@@ -5791,13 +5791,12 @@ function select_jira_key_() {
   local tickets=$(acli jira workitem search --jql "project='$jira_proj' AND ((assignee IS EMPTY AND status='To Do') OR (assignee=currentUser() AND status!='$jira_done')) AND \
     Sprint IS NOT EMPTY ORDER BY priority DESC" --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
   if [[ -z "$tickets" ]]; then
-    print " no jira projects found" >&2
-    print " run ${yellow_cor}acli jira auth login --web${reset_cor} to make sure you are authenticated" >&2
+    print " no jira work items found for $jira_proj" >&2
     return 1;
   fi
 
   local ticket=""
-  ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
+  ticket=$(choose_one_ "jira work item" "${(@f)$(printf "%s\n" "$tickets")}")
   if [[ -z "$ticket" ]]; then return 1; fi
 
   local jira_key=${ticket%% *}
@@ -5948,46 +5947,49 @@ function jira() {
     if [[ -z "$jira_key" ]]; then return 1; fi
   fi
 
-  local open_work=0
-  local branch_found="$(select_branch_ -ai "$jira_key" "" "$proj_folder")"
+  local branch_name=""
+  local branch_found="$(select_branch_ -ai "$jira_key" "" "$proj_folder" 2>/dev/null)"
 
   if [[ -n "$branch_found" ]]; then
-    confirm_ "branch found: ${green_prompt_cor}${branch_found}${reset_prompt_cor}, open branch or create a new one?" "open" "create new";
+    confirm_ "branch found for work item: ${green_prompt_cor}${branch_found}${reset_prompt_cor}, open branch or create a new one?" "open" "create new";
     local _RET=$?
     if (( _RET == 130 || _RET == 2 )); then return 1; fi
     if (( _RET == 0 )); then
-      open_work=1
+      branch_name="$branch_found"
     fi
   fi
 
+  if [[ -z "$branch_name" ]]; then
+    branch_name="$jira_key"
+
+    if [[ -z "$pump_no_monogram" ]]; then
+      confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
+      local _RET=$?
+      if (( _RET == 130 || _RET == 2 )); then return 1; fi
+      if (( _RET == 0 )); then
+        branch_name="${${USER:0:1}:l}-${jira_key}"
+        confirm_ "save preference to use initials and don't ask again?"
+      else
+        confirm_ "save preference to not use initials and don't ask again?"
+      fi
+      local _RET2=$?
+      if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
+      if (( _RET2 == 0 )); then
+        update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
+      fi
+    elif (( pump_no_monogram == 0 )); then
+      branch_name="${${USER:0:1}:l}-${jira_key}"
+    fi
+  fi
+
+  local RET=1
+
   # then ether create a new branch or new folder/clone
   if (( single_mode )); then
-    local branch_name=""
-
-    if (( open_work )); then
-      co -e "$branch_found" --quiet
+    if [[ "$branch_name" == "$branch_found" ]]; then
+      co -e "$branch_name" --quiet
+      RET=$?
     else
-      branch_name="$jira_key"
-
-      if [[ -z "$pump_no_monogram" ]]; then
-        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
-        local _RET=$?
-        if (( _RET == 130 || _RET == 2 )); then return 1; fi
-        if (( _RET == 0 )); then
-          branch_name="${${USER:0:1}:l}-${jira_key}"
-          confirm_ "save preference to use initials and don't ask again?"
-        else
-          confirm_ "save preference to not use initials and don't ask again?"
-        fi
-        local _RET2=$?
-        if (( _RET2 == 130 || _RET2 == 2 )); then return 130; fi
-        if (( _RET2 == 0 )); then
-          update_setting_ $i "PUMP_NO_MONOGRAM" $_RET &>/dev/null
-        fi
-      elif (( pump_no_monogram == 0 )); then
-        branch_name="${${USER:0:1}:l}-${jira_key}"
-      fi
-
       local default_branch=$(get_default_branch_ "$proj_folder")
       
       if [[ -z "$default_branch" ]]; then
@@ -5997,20 +5999,18 @@ function jira() {
       fi
 
       co "$branch_name" "$default_branch"
+      RET=$?
     fi
 
   else
-    if (( open_work )); then
-      clone "$proj_arg" "$branch_found"
-    else
-      clone "$proj_arg" "$jira_key"
-    fi
+    clone "$proj_arg" "$branch_name"
+    RET=$?
   fi
 
-  acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
-
-  # start the work by transitioning the ticket
-  jira -p "$proj_arg" "$jira_key"
+  if (( RET == 0 )); then
+    acli jira workitem assign --key="$jira_key" --assignee="@me" --yes
+    jira -p "$proj_arg" "$jira_key"
+  fi
 
   return $?;
 }
