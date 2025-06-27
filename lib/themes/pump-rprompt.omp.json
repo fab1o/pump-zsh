@@ -1,8 +1,6 @@
-// // .copy and paste into your .zshrc file and uncomment the lines below
-// ZSH_THEME=""
-// PROMPT=""
-// plugins=(pump)
-// // oh-my-posh theme:
+// // .copy and paste into your .zshrc file at the end of the file
+// and uncomment the line below
+//
 // eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump-rprompt.omp.json)"
 
 {

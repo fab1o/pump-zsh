@@ -1,4 +1,5 @@
-## .copy and paste into your .zshrc file and uncomment the lines below
+## .copy and paste into your .zshrc file just before line "source $ZSH/oh-my-zsh.sh"
+## and uncomment the lines below
 # ZSH_THEME=pump-git-rprompt
 # PROMPT=➜
 # plugins=(git-prompt pump)
