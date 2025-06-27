@@ -6714,6 +6714,8 @@ function glog() {
   local default_branch=$(get_default_branch_ "$folder" 2>/dev/null)
   local remote_name=$(get_remote_origin_ "$folder")
 
+  print ""
+
   if (( glog_is_c )); then
     if (( glog_is_a )); then
       git -C "$folder" --no-pager log "$branch_arg" HEAD --oneline --graph --date=relative --no-decorate $@
@@ -6824,7 +6826,6 @@ function push() {
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} && ! push_is_q )); then
-    print ""
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
@@ -6914,7 +6915,6 @@ function pushf() {
   fi
 
   if (( RET == 0 && ! ${argv[(Ie)--quiet]} && ! pushf_is_q )); then
-    print ""
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
@@ -7027,7 +7027,6 @@ function pull() {
   fi
 
   if (( RET == 0 && ! is_quiet )); then
-    print ""
     glog -ca "$branch_arg" "$folder" -1
     # no pbcopy
   fi
@@ -7184,12 +7183,13 @@ function drelease() {
 
 function release() {
   set +x
-  eval "$(parse_flags_ "release_" "mnps" "" "$@")"
+  eval "$(parse_flags_ "release_" "mnpsr" "" "$@")"
   (( release_is_d )) && set -x
 
   if (( release_is_h )); then
     print "  ${yellow_cor}release ${solid_yellow_cor}<pro>${reset_cor} : to create a new release of package.json version"
     print "  ${yellow_cor}release ${solid_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
+    print "  ${yellow_cor}release -r${reset_cor} : re-release if version is already released"
     print "  ${yellow_cor}release -s${reset_cor} : skip confirmation"
     print "  --"
     print "  ${yellow_cor}release -m${reset_cor} : bump the major version by 1 and create a release"
@@ -7348,15 +7348,19 @@ function release() {
   cd "$proj_folder"
 
   if gh release view "$tag" 1>/dev/null 2>&1; then
-    if (( ! release_is_s )); then
-      if ! confirm_ "$tag has already been released, delete and release again?"; then
-        cd "$_pwd"
-        add-zsh-hook chpwd pump_chpwd_
-        return 1;
+    if (( release_is_r )); then
+      gh release delete "$tag" --yes
+    else
+      cd "$_pwd"
+      add-zsh-hook chpwd pump_chpwd_
+      print " fatal: release already exists: $tag" >&2
+      if [[ "$proj_arg" == "$CURRENT_PUMP_SHORT_NAME" ]]; then
+        print " run ${yellow_cor}release -rs ${tag}${reset_cor} to re-release it" >&2
+      else
+        print " run ${yellow_cor}release -rs ${proj_arg} ${tag}${reset_cor} to re-release it" >&2
       fi
+      return 1;
     fi
-    release_is_s=1
-    gh release delete "$tag" --yes
   fi
 
   cd "$_pwd"
@@ -7365,12 +7369,17 @@ function release() {
   # check if tag already exists
   local existing_tag="$(git -C "$proj_folder" tag --list "$tag" 2>/dev/null)"
   if [[ -n "$existing_tag" ]]; then
-    if (( ! release_is_s )); then
-      if ! confirm_ "$tag already exists, delete and release again?"; then
-        return 1;
+    if (( release_is_r )); then
+      if ! dtag "$proj_arg" "$tag" --quiet; then return 1; fi
+    else
+      print " fatal: tag already exists: $tag" >&2
+      if [[ "$proj_arg" == "$CURRENT_PUMP_SHORT_NAME" ]]; then
+        print " run ${yellow_cor}release -rs ${tag}${reset_cor} to re-release it" >&2
+      else
+        print " run ${yellow_cor}release -rs ${proj_arg} ${tag}${reset_cor} to re-release it" >&2
       fi
+      return 1;
     fi
-    if ! dtag "$proj_arg" "$tag" --quiet; then return 1; fi
   fi
 
   if ! tag "$proj_arg" "$tag"; then return 1; fi
@@ -7515,9 +7524,9 @@ function tags() {
 
   local tags=""
 
-  if (( n == 1 )); then
-    tags=$(git -C "$proj_folder" describe --tags --abbrev=0 2>/dev/null)
-  fi
+  # if (( n == 1 )); then
+  #   tags=$(git -C "$proj_folder" describe --tags --abbrev=0 2>/dev/null)
+  # fi
 
   if [[ -z "$tags" ]]; then
     tags=$(git -C "$proj_folder" for-each-ref refs/tags --sort=-creatordate --format='%(creatordate:short)\t%(refname:short)' --count="$n")
