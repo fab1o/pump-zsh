@@ -9787,9 +9787,9 @@ function help() {
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "chp" "cherry-pick commit"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "continue rebase/merge/chp"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "mc" "continue merge"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merge"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merging"
   printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "rc" "continue rebase"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebase"
+  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebasing"
   
   if ! pause_output_; then return 0; fi
   
