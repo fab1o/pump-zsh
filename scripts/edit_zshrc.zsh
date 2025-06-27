@@ -68,13 +68,16 @@ if [[ $found_pump_plugin -eq 0 ]]; then
 fi
 
 if ! grep -q '^ZSH_THEME="pump"$' "$zshrc_file"; then
-  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update Oh My Zsh theme to pump? (y/n) "
+  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update Oh My Zsh theme to pump? Choose 'no' if you use Oh My Posh or your own custom Oh My Zsh theme (y/n) "
   if [[ $REPLY == [yY] ]]; then
     print "y"
   elif [[ $REPLY == [nN] ]]; then
     print "n"
+    print ""
     exit 0;
   fi
+
+  print ""
 
   if grep -q '^ZSH_THEME=' "$zshrc_file"; then
     # If ZSH_THEME is found, update it to ZSH_THEME="pump"
