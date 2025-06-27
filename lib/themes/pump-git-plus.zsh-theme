@@ -1,6 +1,6 @@
 ## .copy and paste into your .zshrc file and uncomment the lines below
-# ZSH_THEME="pump-git-plus"
-# PROMPT="➜"
+# ZSH_THEME=pump-git-plus
+# PROMPT=➜
 # plugins=(git-prompt pump)
 
 PROMPT="%(?:%{$fg_bold[green]%}%1{$PROMPT%}:%{$fg_bold[red]%}%1{$PROMPT%}) %{$fg[cyan]%}%c%{$reset_color%}"

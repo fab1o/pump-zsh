@@ -67,33 +67,15 @@ if [[ $found_pump_plugin -eq 0 ]]; then
   print " added pump to your plugins=(...)"
 fi
 
-if ! grep -q '^ZSH_THEME="pump"$' "$zshrc_file"; then
-  read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update Oh My Zsh theme to pump? Choose 'no' if you use Oh My Posh or your own custom Oh My Zsh theme (y/n) "
-  if [[ $REPLY == [yY] ]]; then
-    print "y"
-  elif [[ $REPLY == [nN] ]]; then
-    print "n"
-    print ""
-    exit 0;
-  fi
-
-  print ""
-
-  if grep -q '^ZSH_THEME=' "$zshrc_file"; then
-    # If ZSH_THEME is found, update it to ZSH_THEME="pump"
-    if [[ "$(uname)" == "Darwin" ]]; then
-      # macOS (BSD sed) requires correct handling of patterns
-      sed -i '' 's/^ZSH_THEME=.*$/ZSH_THEME="pump"/' "$zshrc_file"
-    else
-      # Linux (GNU sed)
-      sed -i 's/^ZSH_THEME=.*$/ZSH_THEME="pump"/' "$zshrc_file"
-    fi
-  else
-    print " ZSH_THEME not found in file: $zshrc_file" >&2
-    print " update theme manually by adding this to your file:" >&2
-    print "##################" >&2
-    print "ZSH_THEME=\"pump\"" >&2
-    print "##################" >&2
-    exit 1
-  fi
+if grep -q '^ZSH_THEME=pump-git$' "$zshrc_file"; then
+  exit 0;
 fi
+
+# read -qs "?"$'\e[38;5;99m'confirm:$'\e[0m'" update Oh My Zsh theme to pump? Choose 'no' if you use Oh My Posh or your own custom Oh My Zsh theme (y/n) "
+# if [[ $REPLY == [yY] ]]; then
+#   print "y"
+# elif [[ $REPLY == [nN] ]]; then
+#   print "n"
+#   print ""
+#   exit 0;
+# fi

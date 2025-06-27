@@ -1,6 +1,6 @@
 ## .copy and paste into your .zshrc file and uncomment the lines below
-# ZSH_THEME="pump-git-timer"
-# PROMPT="➜"
+# ZSH_THEME=pump-git-timer
+# PROMPT=➜
 # plugins=(git-prompt pump)
 
 function pump_git_super_status() {
