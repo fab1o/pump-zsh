@@ -1,59 +1,49 @@
 typeset -g is_debug=0 # (debug flag) when -d is on, it will be shared across all subsequent function calls
-typeset -g MAX_NAME_COUNT=15
 
-typeset -g dark_gray_cor="\e[38;5;240m"
-typeset -g gray_cor="\e[38;5;248m"
+# regular colors
+typeset -g black_cor=$'\e[0;30m'
+typeset -g red_cor=$'\e[0;31m'
+typeset -g green_cor=$'\e[0;32m'
+typeset -g yellow_cor=$'\e[0;33m'
+typeset -g blue_cor=$'\e[0;34m'
+typeset -g magenta_cor=$'\e[0;35m'
+typeset -g cyan_cor=$'\e[0;36m'
+typeset -g white_cor=$'\e[0;37m'
 
-typeset -g bright_green_cor="\e[1m\e[38;5;151m"
-typeset -g solid_green_cor="\e[32m"
-typeset -g green_cor="\e[92m"
+# special colors
+typeset -g purple_cor=$'\e[38;5;99m'
+typeset -g bold_purple_cor=$'\e[1;38;5;99m'
+typeset -g pink_cor=$'\e[38;5;212m'
+typeset -g bold_pink_cor=$'\e[1;38;5;212m'
+typeset -g orange_cor=$'\e[38;5;208m'
+typeset -g dark_orange_cor=$'\e[38;5;202m'
+typeset -g gray_cor=$'\e[38;5;248m'
 
-# typeset -g bright_yellow_cor="\e[1m\e[38;5;220m"
-typeset -g bright_yellow_cor="\e[1m\e[38;5;228m"
-typeset -g solid_yellow_cor="\e[33m"
-typeset -g yellow_cor="\e[93m"
+# bold (bright) colors
+typeset -g bold_black_cor=$'\e[1;30m'
+typeset -g bold_red_cor=$'\e[1;31m'
+typeset -g bold_green_cor=$'\e[1;32m'
+typeset -g bold_yellow_cor=$'\e[1;33m'
+typeset -g bold_blue_cor=$'\e[1;34m'
+typeset -g bold_magenta_cor=$'\e[1;35m'
+typeset -g bold_cyan_cor=$'\e[1;36m'
+typeset -g bold_white_cor=$'\e[1;37m'
 
-typeset -g orange_cor="\e[38;5;208m"
-typeset -g dark_orange_cor="\e[38;5;202m"
+# high-intensity colors (90–97)
+typeset -g hi_black_cor=$'\e[0;90m'
+typeset -g hi_red_cor=$'\e[0;91m'
+typeset -g hi_green_cor=$'\e[0;92m'
+typeset -g hi_yellow_cor=$'\e[0;93m'
+typeset -g hi_blue_cor=$'\e[0;94m'
+typeset -g hi_magenta_cor=$'\e[0;95m'
+typeset -g hi_cyan_cor=$'\e[0;96m'
+typeset -g hi_white_cor=$'\e[0;97m'
 
-typeset -g bright_red_cor="\e[38;5;160m"
-typeset -g solid_red_cor="\e[31m"
-typeset -g red_cor="\e[91m"
-
-typeset -g bright_magenta_cor="\e[38;5;201m"
-typeset -g solid_magenta_cor="\e[35m"
-typeset -g magenta_cor="\e[95m"
-
-typeset -g bright_blue_cor="\e[1m\e[38;5;75m"
-typeset -g solid_blue_cor="\e[34m"
-typeset -g blue_cor="\e[94m"
-
-typeset -g bright_cyan_cor="\e[1m\e[36m"
-typeset -g solid_cyan_cor="\e[36m"
-typeset -g cyan_cor="\e[96m"
-
-typeset -g solid_pink_cor="\e[0;95m"
-typeset -g pink_cor="\e[38;5;212m"
-
-typeset -g purple_cor="\e[38;5;99m"
-
-typeset -g reset_cor="\e[0m"
-
-typeset -g green_prompt_cor=$'\e[32m'
-typeset -g blue_prompt_cor=$'\e[0;94m'
-typeset -g magenta_prompt_cor=$'\e[0;95m'
-
-typeset -g bright_pink_prompt_cor=$'\e[38;5;201m'
-typeset -g pink_prompt_cor=$'\e[38;5;212m'
-
-typeset -g purple_prompt_cor=$'\e[38;5;99m'
-typeset -g bold_purple_prompt_cor=$'\e[1;38;5;99m'
-typeset -g light_purple_prompt_cor=$'\e[38;2;167;139;250m'
-
-typeset -g reset_prompt_cor=$'\e[0m'
+# text attributes
+typeset -g bold_cor=$'\e[1m'
+typeset -g reset_cor=$'\e[0m'
 
 typeset -g PUMP_VERSION="0.0.0"
-
 typeset -g PUMP_VERSION_FILE="$(dirname "$0")/.version"
 typeset -g PUMP_CONFIG_FILE="$(dirname "$0")/config/pump.zshenv"
 
@@ -210,13 +200,13 @@ function confirm_() {
     # VERY IMPORTANT: 2>/dev/tty to display on VSCode Terminal and on refresh
     ##########################################################################
     if (( change_default )); then
-      gum confirm "confirm:${reset_prompt_cor} $question" \
+      gum confirm "confirm:${reset_cor} $question" \
         --no-show-help \
         --default=false \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
     else
-      gum confirm "confirm:${reset_prompt_cor} $question" \
+      gum confirm "confirm:${reset_cor} $question" \
         --no-show-help \
         --affirmative="$option1" \
         --negative="$option2" 2>/dev/tty
@@ -278,9 +268,11 @@ function update_() {
       print " updating pump-zsh..."
       zsh -c "$(curl -H "Cache-Control: no-cache" -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/update.zsh)"
     fi
+
     PUMP_VERSION=$(<"$PUMP_VERSION_FILE")
-    print " pump version: ${purple_cor}$PUMP_VERSION${reset_cor}"
+    print " pump version: ${purple_cor}${PUMP_VERSION}${reset_cor}"
     zsh
+
     return 0;
   else
     if (( update_is_f )); then
@@ -295,7 +287,14 @@ update_
 function cl() {
   set +x
   is_debug=0
-  tput reset
+
+  # if command -v tput; then
+  #   tput clear
+  # elif command -v clear; then
+  #   clear
+  # else
+  printf "\033c"
+  # fi
 }
 
 function input_from_() {
@@ -307,7 +306,7 @@ function input_from_() {
   local _input=""
 
   # >&2 needs to display because this is called from a subshell
-  print " ${light_purple_prompt_cor}${header}:${reset_cor}" >&2
+  print " ${bold_purple_cor}${header}:${reset_cor}" >&2
 
   if command -v gum &>/dev/null; then
     _input=$(gum input --placeholder="$placeholder" --char-limit="$max" --value="$value")
@@ -352,7 +351,7 @@ function filter_one_() {
   local RET=0
 
   if command -v gum &>/dev/null; then
-    print "${bold_purple_prompt_cor} choose $header: ${reset_cor}" >&2
+    print "${bold_purple_cor} choose $header: ${reset_cor}" >&2
     
     local choice=""
     
@@ -387,9 +386,9 @@ function choose_one_() {
   if command -v gum &>/dev/null; then
     local choice=""
     if (( choose_one_is_a )); then
-      choice="$(gum choose --select-if-one --height="20" --limit=1 --header=" choose $header:${reset_prompt_cor}" -- ${@:2} 2>/dev/tty)"
+      choice="$(gum choose --select-if-one --height="20" --limit=1 --header=" choose $header:${reset_cor}" -- ${@:2} 2>/dev/tty)"
     else
-      choice="$(gum choose --height="20" --limit=1 --header=" choose $header:${reset_prompt_cor}" -- ${@:2} 2>/dev/tty)"
+      choice="$(gum choose --height="20" --limit=1 --header=" choose $header:${reset_cor}" -- ${@:2} 2>/dev/tty)"
     fi
     RET=$?
     if (( RET != 0 )); then return $RET; fi
@@ -400,7 +399,7 @@ function choose_one_() {
   
   trap 'print ""; return 130' INT # for some reason it returns 2
 
-  PS3="${light_purple_prompt_cor}choose $header: ${reset_prompt_cor}"
+  PS3="${bold_purple_cor}choose $header: ${reset_cor}"
 
   select choice in "${@:2}" "quit"; do
     case $choice in
@@ -430,9 +429,9 @@ function choose_multiple_() {
   if command -v gum &>/dev/null; then
     local choice=""
     if (( choose_multiple_is_a )); then
-      choices="$(gum choose --select-if-one --height="20" --no-limit --header=" choose multiple $header ${light_purple_prompt_cor}(use spacebar to select)${bold_purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
+      choices="$(gum choose --select-if-one --height="20" --no-limit --header=" choose multiple $header ${bold_purple_cor}(use spacebar to select)${bold_purple_cor}:${reset_cor}" -- ${@:2})"
     else
-      choices="$(gum choose --height="20" --no-limit --header=" choose multiple $header ${light_purple_prompt_cor}(use spacebar to select)${bold_purple_prompt_cor}:${reset_prompt_cor}" -- ${@:2})"
+      choices="$(gum choose --height="20" --no-limit --header=" choose multiple $header ${bold_purple_cor}(use spacebar to select)${bold_purple_cor}:${reset_cor}" -- ${@:2})"
     fi
     RET=$?
     
@@ -445,7 +444,7 @@ function choose_multiple_() {
   trap 'print ""; return 130' INT # for some reason it returns 2
 
   choices=()
-  PS3="${light_purple_prompt_cor}choose multiple $header, then choose \"done\" to finish ${choices[*]}${reset_prompt_cor}"
+  PS3="${bold_purple_cor}choose multiple $header, then choose \"done\" to finish ${choices[*]}${reset_cor}"
 
   select choice in "${@:2}" "done"; do
     case $choice in
@@ -559,7 +558,7 @@ function update_setting_() {
     print "   • check if you have write permissions to the file: $PUMP_CONFIG_FILE" >&2
     print "   • re-install pump-zsh" >&2
   else
-    print " updated setting: [${solid_magenta_cor}${key}_$i=${reset_cor}${gray_cor}${value}${reset_cor}]"
+    print " updated setting: [${hi_magenta_cor}${key}_$i=${reset_cor}${gray_cor}${value}${reset_cor}]"
   fi
 
   return 0;
@@ -586,7 +585,7 @@ function input_branch_name_() {
 function input_name_() {
   local header="$1"
   local placeholder="$2"
-  local max="${3:-$MAX_NAME_COUNT}"
+  local max="${3:-15}"
 
   while true; do
     local typed_value=""
@@ -627,7 +626,7 @@ function find_proj_folder_() {
 
   # >&2 needs to display because this is called from a subshell
   # print " ${header}:" >&2
-  print "${light_purple_prompt_cor} ${header}:${reset_cor}" >&2
+  print "${bold_purple_cor} ${header}:${reset_cor}" >&2
   print "" >&2
 
   add-zsh-hook -d chpwd pump_chpwd_
@@ -652,7 +651,7 @@ function find_proj_folder_() {
         print "  ${red_cor}not a folder, please select a folder${reset_cor}" >&2
         cd "$HOME"
       else
-        confirm_ "set project folder to: ${blue_prompt_cor}${realfolder}${reset_prompt_cor} or continue to browse further?" "set folder" "continue to browse"
+        confirm_ "set project folder to: ${blue_cor}${realfolder}${reset_cor} or continue to browse further?" "set folder" "continue to browse"
         RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if (( RET == 1 )); then
@@ -1213,7 +1212,7 @@ function choose_mode_() {
 
   local default=$( (( mode )) && echo "single" || echo "multiple" )
 
-  confirm_ "manage the project with ${pink_prompt_cor}multiple${reset_prompt_cor} or ${purple_prompt_cor}single${reset_prompt_cor} mode?" "multiple" "single" "$default"
+  confirm_ "manage the project with ${pink_cor}multiple${reset_cor} or ${purple_cor}single${reset_cor} mode?" "multiple" "single" "$default"
   local RET=$?
 
   local i=0
@@ -1575,7 +1574,7 @@ function save_proj_cmd_() {
   local old_proj_cmd="$3"
 
   local typed_proj_cmd=""
-  typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name" 2>/dev/tty)
+  typed_proj_cmd=$(input_name_ "type your project name" "$pkg_name" 10 2>/dev/tty)
   if (( $? == 130 || $? == 2 )); then return 130; fi
   if [[ -z "$typed_proj_cmd" ]]; then return 1; fi
 
@@ -1676,7 +1675,7 @@ function save_proj_folder_() {
       local proj_found=$(find_proj_by_folder_)
       if [[ -z "$proj_found" ]]; then
         # ask to use pwd
-        confirm_ "use as project folder: ${blue_prompt_cor}${PWD}${reset_prompt_cor}?"
+        confirm_ "use as project folder: ${blue_cor}${PWD}${reset_cor}?"
         RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if (( RET == 0 )); then
@@ -1690,7 +1689,7 @@ function save_proj_folder_() {
   local RET=0
   
   if (( save_proj_folder_is_e )) && [[ -n "$proj_folder" ]]; then
-    confirm_ "keep using project folder: ${blue_prompt_cor}$proj_folder${reset_prompt_cor}?"
+    confirm_ "keep using project folder: ${blue_cor}$proj_folder${reset_cor}?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1777,7 +1776,7 @@ function save_proj_repo_() {
 
   if (( ! save_proj_repo_is_f )); then
     if (( save_proj_repo_is_e )) && [[ -n "$proj_repo" ]]; then
-      confirm_ "keep using repository: ${blue_prompt_cor}$proj_repo${reset_prompt_cor}?"
+      confirm_ "keep using repository: ${blue_cor}$proj_repo${reset_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 1 )); then
@@ -1859,7 +1858,7 @@ function save_pkg_manager_() {
   local RET=0
 
   if [[ -n "$pkg_manager" ]] && (( ! save_pkg_manager_is_f )); then
-    confirm_ "set package manager ${pink_prompt_cor}${pkg_manager}${reset_prompt_cor}?"
+    confirm_ "set package manager ${pink_cor}${pkg_manager}${reset_cor}?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then
@@ -1905,10 +1904,10 @@ function save_proj_f_() {
   TEMP_PUMP_REPO=""
   TEMP_PUMP_SHORT_NAME=""
   TEMP_SAVE_CMD_ATTEMPTS=0
-  SAVE_COR="${bright_yellow_cor}"
+  SAVE_COR="${bold_yellow_cor}"
 
   if (( save_proj_f_is_a )); then
-    SAVE_COR="${bright_green_cor}"
+    SAVE_COR="${bold_green_cor}"
     display_line_ "add new project" "${SAVE_COR}"
     print "" >&1
   fi
@@ -1969,10 +1968,10 @@ function save_proj_() {
 
   # display header
   if (( save_proj_is_e )); then
-    SAVE_COR="${bright_yellow_cor}"
+    SAVE_COR="${bold_yellow_cor}"
     display_line_ "edit project: ${proj_name}" "${SAVE_COR}"
   else
-    SAVE_COR="${bright_green_cor}"
+    SAVE_COR="${bold_green_cor}"
     display_line_ "add new project" "${SAVE_COR}"
   fi
 
@@ -2051,7 +2050,7 @@ function save_proj_() {
   fi
   
   if (( display_msg )); then
-    print " now run command: ${solid_blue_cor}${PUMP_SHORT_NAME[$i]}${reset_cor}" >&1
+    print " now run command: ${blue_cor}${PUMP_SHORT_NAME[$i]}${reset_cor}" >&1
   fi
 }
 # end of save project data to config file =========================================
@@ -2081,16 +2080,15 @@ function unset_aliases_() {
   unalias be2eui &>/dev/null
   unalias btestw &>/dev/null 
 
-  unset -f i &>/dev/null
   unset -f build &>/dev/null
   unset -f deploy &>/dev/null
   unset -f format &>/dev/null
   unset -f ig &>/dev/null
   unset -f lint &>/dev/null
   unset -f rdev &>/dev/null
+  unset -f rstart &>/dev/null
   unset -f sb &>/dev/null
   unset -f sbb &>/dev/null
-  unset -f start &>/dev/null
   unset -f tsc &>/dev/null
   unset -f watch &>/dev/null
 }
@@ -2130,8 +2128,6 @@ function set_aliases_() {
 
   # Reset all aliases
   #unalias -a &>/dev/null
-  alias i="$pkg_manager install"
-  alias install="$pkg_manager install"
   # Package manager aliases =========================================================
   alias build="$pkg_manager run build"
   alias deploy="$pkg_manager run deploy"
@@ -2140,7 +2136,7 @@ function set_aliases_() {
   alias rdev="$pkg_manager run dev"
   alias sb="$pkg_manager run storybook"
   alias sbb="$pkg_manager run storybook:build"
-  alias start="$pkg_manager run start"
+  alias rstart="$pkg_manager run start"
   alias tsc="$pkg_manager run tsc"
   alias watch="$pkg_manager run watch"
 
@@ -2482,91 +2478,91 @@ function get_node_version_() {
 function print_current_proj_() {
   local i="$1"
   
-  display_line_ "" "$dark_gray_cor"
+  display_line_ "" "$gray_cor"
 
   if (( i > 0 )); then
-    print " [${solid_magenta_cor}PUMP_SHORT_NAME_$i=${reset_cor}${gray_cor}${PUMP_SHORT_NAME[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_FOLDER_$i=${reset_cor}${gray_cor}${PUMP_FOLDER[${solid_magenta_cor}$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_REPO_$i=${reset_cor}${gray_cor}${PUMP_REPO[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_SINGLE_MODE_$i=${reset_cor}${gray_cor}${PUMP_SINGLE_MODE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PKG_MANAGER_$i=${reset_cor}${gray_cor}${PUMP_PKG_MANAGER[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_RUN_$i=${reset_cor}${gray_cor}${PUMP_RUN[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_RUN_STAGE_$i=${reset_cor}${gray_cor}${PUMP_RUN_STAGE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_RUN_PROD_$i=${reset_cor}${gray_cor}${PUMP_RUN_PROD[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_SETUP_$i=${reset_cor}${gray_cor}${PUMP_SETUP[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_FIX_$i=${reset_cor}${gray_cor}${PUMP_FIX[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_CLONE_$i=${reset_cor}${gray_cor}${PUMP_CLONE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PRO_$i=${reset_cor}${gray_cor}${PUMP_PRO[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_USE_$i=${reset_cor}${gray_cor}${PUMP_USE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_CODE_EDITOR_$i=${reset_cor}${gray_cor}${PUMP_CODE_EDITOR[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_COV_$i=${reset_cor}${gray_cor}${PUMP_COV[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_OPEN_COV_$i=${reset_cor}${gray_cor}${PUMP_OPEN_COV_[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_TEST_$i=${reset_cor}${gray_cor}${PUMP_TEST[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_RETRY_TEST_$i=${reset_cor}${gray_cor}${PUMP_RETRY_TEST[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_TEST_WATCH_$i=${reset_cor}${gray_cor}${PUMP_TEST_WATCH[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_E2E_$i=${reset_cor}${gray_cor}${PUMP_E2E[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_E2EUI_$i=${reset_cor}${gray_cor}${PUMP_E2EUI[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PR_TEMPLATE_FILE_$i=${reset_cor}${gray_cor}${PUMP_PR_TEMPLATE_FILE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PR_REPLACE_$i=${reset_cor}${gray_cor}${PUMP_PR_REPLACE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PR_APPEND_$i=${reset_cor}${gray_cor}${PUMP_PR_APPEND[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PR_RUN_TEST_$i=${reset_cor}${gray_cor}${PUMP_PR_RUN_TEST[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_COMMIT_ADD_$i=${reset_cor}${gray_cor}${PUMP_COMMIT_ADD[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_REFIX_PUSH_$i=${reset_cor}${gray_cor}${PUMP_REFIX_PUSH[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_REFIX_AMEND_$i=${reset_cor}${gray_cor}${PUMP_REFIX_AMEND[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_GHA_INTERVAL_$i=${reset_cor}${gray_cor}${PUMP_GHA_INTERVAL[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${gray_cor}${PUMP_GHA_WORKFLOW[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${gray_cor}${PUMP_PRINT_README[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${gray_cor}${PUMP_PKG_NAME[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_PROGRESS[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_REVIEW[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${gray_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${gray_cor}${PUMP_NVM_USE_V[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${gray_cor}${PUMP_DEFAULT_BRANCH[$i]}${reset_cor}]"
-    print " [${solid_magenta_cor}PUMP_NO_MONOGRAM_$i=${reset_cor}${gray_cor}${PUMP_NO_MONOGRAM[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_SHORT_NAME_$i=${reset_cor}${gray_cor}${PUMP_SHORT_NAME[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_FOLDER_$i=${reset_cor}${gray_cor}${PUMP_FOLDER[${hi_magenta_cor}$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_REPO_$i=${reset_cor}${gray_cor}${PUMP_REPO[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_SINGLE_MODE_$i=${reset_cor}${gray_cor}${PUMP_SINGLE_MODE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PKG_MANAGER_$i=${reset_cor}${gray_cor}${PUMP_PKG_MANAGER[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_RUN_$i=${reset_cor}${gray_cor}${PUMP_RUN[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_RUN_STAGE_$i=${reset_cor}${gray_cor}${PUMP_RUN_STAGE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_RUN_PROD_$i=${reset_cor}${gray_cor}${PUMP_RUN_PROD[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_SETUP_$i=${reset_cor}${gray_cor}${PUMP_SETUP[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_FIX_$i=${reset_cor}${gray_cor}${PUMP_FIX[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_CLONE_$i=${reset_cor}${gray_cor}${PUMP_CLONE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PRO_$i=${reset_cor}${gray_cor}${PUMP_PRO[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_USE_$i=${reset_cor}${gray_cor}${PUMP_USE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_CODE_EDITOR_$i=${reset_cor}${gray_cor}${PUMP_CODE_EDITOR[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_COV_$i=${reset_cor}${gray_cor}${PUMP_COV[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_OPEN_COV_$i=${reset_cor}${gray_cor}${PUMP_OPEN_COV_[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_TEST_$i=${reset_cor}${gray_cor}${PUMP_TEST[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_RETRY_TEST_$i=${reset_cor}${gray_cor}${PUMP_RETRY_TEST[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_TEST_WATCH_$i=${reset_cor}${gray_cor}${PUMP_TEST_WATCH[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_E2E_$i=${reset_cor}${gray_cor}${PUMP_E2E[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_E2EUI_$i=${reset_cor}${gray_cor}${PUMP_E2EUI[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PR_TEMPLATE_FILE_$i=${reset_cor}${gray_cor}${PUMP_PR_TEMPLATE_FILE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PR_REPLACE_$i=${reset_cor}${gray_cor}${PUMP_PR_REPLACE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PR_APPEND_$i=${reset_cor}${gray_cor}${PUMP_PR_APPEND[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PR_RUN_TEST_$i=${reset_cor}${gray_cor}${PUMP_PR_RUN_TEST[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_COMMIT_ADD_$i=${reset_cor}${gray_cor}${PUMP_COMMIT_ADD[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_REFIX_PUSH_$i=${reset_cor}${gray_cor}${PUMP_REFIX_PUSH[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_REFIX_AMEND_$i=${reset_cor}${gray_cor}${PUMP_REFIX_AMEND[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_GHA_INTERVAL_$i=${reset_cor}${gray_cor}${PUMP_GHA_INTERVAL[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_GHA_WORKFLOW_$i=${reset_cor}${gray_cor}${PUMP_GHA_WORKFLOW[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PRINT_README_$i=${reset_cor}${gray_cor}${PUMP_PRINT_README[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_PKG_NAME_$i=${reset_cor}${gray_cor}${PUMP_PKG_NAME[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_JIRA_IN_PROGRESS_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_PROGRESS[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_JIRA_IN_REVIEW_$i=${reset_cor}${gray_cor}${PUMP_JIRA_IN_REVIEW[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${gray_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${gray_cor}${PUMP_NVM_USE_V[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_DEFAULT_BRANCH_$i=${reset_cor}${gray_cor}${PUMP_DEFAULT_BRANCH[$i]}${reset_cor}]"
+    print " [${hi_magenta_cor}PUMP_NO_MONOGRAM_$i=${reset_cor}${gray_cor}${PUMP_NO_MONOGRAM[$i]}${reset_cor}]"
 
     return 0;
   fi
 
-  print " [${solid_magenta_cor}CURRENT_PUMP_SHORT_NAME=${reset_cor}${gray_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_FOLDER=${reset_cor}${gray_cor}${CURRENT_PUMP_FOLDER}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_REPO=${reset_cor}${gray_cor}${CURRENT_PUMP_REPO}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_SINGLE_MODE=${reset_cor}${gray_cor}${CURRENT_PUMP_SINGLE_MODE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}${gray_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_RUN=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN_STAGE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN_PROD}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_SETUP=${reset_cor}${gray_cor}${CURRENT_PUMP_SETUP}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_FIX=${reset_cor}${gray_cor}${CURRENT_PUMP_FIX}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_CLONE=${reset_cor}${gray_cor}${CURRENT_PUMP_CLONE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PRO=${reset_cor}${gray_cor}${CURRENT_PUMP_PRO}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_USE=${reset_cor}${gray_cor}${CURRENT_PUMP_USE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}${gray_cor}${CURRENT_PUMP_CODE_EDITOR}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_COV=${reset_cor}${gray_cor}${CURRENT_PUMP_COV}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}${gray_cor}${CURRENT_PUMP_OPEN_COV}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_TEST}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_RETRY_TEST}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}${gray_cor}${CURRENT_PUMP_TEST_WATCH}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_E2E=${reset_cor}${gray_cor}${CURRENT_PUMP_E2E}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_E2EUI=${reset_cor}${gray_cor}${CURRENT_PUMP_E2EUI}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PR_TEMPLATE_FILE=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_TEMPLATE_FILE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_REPLACE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_APPEND}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_RUN_TEST}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}${gray_cor}${CURRENT_PUMP_COMMIT_ADD}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_REFIX_PUSH=${reset_cor}${gray_cor}${CURRENT_PUMP_REFIX_PUSH}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_REFIX_AMEND=${reset_cor}${gray_cor}${CURRENT_PUMP_REFIX_AMEND}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}${gray_cor}${CURRENT_PUMP_GHA_INTERVAL}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}${gray_cor}${CURRENT_PUMP_GHA_WORKFLOW}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PRINT_README=${reset_cor}${gray_cor}${CURRENT_PUMP_PRINT_README}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}${gray_cor}${CURRENT_PUMP_PKG_NAME}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_IN_PROGRESS}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_IN_REVIEW}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_DONE}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_SKIP_LOOKUP}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_USE_V}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}${gray_cor}${CURRENT_PUMP_DEFAULT_BRANCH}${reset_cor}]"
-  print " [${solid_magenta_cor}CURRENT_PUMP_NO_MONOGRAM=${reset_cor}${gray_cor}${CURRENT_PUMP_NO_MONOGRAM}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_SHORT_NAME=${reset_cor}${gray_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_FOLDER=${reset_cor}${gray_cor}${CURRENT_PUMP_FOLDER}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_REPO=${reset_cor}${gray_cor}${CURRENT_PUMP_REPO}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_SINGLE_MODE=${reset_cor}${gray_cor}${CURRENT_PUMP_SINGLE_MODE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PKG_MANAGER=${reset_cor}${gray_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_RUN=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_RUN_STAGE=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN_STAGE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_RUN_PROD=${reset_cor}${gray_cor}${CURRENT_PUMP_RUN_PROD}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_SETUP=${reset_cor}${gray_cor}${CURRENT_PUMP_SETUP}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_FIX=${reset_cor}${gray_cor}${CURRENT_PUMP_FIX}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_CLONE=${reset_cor}${gray_cor}${CURRENT_PUMP_CLONE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PRO=${reset_cor}${gray_cor}${CURRENT_PUMP_PRO}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_USE=${reset_cor}${gray_cor}${CURRENT_PUMP_USE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_CODE_EDITOR=${reset_cor}${gray_cor}${CURRENT_PUMP_CODE_EDITOR}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_COV=${reset_cor}${gray_cor}${CURRENT_PUMP_COV}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_OPEN_COV=${reset_cor}${gray_cor}${CURRENT_PUMP_OPEN_COV}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_TEST}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_RETRY_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_RETRY_TEST}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_TEST_WATCH=${reset_cor}${gray_cor}${CURRENT_PUMP_TEST_WATCH}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_E2E=${reset_cor}${gray_cor}${CURRENT_PUMP_E2E}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_E2EUI=${reset_cor}${gray_cor}${CURRENT_PUMP_E2EUI}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PR_TEMPLATE_FILE=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_TEMPLATE_FILE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PR_REPLACE=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_REPLACE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PR_APPEND=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_APPEND}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PR_RUN_TEST=${reset_cor}${gray_cor}${CURRENT_PUMP_PR_RUN_TEST}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_COMMIT_ADD=${reset_cor}${gray_cor}${CURRENT_PUMP_COMMIT_ADD}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_REFIX_PUSH=${reset_cor}${gray_cor}${CURRENT_PUMP_REFIX_PUSH}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_REFIX_AMEND=${reset_cor}${gray_cor}${CURRENT_PUMP_REFIX_AMEND}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_GHA_INTERVAL=${reset_cor}${gray_cor}${CURRENT_PUMP_GHA_INTERVAL}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_GHA_WORKFLOW=${reset_cor}${gray_cor}${CURRENT_PUMP_GHA_WORKFLOW}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PRINT_README=${reset_cor}${gray_cor}${CURRENT_PUMP_PRINT_README}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_PKG_NAME=${reset_cor}${gray_cor}${CURRENT_PUMP_PKG_NAME}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_JIRA_IN_PROGRESS=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_IN_PROGRESS}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_JIRA_REVIEW=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_IN_REVIEW}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}${gray_cor}${CURRENT_PUMP_JIRA_DONE}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_SKIP_LOOKUP}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}${gray_cor}${CURRENT_PUMP_NVM_USE_V}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_DEFAULT_BRANCH=${reset_cor}${gray_cor}${CURRENT_PUMP_DEFAULT_BRANCH}${reset_cor}]"
+  print " [${hi_magenta_cor}CURRENT_PUMP_NO_MONOGRAM=${reset_cor}${gray_cor}${CURRENT_PUMP_NO_MONOGRAM}${reset_cor}]"
 }
 
 function which_pro_index_pwd_() {
@@ -3652,15 +3648,16 @@ function load_config_() {
     local proj_cmd=""
     proj_cmd=$(sed -n "s/^PUMP_SHORT_NAME_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_SHORT_NAME_${i}" 2>/dev/tty
+      print " ${red_cor}error in your pump.zshenv config file: PUMP_SHORT_NAME_${i}${reset_cor}" 2>/dev/tty
+      print " fix the issue then ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
     [[ -z "$proj_cmd" ]] && continue;  # skip if not defined
 
     if ! validate_proj_cmd_strict_ "$proj_cmd"; then
-      print "  in config data at PUMP_SHORT_NAME_$i" 2>/dev/tty
-      print "  fix the issue then  ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
+      print "  ${red_cor}in your pump.zshenv config file: PUMP_SHORT_NAME_${i}${reset_cor}" 2>/dev/tty
+      print "  fix the issue then ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
@@ -3668,7 +3665,8 @@ function load_config_() {
     local proj_repo=""
     proj_repo=$(sed -n "s/^PUMP_REPO_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_REPO_${i}" 2>/dev/tty
+      print " ${red_cor}error in your pump.zshenv config file: PUMP_REPO_${i}${reset_cor}" 2>/dev/tty
+      print " fix the issue then ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
@@ -3676,13 +3674,14 @@ function load_config_() {
     local proj_folder=""
     proj_folder=$(sed -n "s/^PUMP_FOLDER_${i}=\\([^ ]*\\)/\\1/p" "$PUMP_CONFIG_FILE")
     if (( $? != 0 )); then
-      print " something is wrong with your config data at PUMP_FOLDER_${i}" 2>/dev/tty
+      print " ${red_cor}error in your pump.zshenv config file: PUMP_FOLDER_${i}${reset_cor}" 2>/dev/tty
+      print " fix the issue then  ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       continue;
     fi
 
     if [[ -n "$proj_folder" ]]; then
       if ! check_proj_folder_ $i "$proj_folder" "$proj_cmd" "$proj_repo"; then
-        print "  error in config data at PUMP_FOLDER_${i}" 2>/dev/tty
+        print "  ${red_cor}in your pump.zshenv config file: PUMP_FOLDER_${i}${reset_cor}" 2>/dev/tty
         print "  fix the issue then  ${yellow_cor}refresh${reset_cor}" 2>/dev/tty
       fi
     fi
@@ -3765,7 +3764,7 @@ function del_file_() {
   local RET=0
 
   if (( ! del_file_is_s && count <= 3 )) && [[ "${file:t}" != ".DS_Store" ]]; then;
-    confirm_ "delete $type: ${blue_prompt_cor}$file${reset_prompt_cor}?"
+    confirm_ "delete $type: ${blue_cor}$file${reset_cor}?"
     RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET != 0 )); then
@@ -3831,7 +3830,7 @@ function del_files_() {
     if (( count > 3 )); then
       if (( dont_ask == 0 )); then
         dont_ask=1;
-        confirm_ "delete all: ${blue_prompt_cor}${(j:, :)files[$count,-1]}${reset_prompt_cor}?"
+        confirm_ "delete all: ${blue_cor}${(j:, :)files[$count,-1]}${reset_cor}?"
         RET=$?
         if (( RET == 130 )); then
           break;
@@ -3890,7 +3889,7 @@ function del() {
   (( del_is_d )) && set -x
 
   if (( del_is_h )); then
-    print "  ${yellow_cor}del ${solid_yellow_cor}<glob>${reset_cor} : to delete files"
+    print "  ${yellow_cor}del ${hi_yellow_cor}<glob>${reset_cor} : to delete files"
     print "  ${yellow_cor}del -a${reset_cor} : include hidden files"
     print "  ${yellow_cor}del -q${reset_cor} : quietly, no output"
     print "  ${yellow_cor}del -s${reset_cor} : skip confirmation"
@@ -3960,7 +3959,7 @@ function fix() {
   (( fix_is_d )) && set -x
 
   if (( fix_is_h )); then
-    print "  ${yellow_cor}fix ${solid_yellow_cor}[<folder>]${reset_cor} : to run fix script, or format + lint script if no fix script is defined"
+    print "  ${yellow_cor}fix ${hi_yellow_cor}[<folder>]${reset_cor} : to run fix script or format + lint scripts"
     return 0;
   fi
 
@@ -3995,8 +3994,13 @@ function fix() {
 
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
       local _fix=$(get_script_from_pkg_json_ "fix" "$folder")
-      local _lint=$(get_script_from_pkg_json_ "lint" "$folder")
-      local _format=$(get_script_from_pkg_json_ "format" "$folder")
+      local _lintfix=$(get_script_from_pkg_json_ "lint:fix" "$folder")
+      local _formatfix=$(get_script_from_pkg_json_ "format:fix" "$folder")
+
+      local _prettier="${_formatfix:-$(get_script_from_pkg_json_ "prettier" "$folder")}"
+      local _eslint="${_lintfix:-$(get_script_from_pkg_json_ "eslint" "$folder")}"
+      local _lint="${_eslint:-$(get_script_from_pkg_json_ "lint" "$folder")}"
+      local _format="${_prettier:-$(get_script_from_pkg_json_ "format" "$folder")}"
 
       if [[ -n "$_fix" ]]; then
         eval "$pkg_manager fix"
@@ -4035,7 +4039,7 @@ function refix() {
   (( refix_is_d )) && set -x
 
   if (( refix_is_h )); then
-    print "  ${yellow_cor}refix ${solid_yellow_cor}[<folder>]${reset_cor} : to reset last commit then run fix lint and format then re-push"
+    print "  ${yellow_cor}refix ${hi_yellow_cor}[<folder>]${reset_cor} : to reset last commit then run fix lint and format then re-push"
     print "  ${yellow_cor}refix -q${reset_cor} : quietly, no output"
     return 0;
   fi
@@ -4172,7 +4176,7 @@ function covc_() {
   local proj_folder="$PWD"
 
   if [[ -z "$CURRENT_PUMP_COV" || -z "$CURRENT_PUMP_SETUP" ]]; then
-    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${solid_blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor} - edit your pump.zshenv then  ${yellow_cor}refresh${reset_cor}" >&2
+    print " CURRENT_PUMP_COV or CURRENT_PUMP_SETUP is missing for ${blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor} - edit your pump.zshenv then  ${yellow_cor}refresh${reset_cor}" >&2
     return 1;
   fi
 
@@ -4551,7 +4555,7 @@ function e2eui() {
 
   if (( e2eui_is_h )); then
     print "  ${yellow_cor}e2eui${reset_cor} : to run PUMP_E2EUI"
-    print "  ${yellow_cor}e2eui ${solid_yellow_cor}<test_project>${reset_cor} : to run PUMP_E2EUI --project"
+    print "  ${yellow_cor}e2eui ${hi_yellow_cor}<test_project>${reset_cor} : to run PUMP_E2EUI --project"
     return 0;
   fi
 
@@ -4666,7 +4670,7 @@ function pra() {
   (( pra_is_d )) && set -x
 
   if (( pra_is_h )); then
-    print "  ${yellow_cor}pra${reset_cor} : to set assignee as the author of all Pull Requests"
+    print "  ${yellow_cor}pra${reset_cor} : to set assignee as the author of all pull requests"
     return 0;
   fi
 
@@ -4831,7 +4835,7 @@ function pr() {
     if (( $? == 130 || $? == 2 )); then return 130; fi
 
     if [[ -z "$pr_title" ]]; then return 1; fi
-    print " ${light_purple_prompt_cor}pull request title:${reset_cor} $pr_title" >&2
+    print " ${bold_purple_cor}pull request title:${reset_cor} $pr_title" >&2
 
     jira_key=$(extract_jira_key_ "$pr_title")
     if (( $? == 1 )) && [[ -n "$jira_key" ]]; then
@@ -4878,7 +4882,7 @@ function pr() {
         fi
       done
     elif (( ! pr_is_s )); then
-      print " ${light_purple_prompt_cor}press enter to continue without labels${reset_cor}"
+      print " ${bold_purple_cor}press enter to continue without labels${reset_cor}"
       choose_labels=("${(@f)$(choose_multiple_ "labels" "${all_labels[@]}")}")
       if (( $? == 130 || $? == 2 )); then return 130; fi
 
@@ -4887,7 +4891,7 @@ function pr() {
 
     if [[ -n "$choose_labels" ]]; then
       pr_labels="${(j:,:)choose_labels}"
-      print " ${light_purple_prompt_cor}labels:${reset_cor} $choose_labels" >&2
+      print " ${bold_purple_cor}labels:${reset_cor} $choose_labels" >&2
     fi
   fi
 
@@ -4960,11 +4964,11 @@ function run() {
     print "  --"
     if [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
       print "  ${yellow_cor}run <folder>${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on dev environment"
-      print "  ${yellow_cor}run <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on given environment"
+      print "  ${yellow_cor}run <folder> ${hi_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on given environment"
       print "  --"
     fi
     print "  ${yellow_cor}run <pro> <folder>${reset_cor} : to run a project's folder on dev environment"
-    print "  ${yellow_cor}run <pro> <folder> ${solid_yellow_cor}<env>${reset_cor} : to run a project's folder on a given environment"
+    print "  ${yellow_cor}run <pro> <folder> ${hi_yellow_cor}<env>${reset_cor} : to run a project's folder on a given environment"
     return 0;
   fi
 
@@ -5085,11 +5089,11 @@ function run() {
         fi
       fi
     fi
-    print " ${solid_pink_cor}${pump_run}${reset_cor}"
+    print " ${hi_pink_cor}${pump_run}${reset_cor}"
     
     if ! eval "$pump_run"; then return 1; fi
   else
-    print " ${solid_pink_cor}${pump_run}${reset_cor}"
+    print " ${hi_pink_cor}${pump_run}${reset_cor}"
     
     if ! eval "$pump_run"; then
       if [[ "$env_mode" == "stage" || "$env_mode" == "prod" ]]; then
@@ -5115,7 +5119,7 @@ function setup() {
       fi
       print "  --"
     print "  ${yellow_cor}setup <pro>${reset_cor} : to setup a project"
-    print "  ${yellow_cor}setup <pro> ${solid_yellow_cor}<folder>${reset_cor} : to setup a project's folder"
+    print "  ${yellow_cor}setup <pro> ${hi_yellow_cor}<folder>${reset_cor} : to setup a project's folder"
     return 0;
   fi
 
@@ -5189,11 +5193,11 @@ function setup() {
         pump_setup="$pkg_manager install"
       fi
     fi
-    print " ${solid_pink_cor}${pump_setup}${reset_cor}"
+    print " ${hi_pink_cor}${pump_setup}${reset_cor}"
     
     if ! eval "$pump_setup"; then return 1; fi
   else
-    print " ${solid_pink_cor}${pump_setup}${reset_cor}"
+    print " ${hi_pink_cor}${pump_setup}${reset_cor}"
     
     if ! eval "$pump_setup"; then
       print " ${red_cor}fatal: failed to run PUMP_SETUP_$i ${reset_cor}" >&2
@@ -5222,7 +5226,7 @@ function setup() {
       if [[ "$name" == "dev" && -n "$cmd" ]]; then print "  • ${yellow_cor}run${reset_cor} (alias for \"$pkg_manager run dev\")"; fi
       if [[ "$name" == "stage" && -n "$cmd" ]]; then print "  • ${yellow_cor}run stage${reset_cor} (alias for \"$pkg_manager run stage\")"; fi
       if [[ "$name" == "prod" && -n "$cmd" ]]; then print "  • ${yellow_cor}run prod${reset_cor} (alias for \"$pkg_manager run prod\")"; fi
-      if [[ "$name" == "test" && -n "$cmd" ]]; then print "  • ${yellow_cor}test${reset_cor} (alias for \"$pkg_manager run test\")"; fi
+      if [[ "$name" == "test" && -n "$cmd" ]]; then print "  • ${yellow_cor}test${reset_cor} (alias for \"$pkg_manager test\")"; fi
     done
     print "  --"
   fi
@@ -5381,7 +5385,7 @@ function rev() {
     print "  ${yellow_cor}rev -e <branch>${reset_cor} : open review by an exact branch (no lookup)"
     print "  --"
     print "  ${yellow_cor}rev <pro>${reset_cor} : to open a review for a project"
-    print "  ${yellow_cor}rev <pro> ${solid_yellow_cor}<branch>${reset_cor} : to open a review for a project's branch"
+    print "  ${yellow_cor}rev <pro> ${hi_yellow_cor}<branch>${reset_cor} : to open a review for a project's branch"
     return 0;
   fi
 
@@ -5557,7 +5561,7 @@ function rev() {
   if (( ! skip_setup )); then
     if [[ -n "$pump_setup" ]]; then
       print " setting up ${gray_cor}${full_rev_folder}${reset_cor}"
-      print " ${solid_pink_cor}${pump_setup}${reset_cor}"
+      print " ${hi_pink_cor}${pump_setup}${reset_cor}"
 
       if ! eval "$pump_setup"; then
         print " ${red_cor}fatal: failed to run PUMP_SETUP_$i ${reset_cor}" >&2
@@ -5602,7 +5606,7 @@ function rev() {
 
 function clone() {
   set +x
-  eval "$(parse_flags_ "clone_" "e" "" "$@")"
+  eval "$(parse_flags_ "clone_" "ej" "" "$@")"
   (( clone_is_d )) && set -x
 
   if (( clone_is_h )); then
@@ -5614,6 +5618,7 @@ function clone() {
     print "  ${yellow_cor}clone <pro>${reset_cor} : to clone a project directly"
     print "  ${yellow_cor}clone <pro> <branch>${reset_cor} : to clone a project's branch, only if project is in multiple mode"
     print "  ${yellow_cor}clone <pro> <branch> <default_branch>${reset_cor} : to clone a project's branch with a given default branch, only if project is in multiple mode"
+    print "  ${yellow_cor}clone -j${reset_cor} : to clone a project based on jira work item"
     return 0;
   fi
 
@@ -5664,6 +5669,11 @@ function clone() {
   if (( ! i )); then return 1; fi
 
   proj_arg="${PUMP_SHORT_NAME[$i]}"
+
+  if (( clone_is_j )); then
+    jira "$proj_arg"
+    return $?;
+  fi
 
   local pump_clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
@@ -5737,7 +5747,7 @@ function clone() {
     fi
 
     if [[ -z "$pump_default_branch" || "$default_branch" != "$pump_default_branch" ]]; then
-      confirm_ "save default branch ${green_prompt_cor}$default_branch${reset_prompt_cor} and don't ask again, unless it changes?"
+      confirm_ "save default branch ${green_cor}$default_branch${reset_cor} and don't ask again, unless it changes?"
       local RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 0 )); then
@@ -5767,7 +5777,7 @@ function clone() {
     local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
     if [[ -n "$jira_key" ]] && (( user_typed_name )); then
       if [[ -z "$pump_no_monogram" ]]; then
-        confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_arg}${reset_prompt_cor}?"
+        confirm_ "use initials for the branch name: ${green_cor}${${USER:0:1}:l}-${branch_arg}${reset_cor}?"
         local RET=$?
         if (( RET == 130 || RET == 2 )); then return 130; fi
         if (( RET == 0 )); then
@@ -5791,7 +5801,7 @@ function clone() {
       if [[ -n "$remote_branch" ]]; then
         print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor}"
       else
-        print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${solid_green_cor}${default_branch}${reset_cor}"
+        print " preparing to clone branch: ${green_cor}${branch_arg}${reset_cor} based on ${hi_green_cor}${default_branch}${reset_cor}"
       fi
     fi
   else
@@ -5841,13 +5851,13 @@ function clone() {
   fi
 
   if [[ "$default_branch" != "$branch_arg" ]]; then
-    print " ${solid_pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
+    print " ${hi_pink_cor}git config init.defaultBranch $default_branch ${reset_cor}"
     git config init.defaultBranch "$default_branch"
     git config "branch.${branch_arg}.gh-merge-base" "$default_branch"
   fi
 
   if [[ -n "$pump_clone" ]]; then
-    print " ${solid_pink_cor}${pump_clone}${reset_cor}"
+    print " ${hi_pink_cor}${pump_clone}${reset_cor}"
     if ! eval "$pump_clone"; then
       print " ${red_cor}fatal: failed to run PUMP_CLONE_$i ${reset_cor}" >&2
       print " edit your pump.zshenv config file, then  ${yellow_cor}refresh${reset_cor}" >&2
@@ -5855,7 +5865,7 @@ function clone() {
   fi
   
   print ""
-  print " successfully cloned project: ${solid_blue_cor}${proj_arg}${reset_cor}"
+  print " successfully cloned project: ${blue_cor}${proj_arg}${reset_cor}"
   print " default branch is: ${green_cor}$(git config --get init.defaultBranch)${reset_cor}"
   
   print ""
@@ -5870,7 +5880,7 @@ function clone() {
 
     if [[ -z "$pump_setup" ]]; then
       if [[ -n "$setup_script" ]]; then
-        print "  • ${yellow_cor}setup${reset_cor} (alias for \"$pkg_manager setup\")"
+        print "  • ${yellow_cor}setup${reset_cor} (alias for \"$pkg_manager run setup\")"
       else
         print "  • ${yellow_cor}setup${reset_cor} (alias for \"$pkg_manager install\")"
       fi
@@ -5879,7 +5889,6 @@ function clone() {
     else
       print "  • ${yellow_cor}setup${reset_cor} (runs config entry: PUMP_SETUP_$i)"
     fi
-    print "  • ${yellow_cor}i${reset_cor} or ${solid_yellow_cor}install${reset_cor} (alias for \"$pkg_manager install\")"
     print " --"
   fi
 
@@ -5990,12 +5999,10 @@ function jira() {
   (( jira_is_d )) && set -x
 
   if (( jira_is_h )); then
-    print "  ${yellow_cor}jira${reset_cor} : to start the work on a new ticket for current project"
-    print "  ${yellow_cor}jira ${solid_yellow_cor}<pro>${reset_cor} : to start the work on a new ticket for a project"
-    print "  ${yellow_cor}jira -p <pro> <key>${reset_cor} : to update the status of a ticket to \"In Progress\""
-    print "  ${yellow_cor}jira -r <pro> <key>${reset_cor} : to update the status of a ticket to \"In Review\""
-    print "  ${yellow_cor}jira -c <pro> <key>${reset_cor} : to update the status of a ticket to \"Close\" or \"Done\""
-    print "  ${yellow_cor}jira -s <key> <status>${reset_cor} : to update the status of a ticket (e.g. \"In Progress\", \"In Review\", \"Done\")"
+    print "  ${yellow_cor}jira ${hi_yellow_cor}[<pro>] [<ticket_key>]${reset_cor} : to open a ticket"
+    print "  ${yellow_cor}jira -p${reset_cor} : to move ticket to \"In Progress\" status"
+    print "  ${yellow_cor}jira -r${reset_cor} : to move ticket to \"In Review\" status"
+    print "  ${yellow_cor}jira -c${reset_cor} : to close a ticket"
     return 0;
   fi
 
@@ -6087,7 +6094,7 @@ function jira() {
     local current_user=$(acli jira auth status | awk -F': ' '/Email:/ { print $2 }' 2>/dev/null)
 
     if [[ "$current_jira_assignee" != "$current_user" ]]; then
-      confirm_ "work item ${jira_key} is assigned to $current_jira_assignee - transition it to status: ${green_prompt_cor}${jira_status}${reset_prompt_cor}?"
+      confirm_ "work item ${jira_key} is assigned to $current_jira_assignee - transition it to status: ${green_cor}${jira_status}${reset_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       if (( RET == 1 )); then return 0; fi
@@ -6146,7 +6153,7 @@ function jira() {
   local branch_found=$(select_branch_ -ai "$jira_key" "" "$proj_folder" 2>/dev/null)
 
   if [[ -n "$branch_found" ]]; then
-    confirm_ "branch found for work item: ${green_prompt_cor}${branch_found}${reset_prompt_cor} - open branch or create a new one?" "open" "create new"
+    confirm_ "branch found for work item: ${green_cor}${branch_found}${reset_cor} - open branch or create a new one?" "open" "create new"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     
@@ -6160,7 +6167,7 @@ function jira() {
     branch_name="$jira_key"
 
     if [[ -z "$pump_no_monogram" ]]; then
-      confirm_ "use initials for the branch name: ${green_prompt_cor}${${USER:0:1}:l}-${branch_name}${reset_prompt_cor}?"
+      confirm_ "use initials for the branch name: ${green_cor}${${USER:0:1}:l}-${branch_name}${reset_cor}?"
       local RET=$?
       if (( RET == 130 || RET == 2 )); then return 130; fi
       
@@ -6235,7 +6242,7 @@ function abort() {
   (( abort_is_d )) && set -x
 
   if (( abort_is_h )); then
-    print "  ${yellow_cor}abort ${solid_yellow_cor}[<folder>]${reset_cor} : to abort any in progress rebase, merge and cherry-pick"
+    print "  ${yellow_cor}abort ${hi_yellow_cor}[<folder>]${reset_cor} : to abort any in progress rebase, merge and cherry-pick"
     return 0;
   fi
 
@@ -6312,7 +6319,7 @@ function chp() {
   (( chp_is_d )) && set -x
 
   if (( chp_is_h )); then
-    print "  ${yellow_cor}chp <commit_hash> ${solid_yellow_cor}[<folder>]${reset_cor} : to cherry-pick a commit"
+    print "  ${yellow_cor}chp <commit_hash> ${hi_yellow_cor}[<folder>]${reset_cor} : to cherry-pick a commit"
     return 0;
   fi
 
@@ -6358,7 +6365,7 @@ function chc() {
   (( chc_is_d )) && set -x
 
   if (( chc_is_h )); then
-    print "  ${yellow_cor}chc ${solid_yellow_cor}[<folder>]${reset_cor} : to continue in progress cherry-pick"
+    print "  ${yellow_cor}chc ${hi_yellow_cor}[<folder>]${reset_cor} : to continue in progress cherry-pick"
     return 0;
   fi
 
@@ -6386,7 +6393,7 @@ function mc() {
   (( mc_is_d )) && set -x
 
   if (( mc_is_h )); then
-    print "  ${yellow_cor}mc ${solid_yellow_cor}[<folder>]${reset_cor} : to continue in progress merge"
+    print "  ${yellow_cor}mc ${hi_yellow_cor}[<folder>]${reset_cor} : to continue in progress merge"
     return 0;
   fi
 
@@ -6416,7 +6423,7 @@ function rc() {
   (( rc_is_d )) && set -x
 
   if (( rc_is_h )); then
-    print "  ${yellow_cor}rc ${solid_yellow_cor}[<folder>]${reset_cor} : to continue in progress rebase"
+    print "  ${yellow_cor}rc ${hi_yellow_cor}[<folder>]${reset_cor} : to continue in progress rebase"
     return 0;
   fi
 
@@ -6446,7 +6453,7 @@ function cont() {
   (( conti_is_d )) && set -x
 
   if (( conti_is_h )); then
-    print "  ${yellow_cor}cont ${solid_yellow_cor}[<folder>]${reset_cor} : to continue any in progress rebase, merge or cherry-pick"
+    print "  ${yellow_cor}cont ${hi_yellow_cor}[<folder>]${reset_cor} : to continue any in progress rebase, merge or cherry-pick"
     return 0;
   fi
 
@@ -6572,7 +6579,7 @@ function repush() {
   (( repush_is_d )) && set -x
 
   if (( repush_is_h )); then
-    print "  ${yellow_cor}repush ${solid_yellow_cor}[<folder>]${reset_cor} : to reset last commit without losing your changes then re-push all changes using the same message"
+    print "  ${yellow_cor}repush ${hi_yellow_cor}[<folder>]${reset_cor} : to reset last commit without losing your changes then re-push all changes using the same message"
     print "  ${yellow_cor}repush -x${reset_cor} : only staged changes"
     print "  ${yellow_cor}repush -q${reset_cor} : quietly, no output"
     return 0;
@@ -6608,7 +6615,7 @@ function recommit() {
   (( recommit_is_d )) && set -x
 
   if (( recommit_is_h )); then
-    print "  ${yellow_cor}recommit ${solid_yellow_cor}[<folder>]${reset_cor} : to reset last commit then re-commit all changes with the same message"
+    print "  ${yellow_cor}recommit ${hi_yellow_cor}[<folder>]${reset_cor} : to reset last commit then re-commit all changes with the same message"
     print "  ${yellow_cor}recommit -x${reset_cor} : only staged changes"
     print "  ${yellow_cor}recommit -q${reset_cor} : quietly, no output"
     return 0;
@@ -6652,7 +6659,7 @@ function fetch() {
   # (( fetch_is_d )) && set -x
 
   if (( fetch_is_h )); then
-    print "  ${yellow_cor}fetch ${solid_yellow_cor}[folder]${reset_cor} : to fetch and prune from origin all branches and tags"
+    print "  ${yellow_cor}fetch ${hi_yellow_cor}[folder]${reset_cor} : to fetch and prune from origin all branches and tags"
     print "  ${yellow_cor}fetch -t${reset_cor} : to force fetch"
     print "  ${yellow_cor}fetch -to${reset_cor} : to fetch all tags only"
     return 0;
@@ -6709,7 +6716,7 @@ function gconf() {
   (( gconf_is_d )) && set -x
 
   if (( gconf_is_h )); then
-    print "  ${yellow_cor}gconf ${solid_yellow_cor}[<scope>] [<folder>]${reset_cor} : to display git configuration"
+    print "  ${yellow_cor}gconf ${hi_yellow_cor}[<scope>] [<folder>]${reset_cor} : to display git configuration"
     return 0;
   fi
 
@@ -6754,10 +6761,10 @@ function glog() {
   (( glog_is_d )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog ${solid_yellow_cor}[<folder>]${reset_cor} : to log last 10 commits"
-    print "  ${yellow_cor}glog -c ${solid_yellow_cor}[<branch>]${reset_cor} : to log branch's commits since default branch"
-    print "  ${yellow_cor}glog -a ${solid_yellow_cor}[<branch>]${reset_cor} : to log all commits"
-    print "  ${yellow_cor}glog -n ${solid_yellow_cor}[<folder>]${reset_cor} : to log n commits, where n is a number"
+    print "  ${yellow_cor}glog ${hi_yellow_cor}[<folder>]${reset_cor} : to log last 10 commits"
+    print "  ${yellow_cor}glog -c ${hi_yellow_cor}[<branch>]${reset_cor} : to log branch's commits since default branch"
+    print "  ${yellow_cor}glog -a ${hi_yellow_cor}[<branch>]${reset_cor} : to log all commits"
+    print "  ${yellow_cor}glog -n ${hi_yellow_cor}[<folder>]${reset_cor} : to log n commits, where n is a number"
     return 0;
   fi
 
@@ -6831,7 +6838,7 @@ function push() {
   (( push_is_d )) && set -x
 
   if (( push_is_h )); then
-    print "  ${yellow_cor}push ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to push --no-verify --set-upstream"
+    print "  ${yellow_cor}push ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : to push --no-verify --set-upstream"
     print "  ${yellow_cor}push -f${reset_cor} : to push --no-verify --force-with-lease"
     print "  ${yellow_cor}push -t${reset_cor} : to push --no-verify --tags"
     print "  ${yellow_cor}push -q${reset_cor} : quietly, no output"
@@ -6931,7 +6938,7 @@ function pushf() {
   (( pushf_is_d )) && set -x
 
   if (( pushf_is_h )); then
-    print "  ${yellow_cor}pushf ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to push --no-verify --force-with-lease"
+    print "  ${yellow_cor}pushf ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : to push --no-verify --force-with-lease"
     print "  ${yellow_cor}pushf -f${reset_cor} : to push --no-verify --force"
     print "  ${yellow_cor}pushf -t${reset_cor} : to push --no-verify --tags --force"
     print "  ${yellow_cor}pushf -q${reset_cor} : quietly, no output"
@@ -7013,7 +7020,7 @@ function pullr() {
   (( pullr_is_d )) && set -x
 
   if (( pullr_is_h )); then
-    print "  ${yellow_cor}pullr ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull --rebase"
+    print "  ${yellow_cor}pullr ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull --rebase"
     print "  ${yellow_cor}pullr -q${reset_cor} : to pull --rebase --quiet"
     return 0;
   fi
@@ -7027,7 +7034,7 @@ function pull() {
   (( pull_is_d )) && set -x
 
   if (( pull_is_h )); then
-    print "  ${yellow_cor}pull ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
+    print "  ${yellow_cor}pull ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : to pull branch from origin"
     print "  ${yellow_cor}pull -t${reset_cor} : to pull tags along with branches"
     print "  ${yellow_cor}pull -to${reset_cor} : to pull tags only"
     print "  ${yellow_cor}pull -r${reset_cor} : to pull --rebase"
@@ -7127,8 +7134,8 @@ function dtag() {
   (( dtag_is_d )) && set -x
 
   if (( dtag_is_h )); then
-    print "  ${yellow_cor}dtag ${solid_yellow_cor}[<pro>] [<name>]${reset_cor} : to delete a project's tag"
-    print "  ${yellow_cor}dtag ${solid_yellow_cor}<name>${reset_cor} : to delete a tag directly"
+    print "  ${yellow_cor}dtag ${hi_yellow_cor}[<pro>] [<name>]${reset_cor} : to delete a project's tag"
+    print "  ${yellow_cor}dtag ${hi_yellow_cor}<name>${reset_cor} : to delete a tag directly"
     return 0;
   fi
 
@@ -7190,8 +7197,8 @@ function drelease() {
   (( drelease_is_d )) && set -x
 
   if (( drelease_is_h )); then
-    print "  ${yellow_cor}drelease ${solid_yellow_cor}[<pro>] [<tag>]${reset_cor} : to delete a project's release and the tag"
-    print "  ${yellow_cor}drelease ${solid_yellow_cor}<tag>${reset_cor} : to delete a project's release and the tag directly"
+    print "  ${yellow_cor}drelease ${hi_yellow_cor}[<pro>] [<tag>]${reset_cor} : to delete a project's release and the tag"
+    print "  ${yellow_cor}drelease ${hi_yellow_cor}<tag>${reset_cor} : to delete a project's release and the tag directly"
     return 0;
   fi
 
@@ -7274,8 +7281,8 @@ function release() {
   (( release_is_d )) && set -x
 
   if (( release_is_h )); then
-    print "  ${yellow_cor}release ${solid_yellow_cor}[<pro>] [<version>]${reset_cor} : to create a new release of package.json version"
-    print "  ${yellow_cor}release ${solid_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
+    print "  ${yellow_cor}release ${hi_yellow_cor}[<pro>] [<version>]${reset_cor} : to create a new release of package.json version"
+    print "  ${yellow_cor}release ${hi_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
     print "  ${yellow_cor}release -r${reset_cor} : re-release if version is already released"
     print "  ${yellow_cor}release -s${reset_cor} : skip confirmation"
     print "  --"
@@ -7492,8 +7499,8 @@ function tag() {
   (( tag_is_d )) && set -x
 
   if (( tag_is_h )); then
-    print " release_ = ${yellow_cor}tag ${solid_yellow_cor}[<pro>] [<name>]${reset_cor} : to create a new tag for a project"
-    print " release_ = ${yellow_cor}tag ${solid_yellow_cor}<name>${reset_cor} : to create a new tag directly"
+    print " release_ = ${yellow_cor}tag ${hi_yellow_cor}[<pro>] [<name>]${reset_cor} : to create a new tag for a project"
+    print " release_ = ${yellow_cor}tag ${hi_yellow_cor}<name>${reset_cor} : to create a new tag directly"
     print " release_ = ${yellow_cor}tag -s${reset_cor} : skip confirmation"
     print " release_ = ${yellow_cor}tag -q${reset_cor} : quietly, no output"
     return 0;
@@ -7578,8 +7585,8 @@ function tags() {
   (( tags_is_d )) && set -x
 
   if (( tags_is_h )); then
-    print "  ${yellow_cor}tags ${solid_yellow_cor}[<pro>] [<n>]${reset_cor} : to list tags of a project"
-    print "  ${yellow_cor}tags ${solid_yellow_cor}<n>${reset_cor} : to list n number of tags of a project"
+    print "  ${yellow_cor}tags ${hi_yellow_cor}[<pro>] [<n>]${reset_cor} : to list tags of a project"
+    print "  ${yellow_cor}tags ${hi_yellow_cor}<n>${reset_cor} : to list n number of tags of a project"
     return 0;
   fi
 
@@ -7628,43 +7635,10 @@ function tags() {
 }
 # end of tagging functions ===============================================
 
-# function restore() {
-#   set +x
-#   eval "$(parse_flags_ "restore_" "q" "q" "$@")"
-#   (( restore_is_d )) && set -x
-
-#   if (( restore_is_h )); then
-#     print "  ${yellow_cor}restore ${solid_yellow_cor}[<folder>]${reset_cor} : to clean staged changes"
-#     if (( ! restore_is_q )); then
-#       print " --"
-#       print_clean_
-#     fi
-#     return 0;
-#   fi
-
-#   local folder="$PWD"
-
-#   if [[ -n "$1" && $1 != -* ]]; then
-#     if [[ -d "$1" ]]; then
-#       folder="$1"
-#     else
-#       print " fatal: not a valid folder argument: $1" >&2
-#       print " run ${yellow_cor}restore -h${reset_cor} to see usage" >&2
-#       return 1;
-#     fi
-#     shift
-#   fi
-
-#   if ! is_folder_git_ "$folder"; then return 1; fi
-
-#   git -C "$folder" restore --quiet .
-# }
-
 function print_clean_() {
   print "  ${orange_cor}soft${reset_cor}   : $(clean -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/  :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
-  # print "  ${orange_cor}softer${reset_cor} : $(restore -hq | sed 's/\[\<folder\>\]//g' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
   print "  ${dark_orange_cor}medium${reset_cor} : $(discard -hq | sed 's/\[\<folder\>\]//g' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
-  print "  ${solid_red_cor}hard${reset_cor}   : $(reseta -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/ :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
+  print "  ${hi_red_cor}hard${reset_cor}   : $(reseta -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/ :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
 }
 
 function clean() {
@@ -7673,7 +7647,7 @@ function clean() {
   (( clean_is_d )) && set -x
 
   if (( clean_is_h )); then
-    print "  ${yellow_cor}clean ${solid_yellow_cor}[<folder>]${reset_cor} : to clean unstaged files"
+    print "  ${yellow_cor}clean ${hi_yellow_cor}[<folder>]${reset_cor} : to clean unstaged files"
     print "  ${yellow_cor}clean -q${reset_cor} : to clean --quiet"
     if (( ! clean_is_q )); then
       print " --"
@@ -7707,7 +7681,7 @@ function discard() {
   (( discard_is_d )) && set -x
 
   if (( discard_is_h )); then
-    print "  ${yellow_cor}discard ${solid_yellow_cor}[<folder>]${reset_cor} : to discard staged and unstaged files"
+    print "  ${yellow_cor}discard ${hi_yellow_cor}[<folder>]${reset_cor} : to discard staged and unstaged files"
     print "  ${yellow_cor}discard -q${reset_cor} : to discard --quiet"
     if (( ! discard_is_q )); then
       print " --"
@@ -7742,7 +7716,7 @@ function reseta() {
   (( reseta_is_d )) && set -x
 
   if (( reseta_is_h )); then
-    print "  ${yellow_cor}reseta ${solid_yellow_cor}[<folder>]${reset_cor} : to erase everything and match HEAD to latest commit of current branch"
+    print "  ${yellow_cor}reseta ${hi_yellow_cor}[<folder>]${reset_cor} : to erase everything and match HEAD to latest commit of current branch"
     print "  ${yellow_cor}reseta -o${reset_cor} : to erase everything and match HEAD to origin"
     print "  ${yellow_cor}reseta -q${reset_cor} : to reset --quiet"
     if (( ! reseta_is_q )); then
@@ -7789,8 +7763,8 @@ function glr() {
   (( glr_is_d )) && set -x
 
   if (( glr_is_h )); then
-    print "  ${yellow_cor}glr ${solid_yellow_cor}[<folder>]${reset_cor} : to list remote branches"
-    print "  ${yellow_cor}glr <branch> ${solid_yellow_cor}[<folder>]${reset_cor} : to list remote branches matching branch"
+    print "  ${yellow_cor}glr ${hi_yellow_cor}[<folder>]${reset_cor} : to list remote branches"
+    print "  ${yellow_cor}glr <branch> ${hi_yellow_cor}[<folder>]${reset_cor} : to list remote branches matching branch"
     return 0;
   fi
 
@@ -7831,8 +7805,8 @@ function gll() {
   (( gll_is_d )) && set -x
 
   if (( gll_is_h )); then
-    print "  ${yellow_cor}gll ${solid_yellow_cor}[<folder>]${reset_cor} : to list local branches"
-    print "  ${yellow_cor}gll <branch> ${solid_yellow_cor}[<folder>]${reset_cor} : to list local branches matching <branch>"
+    print "  ${yellow_cor}gll ${hi_yellow_cor}[<folder>]${reset_cor} : to list local branches"
+    print "  ${yellow_cor}gll <branch> ${hi_yellow_cor}[<folder>]${reset_cor} : to list local branches matching <branch>"
     return 0;
   fi
 
@@ -7895,8 +7869,8 @@ function gha() {
 
   if (( gha_is_h )); then
     print "  ${yellow_cor}gha${reset_cor} : to check status of a workflow in current project"
-    print "  ${yellow_cor}gha ${solid_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow in current project"
-    print "  ${yellow_cor}gha <pro> ${solid_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow for a project"
+    print "  ${yellow_cor}gha ${hi_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow in current project"
+    print "  ${yellow_cor}gha <pro> ${hi_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow for a project"
     print "  ${yellow_cor}gha -a${reset_cor} : to run in auto mode"
     return 0;
   fi
@@ -8079,7 +8053,7 @@ function co() {
     if [[ -z "$pr" ]]; then return 1; fi
     
     if command -v gum &>/dev/null; then
-      gum spin --title="detaching pull request: ${green_prompt_cor}${pr[3]}${reset_prompt_cor}" -- \
+      gum spin --title="detaching pull request: ${green_cor}${pr[3]}${reset_cor}" -- \
         gh pr checkout --force --detach "${pr[1]}"
       RET=$?
       if (( RET == 0 )); then
@@ -8311,7 +8285,7 @@ function back() {
   (( back_is_d )) && set -x
 
   if (( back_is_h )); then
-    print "  ${yellow_cor}back ${solid_yellow_cor}[<folder>]${reset_cor} : to go back the previous branch"
+    print "  ${yellow_cor}back ${hi_yellow_cor}[<folder>]${reset_cor} : to go back the previous branch"
     return 0;
   fi
 
@@ -8436,7 +8410,7 @@ function rebase() {
 
   if (( rebase_is_h )); then
     print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branch on top of the HEAD of default branch"
-    print "  ${yellow_cor}rebase ${solid_yellow_cor}<base_branch> [<folder>]${reset_cor} : to apply the commits on top of the HEAD of base branch"
+    print "  ${yellow_cor}rebase ${hi_yellow_cor}<base_branch> [<folder>]${reset_cor} : to apply the commits on top of the HEAD of base branch"
     print "  ${yellow_cor}rebase -a${reset_cor} : to rebase multiple branches"
     print "  ${yellow_cor}rebase -p${reset_cor} : to push after rebase if succeeds with no conflicts"
     return 0;
@@ -8516,7 +8490,7 @@ function rebase() {
 
   fetch "$folder" --quiet
 
-  print -n " rebasing branch ${green_cor}${branch_arg}${reset_cor} of ${solid_green_cor}${base_branch}${reset_cor}"
+  print -n " rebasing branch ${green_cor}${branch_arg}${reset_cor} of ${hi_green_cor}${base_branch}${reset_cor}"
   if (( merge_is_p )); then
     print -n " then pushing"
   fi
@@ -8540,7 +8514,7 @@ function merge() {
 
   if (( merge_is_h )); then
     print "  ${yellow_cor}merge${reset_cor} : to create a new merge commit from default branch"
-    print "  ${yellow_cor}merge ${solid_yellow_cor}<base_branch> [<folder>]${reset_cor} : to create a new merge commit from base branch"
+    print "  ${yellow_cor}merge ${hi_yellow_cor}<base_branch> [<folder>]${reset_cor} : to create a new merge commit from base branch"
     print "  ${yellow_cor}merge -a${reset_cor} : to merge multiple branches"
     print "  ${yellow_cor}merge -p${reset_cor} : to push after merge succeeds with no conflicts"
     return 0;
@@ -8620,7 +8594,7 @@ function merge() {
 
   fetch "$folder" --quiet
 
-  print -n " merging branch ${green_cor}${branch_arg}${reset_cor} from ${solid_green_cor}${base_branch}${reset_cor}"
+  print -n " merging branch ${green_cor}${branch_arg}${reset_cor} from ${hi_green_cor}${base_branch}${reset_cor}"
   if (( merge_is_p )); then
     print -n " then pushing"
   fi
@@ -8643,7 +8617,7 @@ function prune() {
   (( prune_is_d )) && set -x
 
   if (( prune_is_h )); then
-    print "  ${yellow_cor}prune ${solid_yellow_cor}[<folder>]${reset_cor} : to clean up unreachable or orphaned git branches and tags"
+    print "  ${yellow_cor}prune ${hi_yellow_cor}[<folder>]${reset_cor} : to clean up unreachable or orphaned git branches and tags"
     return 0;
   fi
 
@@ -8725,8 +8699,8 @@ function delb() {
 
   if (( delb_is_h )); then
     print "  ${yellow_cor}delb${reset_cor} : to delete a branch locally in current folder"
-    print "  ${yellow_cor}delb ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : to delete a branch locally in folder"
-    print "  ${yellow_cor}delb -e ${solid_yellow_cor}[<branch>] [<folder>]${reset_cor} : delete only if matches exact name"
+    print "  ${yellow_cor}delb ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : to delete a branch locally in folder"
+    print "  ${yellow_cor}delb -e ${hi_yellow_cor}[<branch>] [<folder>]${reset_cor} : delete only if matches exact name"
     print "  ${yellow_cor}delb -r${reset_cor} : also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : skip confirmation (cannot use with -r)"
@@ -8798,7 +8772,7 @@ function delb() {
     fi
     if (( dont_ask == 0 && count > 3 )); then
       dont_ask=1;
-      confirm_ "delete all: ${blue_prompt_cor}${(j:, :)selected_branches[$count,-1]}${reset_prompt_cor}?"
+      confirm_ "delete all: ${blue_cor}${(j:, :)selected_branches[$count,-1]}${reset_cor}?"
       RET=$?
       if (( RET == 130 )); then
         break;
@@ -8810,7 +8784,7 @@ function delb() {
     fi
     if (( ! delb_is_s || delb_is_r )); then
       local origin=$( (( delb_is_r )) && echo "remote" || echo "local" )
-      confirm_ "delete ${origin} branch: ${magenta_prompt_cor}${branch}${reset_prompt_cor}?"
+      confirm_ "delete ${origin} branch: ${magenta_cor}${branch}${reset_cor}?"
       RET=$?
       if (( RET == 130 || RET == 2 )); then break; fi
       if (( RET == 1 )); then continue; fi
@@ -8841,7 +8815,7 @@ function st() {
   (( st_is_d )) && set -x
 
   if (( st_is_h )); then
-    print "  ${yellow_cor}st ${solid_yellow_cor}[<folder>]${reset_cor} : to show git status"
+    print "  ${yellow_cor}st ${hi_yellow_cor}[<folder>]${reset_cor} : to show git status"
     print "  ${yellow_cor}st -sb${reset_cor} : to show git status in short-format"
     return 0;
   fi
@@ -8902,15 +8876,15 @@ function pro() {
   if (( pro_is_h )); then
     print "  ${yellow_cor}pro <name>${reset_cor} : to set a project"
     print "  ${yellow_cor}pro -l${reset_cor} : to list all projects"
-    print "  ${yellow_cor}pro -a ${solid_yellow_cor}<name>${reset_cor} : to add new project"
+    print "  ${yellow_cor}pro -a ${hi_yellow_cor}<name>${reset_cor} : to add new project"
     print "  ${yellow_cor}pro -e <name>${reset_cor} : to edit a project"
     print "  ${yellow_cor}pro -r <name>${reset_cor} : to remove a project"
     print "  --"
-    print "  ${yellow_cor}pro -i ${solid_yellow_cor}<name>${reset_cor} : to display top project's settings"
-    print "  ${yellow_cor}pro -c ${solid_yellow_cor}<name>${reset_cor} : to display all project's settings"
-    print "  ${yellow_cor}pro -t ${solid_yellow_cor}<name>${reset_cor} : to display project's readme if available"
-    print "  ${yellow_cor}pro -n ${solid_yellow_cor}<name>${reset_cor} : to reset node.js version for a project"
-    print "  ${yellow_cor}pro -u ${solid_yellow_cor}<name>${reset_cor} : to unset project's \"don't ask again\" settings"
+    print "  ${yellow_cor}pro -i ${hi_yellow_cor}<name>${reset_cor} : to display top project's settings"
+    print "  ${yellow_cor}pro -c ${hi_yellow_cor}<name>${reset_cor} : to display all project's settings"
+    print "  ${yellow_cor}pro -t ${hi_yellow_cor}<name>${reset_cor} : to display project's readme if available"
+    print "  ${yellow_cor}pro -n ${hi_yellow_cor}<name>${reset_cor} : to reset node.js version for a project"
+    print "  ${yellow_cor}pro -u ${hi_yellow_cor}<name>${reset_cor} : to unset project's \"don't ask again\" settings"
     print "  --"
     pro -l
     return 0;
@@ -8928,7 +8902,7 @@ function pro() {
       local i=0
       for i in {1..9}; do
         if [[ -n "${PUMP_SHORT_NAME[$i]}" ]]; then
-          print " ${solid_blue_cor}${PUMP_SHORT_NAME[$i]}${reset_cor} = set project to ${PUMP_SHORT_NAME[$i]}"
+          print " ${blue_cor}${PUMP_SHORT_NAME[$i]}${reset_cor} = set project to ${PUMP_SHORT_NAME[$i]}"
         fi
       done
     fi
@@ -9139,10 +9113,7 @@ function pro() {
 
       setopt NO_NOTIFY
       {
-        # exec
         gum spin --title="detecting node.js..." -- bash -c 'sleep 3'
-        # echo -e "\r\033[K"
-        # tput sgr0
       } 2>/dev/tty
 
       # gum spin --title="detecting node.js engine..." -- sleep 2 2>/dev/tty &!
@@ -9176,9 +9147,9 @@ function pro() {
       if [[ -n "$nvm_use_v" ]] && (( ! pro_is_x )); then
         print -n " node.js version set";
         if [[ -n "$old_nvm_use_v" ]]; then
-          print -n " from: ${solid_yellow_cor}$old_nvm_use_v${reset_cor}"
+          print -n " from: ${hi_yellow_cor}$old_nvm_use_v${reset_cor}"
         fi
-        print " to: ${bright_green_cor}$nvm_use_v${reset_cor}"
+        print " to: ${bold_green_cor}$nvm_use_v${reset_cor}"
 
         update_setting_ $i "PUMP_NVM_USE_V" "$nvm_use_v" &>/dev/null
         update_setting_ $i "PUMP_NVM_SKIP_LOOKUP" 1 &>/dev/null
@@ -9210,7 +9181,7 @@ function pro() {
 
       local pkg_name=$(get_pkg_name_)
       local proj_cmd=$(sanitize_pkg_name_ "$pkg_name")
-      # print " project not found, adding new project: ${solid_blue_cor}${proj_cmd}${reset_cor}" 2>/dev/tty
+      # print " project not found, adding new project: ${blue_cor}${proj_cmd}${reset_cor}" 2>/dev/tty
 
       local i=0 foundI=0 emptyI=0
       for i in {1..9}; do
@@ -9233,7 +9204,7 @@ function pro() {
       if (( foundI )); then
         save_proj_f_ -e $foundI "$proj_cmd" "$pkg_name"
       else
-        if confirm_ "add new project: ${bright_pink_prompt_cor}${pkg_name}${reset_prompt_cor}?"; then
+        if confirm_ "add new project: ${bold_pink_cor}${pkg_name}${reset_cor}?"; then
           save_proj_f_ -a $emptyI "$proj_cmd" "$pkg_name"
         fi
       fi
@@ -9290,9 +9261,9 @@ function pro() {
 
   set_current_proj_ $i
 
-  print -n " project set to: ${solid_blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}" >/dev/tty
+  print -n " project set to: ${blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}" >/dev/tty
   if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
-    print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}" >/dev/tty
+    print -n " with ${hi_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}" >/dev/tty
   fi
   print "" >/dev/tty
 
@@ -9328,8 +9299,8 @@ function proj_handler() {
     (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} <folder>${reset_cor} : to set ${proj_cmd} and open folder"
     (( single_mode )) && print "  ${yellow_cor}${proj_cmd} <branch>${reset_cor} : to set/open ${proj_cmd} and switch to branch"
     print "  --"
-    print "  ${yellow_cor}${proj_cmd} -o ${solid_yellow_cor}[<jira_key>]${reset_cor} : to open a ${proj_cmd}'s ticket"
-    print "  ${yellow_cor}${proj_cmd} -c ${solid_yellow_cor}[<jira_key>]${reset_cor} : to close a ${proj_cmd}'s ticket"
+    print "  ${yellow_cor}${proj_cmd} -o ${hi_yellow_cor}[<jira_key>]${reset_cor} : to open a ${proj_cmd}'s ticket"
+    print "  ${yellow_cor}${proj_cmd} -c ${hi_yellow_cor}[<jira_key>]${reset_cor} : to close a ${proj_cmd}'s ticket"
     (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : to open ${proj_cmd}'s default folder"
     print "  --"
     print "  ${yellow_cor}${proj_cmd} -e${reset_cor} : to edit ${proj_cmd}"
@@ -9473,9 +9444,9 @@ function stash() {
 
   if (( stash_is_h )); then
     print "  ${yellow_cor}stash${reset_cor} : to stash all files"
-    print "  ${yellow_cor}stash ${solid_yellow_cor}<name>${reset_cor} : to stash files"
-    print "  ${yellow_cor}stash -v ${solid_yellow_cor}n${reset_cor} : to view latest nth stash"
-    print "  ${yellow_cor}stash -l ${solid_yellow_cor}n${reset_cor} : to list stashes, limit by n"
+    print "  ${yellow_cor}stash ${hi_yellow_cor}<name>${reset_cor} : to stash files"
+    print "  ${yellow_cor}stash -v ${hi_yellow_cor}n${reset_cor} : to view latest nth stash"
+    print "  ${yellow_cor}stash -l ${hi_yellow_cor}n${reset_cor} : to list stashes, limit by n"
     return 0;
   fi
 
@@ -9667,14 +9638,13 @@ function __commit() {
 # end of commit functions =============================================
 
 function help() {
-  #tput reset
   if command -v gum &>/dev/null; then
     gum style --border=rounded --margin=0 --padding="1 16" --border-foreground 212 --width=71 \
       --align=center "welcome to $(gum style --foreground 212 "fab1o's pump my shell! v$PUMP_VERSION")"
   else
     display_line_ "" "${pink_cor}"
     display_line_ "fab1o's pump my shell!" "${pink_cor}" 72 "${reset_cor}"
-    display_line_ "v$PUMP_VERSION" "${pink_cor}" 72 "${reset_cor}"
+    display_line_ "v${PUMP_VERSION}" "${pink_cor}" 72 "${reset_cor}"
     display_line_ "" "${pink_cor}"
   fi
 
@@ -9692,87 +9662,89 @@ function help() {
   
   print ""
   if [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
-    print -n "  project set to: ${solid_blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}"
+    print -n "  project set to: ${blue_cor}${CURRENT_PUMP_SHORT_NAME}${reset_cor}"
     if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
-      print -n " with ${solid_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
+      print -n " with ${hi_magenta_cor}${CURRENT_PUMP_PKG_MANAGER}${reset_cor}"
     fi
     print ""
   else
-    print "  ${red_cor}no project set, run: ${solid_blue_cor}pro${reset_cor}" >&2
+    print "  ${red_cor}no project set${reset_cor}, run: ${blue_cor}pro${reset_cor} to manage projects" >&2
   fi
 
   local spaces="14s"
+  local max=53 # the perfect number for the spaces
 
+  local _fix="${CURRENT_PUMP_FIX:-"$CURRENT_PUMP_PKG_MANAGER run fix (format + lint)"}"
+  local _run="${CURRENT_PUMP_RUN:-"$CURRENT_PUMP_PKG_MANAGER run dev or $CURRENT_PUMP_PKG_MANAGER start"}"
+  local _setup="${CURRENT_PUMP_SETUP:-"$CURRENT_PUMP_PKG_MANAGER run setup or $CURRENT_PUMP_PKG_MANAGER install"}"
+  
+  display_line_ "most popular" "${pink_cor}"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "cl" "clear terminal"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "del" "delete utility"
   print ""
-  display_line_ "get started" "${gray_cor}"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "clone" "clone project or branch"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "jira" "manage jira tickets"
   print ""
-  print "  1. set a project, run: ${gray_cor}pro${reset_cor}"
-  print "  2. clone project, run: ${gray_cor}clone${reset_cor}"
-  print "  3. setup project, run: ${gray_cor}setup${reset_cor}"
-  print "  4. run a project, run: ${gray_cor}run${reset_cor}"
-  print "  5. start new job, run: ${gray_cor}jira${reset_cor}"
-
-  if ! pause_output_; then return 0; fi
-
-  display_line_ "set project" "${solid_blue_cor}"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pull" "git pull"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "git push"
   print ""
-  print " ${solid_blue_cor} pro ${reset_cor}\t\t = set project"
-  for i in {1..9}; do
-    if [[ -n "${PUMP_FOLDER[$i]}" && -n "${PUMP_SHORT_NAME[$i]}" ]]; then
-      printf "  ${solid_blue_cor}%-$spaces${reset_cor} = %s \n" "${PUMP_SHORT_NAME[$i]}" "set project to ${PUMP_SHORT_NAME[$i]}"
-    fi
-  done
-
-  if ! pause_output_; then return 0; fi
-
-  display_line_ "setup & run" "${yellow_cor}"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "git merge"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "git rebase"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "git --abort merge/rebase"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "git --continue merge/rebase"
   print ""
-  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "clone" "clone project or branch"
-  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "i" "$CURRENT_PUMP_PKG_MANAGER install"
-
-  local _setup="$CURRENT_PUMP_SETUP"
-  local _run="$CURRENT_PUMP_RUN"
-  local _run_stage="$CURRENT_PUMP_RUN_STAGE"
-  local _run_prod="$CURRENT_PUMP_RUN_PROD"
-
-  if [[ -z "$_setup" ]]; then
-    _setup="$CURRENT_PUMP_PKG_MANAGER run setup or $CURRENT_PUMP_PKG_MANAGER install"
-  fi
-
-  if [[ -z "$_run" ]]; then
-    _run="$CURRENT_PUMP_PKG_MANAGER run dev or $CURRENT_PUMP_PKG_MANAGER start"
-  fi
-
-  if [[ -z "$_run_stage" ]]; then
-    _run_stage="$CURRENT_PUMP_PKG_MANAGER run stage or $CURRENT_PUMP_PKG_MANAGER start"
-  fi
-
-  if [[ -z "$_run_prod" ]]; then
-    _run_prod="$CURRENT_PUMP_PKG_MANAGER run prod or $CURRENT_PUMP_PKG_MANAGER start"
-  fi
-
-  local max=53
-
-  if (( ${#_setup} > max )); then
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "setup" "run PUMP_SETUP"
+  printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a review"
+  print ""
+  if (( ${#_fix} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "run PUMP_FIX"
   else
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "setup" "$_setup"
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "$_fix"
   fi
   if (( ${#_run} > max )); then
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run" "run PUMP_RUN"
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run" "run PUMP_RUN"
   else
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run" "$_run"
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run" "$_run"
   fi
-  if (( ${#_run_stage} > max )); then
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run stage" "run PUMP_RUN_STAGE"
+  if (( ${#_setup} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "setup" "run PUMP_SETUP"
   else
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run stage" "$_run_stage"
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "setup" "$_setup"
   fi
-  if (( ${#_run_prod} > max )); then
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run prod" "run PUMP_RUN_PROD"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "tsc" "$CURRENT_PUMP_PKG_MANAGER run tsc"
+  if (( ${#CURRENT_PUMP_TEST} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "test" "run CURRENT_PUMP_TEST"
   else
-    printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "run prod" "$_run_prod"
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "test" "$CURRENT_PUMP_TEST"
   fi
+
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "general" "${yellow_cor}"
+  print ""
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "cl" "clear terminal"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "del" "delete utility"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "fl" "list folders"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "help" "display this help"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "hg <text>" "history | grep text"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "kill <port>" "kill port"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "ll" "list all files"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "nver" "node version"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "nlist" "npm list global"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "refresh" "source .zshrc"
+  printf "  ${yellow_cor}%-$spaces${reset_cor} = %s \n" "upgrade" "omz update + pump update"
+
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "project" "${blue_cor}"
+  print ""
+  print " ${blue_cor} pro ${reset_cor}\t\t = manage projects"
+  print "  "
+  for i in {1..9}; do
+    if [[ -n "${PUMP_FOLDER[$i]}" && -n "${PUMP_SHORT_NAME[$i]}" ]]; then
+      printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "${PUMP_SHORT_NAME[$i]}" "open project ${PUMP_SHORT_NAME[$i]}"
+    fi
+  done
 
   if ! pause_output_; then return 0; fi
 
@@ -9781,180 +9753,193 @@ function help() {
   printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a review"
   printf "  ${cyan_cor}%-$spaces${reset_cor} = %s \n" "revs" "list existing reviews"
 
-  if [[ -n "$CURRENT_PUMP_PKG_MANAGER" ]]; then
-    if ! pause_output_; then return 0; fi
+  if ! pause_output_; then return 0; fi
 
-    display_line_ "$CURRENT_PUMP_PKG_MANAGER" "${solid_magenta_cor}"
-    print ""
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "build" "$CURRENT_PUMP_PKG_MANAGER run build"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "deploy" "$CURRENT_PUMP_PKG_MANAGER run deploy"
-    
-    local _fix="${CURRENT_PUMP_FIX:-"$CURRENT_PUMP_PKG_MANAGER run fix (or format + lint)"}"
-    if (( ${#_fix} > max )); then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "run PUMP_FIX"
-    else
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "$_fix"
-    fi
-    
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "format" "$CURRENT_PUMP_PKG_MANAGER run format"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "i" "$CURRENT_PUMP_PKG_MANAGER install"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "lint" "$CURRENT_PUMP_PKG_MANAGER run lint"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "rdev" "$CURRENT_PUMP_PKG_MANAGER run dev"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "sb" "$CURRENT_PUMP_PKG_MANAGER run storybook"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "sbb" "$CURRENT_PUMP_PKG_MANAGER run storybook:build"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "start" "$CURRENT_PUMP_PKG_MANAGER run start"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "tsc" "$CURRENT_PUMP_PKG_MANAGER run tsc"
-    printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "watch" "$CURRENT_PUMP_PKG_MANAGER run watch"
-    
-    if ! pause_output_; then return 0; fi
+  display_line_ "$CURRENT_PUMP_PKG_MANAGER" "${hi_magenta_cor}"
+  print ""
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "build" "$CURRENT_PUMP_PKG_MANAGER run build"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "deploy" "$CURRENT_PUMP_PKG_MANAGER run deploy"
+  if (( ${#_fix} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "run PUMP_FIX"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "fix" "$_fix"
+  fi
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "format" "$CURRENT_PUMP_PKG_MANAGER run format"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "lint" "$CURRENT_PUMP_PKG_MANAGER run lint"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "rdev" "$CURRENT_PUMP_PKG_MANAGER run dev"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "rstart" "$CURRENT_PUMP_PKG_MANAGER run start"
 
-    display_line_ "testing" "${magenta_cor}"
-    print ""
-    if [[ "$CURRENT_PUMP_TEST" != "$CURRENT_PUMP_PKG_MANAGER run test" ]]; then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}test" "$CURRENT_PUMP_PKG_MANAGER run test"
-    fi
-    if [[ "$CURRENT_PUMP_COV" != "$CURRENT_PUMP_PKG_MANAGER run test:coverage" ]]; then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}cov" "$CURRENT_PUMP_PKG_MANAGER run test:coverage"
-    fi
-    if [[ "$CURRENT_PUMP_E2E" != "$CURRENT_PUMP_PKG_MANAGER run test:e2e" ]]; then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}e2e" "$CURRENT_PUMP_PKG_MANAGER run test:e2e"
-    fi
-    if [[ "$CURRENT_PUMP_E2EUI" != "$CURRENT_PUMP_PKG_MANAGER run test:e2e-ui" ]]; then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}e2eui" "$CURRENT_PUMP_PKG_MANAGER run test:e2e-ui"
-    fi
-    if [[ "$CURRENT_PUMP_TEST_WATCH" != "$CURRENT_PUMP_PKG_MANAGER run test:watch" ]]; then
-      printf "  ${solid_magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}testw" "$CURRENT_PUMP_PKG_MANAGER run test:watch"
-    fi
+  local _run_stage="${CURRENT_PUMP_RUN_STAGE:-"$CURRENT_PUMP_PKG_MANAGER run stage or $CURRENT_PUMP_PKG_MANAGER start"}"
+  local _run_prod="${CURRENT_PUMP_RUN_PROD:-"$CURRENT_PUMP_PKG_MANAGER run prod or $CURRENT_PUMP_PKG_MANAGER start"}"
+  if (( ${#_run} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run" "run PUMP_RUN"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run" "$_run"
+  fi
+  if (( ${#_run_stage} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run stage" "run PUMP_RUN_STAGE"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run stage" "$_run_stage"
+  fi
+  if (( ${#_run_prod} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run prod" "run PUMP_RUN_PROD"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "run prod" "$_run_prod"
+  fi
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "sb" "$CURRENT_PUMP_PKG_MANAGER run storybook"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "sbb" "$CURRENT_PUMP_PKG_MANAGER run storybook:build"
+  if (( ${#_setup} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "setup" "run PUMP_SETUP"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "setup" "$_setup"
+  fi
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "tsc" "$CURRENT_PUMP_PKG_MANAGER run tsc"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "watch" "$CURRENT_PUMP_PKG_MANAGER run watch"
+  
+  if ! pause_output_; then return 0; fi
 
-    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "cov" "$CURRENT_PUMP_COV"
-    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "e2e" "$CURRENT_PUMP_E2E"
-    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "e2eui" "$CURRENT_PUMP_E2EUI"
-    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "test" "$CURRENT_PUMP_TEST"
-    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "testw" "$CURRENT_PUMP_TEST_WATCH"
+  display_line_ "$CURRENT_PUMP_PKG_MANAGER test" "${hi_magenta_cor}"
+  print ""
+  if (( ${#CURRENT_PUMP_COV} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "cov" "run CURRENT_PUMP_COV"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "cov" "$CURRENT_PUMP_COV"
+  fi
+  if (( ${#CURRENT_PUMP_E2EUI} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "e2eui" "run CURRENT_PUMP_E2EUI"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "e2eui" "$CURRENT_PUMP_E2EUI"
+  fi
+  if (( ${#CURRENT_PUMP_TEST} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "test" "run CURRENT_PUMP_TEST"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "test" "$CURRENT_PUMP_TEST"
+  fi
+  if (( ${#CURRENT_PUMP_TEST_WATCH} > max )); then
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "testw" "run CURRENT_PUMP_TEST_WATCH"
+  else
+    printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "testw" "$CURRENT_PUMP_TEST_WATCH"
+  fi
+  if [[ "$CURRENT_PUMP_TEST" != "$CURRENT_PUMP_PKG_MANAGER run test" ]]; then
+    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}test" "$CURRENT_PUMP_PKG_MANAGER run test"
+  fi
+  if [[ "$CURRENT_PUMP_COV" != "$CURRENT_PUMP_PKG_MANAGER run test:coverage" ]]; then
+    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}cov" "$CURRENT_PUMP_PKG_MANAGER run test:coverage"
+  fi
+  if [[ "$CURRENT_PUMP_E2E" != "$CURRENT_PUMP_PKG_MANAGER run test:e2e" ]]; then
+    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}e2e" "$CURRENT_PUMP_PKG_MANAGER run test:e2e"
+  fi
+  if [[ "$CURRENT_PUMP_E2EUI" != "$CURRENT_PUMP_PKG_MANAGER run test:e2e-ui" ]]; then
+    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}e2eui" "$CURRENT_PUMP_PKG_MANAGER run test:e2e-ui"
+  fi
+  if [[ "$CURRENT_PUMP_TEST_WATCH" != "$CURRENT_PUMP_PKG_MANAGER run test:watch" ]]; then
+    printf "  ${magenta_cor}%-$spaces${reset_cor} = %s \n" "${CURRENT_PUMP_PKG_MANAGER:0:1}testw" "$CURRENT_PUMP_PKG_MANAGER run test:watch"
   fi
   
   if ! pause_output_; then return 0; fi
-  
-  display_line_ "git" "${solid_cyan_cor}"
-  print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "gconf" "show git config"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "gha" "view last workflow run"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "st" "show git status"
-  
-  if ! pause_output_; then return 0; fi
 
-  display_line_ "git branch" "${solid_cyan_cor}"
+  display_line_ "git branch" "${hi_cyan_cor}"
   print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "back" "switch back to previous branch"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "co" "switch branch (checkout)"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "dev" "switch to dev or develop branch"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "main" "switch to main branch"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "prod" "switch to prod or production branch"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "renb <b>" "rename current branch"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "stage" "switch to stage or staging branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "back" "switch back to previous branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "co" "switch branch (checkout)"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "dev" "switch to dev or develop branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "main" "switch to main branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "prod" "switch to prod or production branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "renb <b>" "rename current branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "stage" "switch to stage or staging branch"
 
   if ! pause_output_; then return 0; fi
   
-  display_line_ "git clean" "${solid_cyan_cor}"
+  display_line_ "git clean" "${hi_cyan_cor}"
   print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "clean" "clean unstaged files"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "delb" "delete branches"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "discard" "discard staged and unstaged files"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "prune" "prune branches and tags"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset1" "reset soft 1 commit"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset2" "reset soft 2 commits"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset3" "reset soft 3 commits"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset4" "reset soft 4 commits"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset5" "reset soft 5 commits"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "reseta" "erase everything, reset to last commit"
-  # printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "restore" "clean staged files"
-
-  if ! pause_output_; then return 0; fi
-
-  display_line_ "git log" "${solid_cyan_cor}"
-  print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "glog" "git log"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "gll" "list local branches"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "glr" "list remote branches"
-
-  if ! pause_output_; then return 0; fi
-
-  display_line_ "git merge" "${solid_cyan_cor}"
-  print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "abort rebase/merge/chp"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "chc" "continue cherry-pick"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "chp" "cherry-pick commit"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "continue rebase/merge/chp"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "mc" "continue merge"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merging"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "rc" "continue rebase"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebasing"
-  
-  if ! pause_output_; then return 0; fi
-  
-  display_line_ "git pull" "${solid_cyan_cor}"
-  print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "fetch" "fetch from remote"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pull" "pull from remote"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pullr" "pull rebase from remote"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "clean" "clean unstaged files"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "delb" "delete branches"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "discard" "discard staged and unstaged files"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "prune" "prune branches and tags"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset1" "reset soft 1 commit"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset2" "reset soft 2 commits"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset3" "reset soft 3 commits"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset4" "reset soft 4 commits"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset5" "reset soft 5 commits"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reseta" "erase everything, reset to last commit"
 
   if ! pause_output_; then return 0; fi
   
-  display_line_ "git push" "${solid_cyan_cor}"
+  display_line_ "git config" "${hi_cyan_cor}"
   print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit wizard"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push to remote"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "force push to remote"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "gconf" "display git config"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "st" "display git status"
+
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "git log" "${hi_cyan_cor}"
+  print ""
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "glog" "git log"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "gll" "list local branches"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "glr" "list remote branches"
+
+  if ! pause_output_; then return 0; fi
+
+  display_line_ "git merge" "${hi_cyan_cor}"
+  print ""
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "abort rebase/merge/chp"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "chc" "continue cherry-pick"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "chp" "cherry-pick commit"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "continue rebase/merge/chp"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "mc" "continue merge"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merge branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rc" "continue rebase"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebase branch"
+  
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "git pull" "${hi_cyan_cor}"
+  print ""
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "fetch" "fetch from remote"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pull" "pull from remote"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pullr" "pull rebase from remote"
 
   if ! pause_output_; then return 0; fi
   
-  display_line_ "git stash" "${solid_cyan_cor}"
+  display_line_ "git push" "${hi_cyan_cor}"
   print ""
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "pop" "apply stash then remove from list"
-  printf "  ${solid_cyan_cor}%-$spaces${reset_cor} = %s \n" "stash" "stash files"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "commit wizard"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "commit with message"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push to remote"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "force push to remote"
 
   if ! pause_output_; then return 0; fi
   
-  display_line_ "release" "${solid_pink_cor}"
+  display_line_ "git stash" "${hi_cyan_cor}"
   print ""
-  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "dtag" "delete a tag"
-  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "drelease" "delete a release"
-  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "release" "create a release"
-  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "tag" "create a tag"
-  printf "  ${solid_pink_cor}%-$spaces${reset_cor} = %s \n" "tags" "display latest tags"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pop" "apply stash then remove from list"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "stash" "stash files"
+
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "release" "${green_cor}"
+  print ""
+  printf "  ${green_cor}%-$spaces${reset_cor} = %s \n" "dtag" "delete a tag"
+  printf "  ${green_cor}%-$spaces${reset_cor} = %s \n" "drelease" "delete a release"
+  printf "  ${green_cor}%-$spaces${reset_cor} = %s \n" "release" "create a release"
+  printf "  ${green_cor}%-$spaces${reset_cor} = %s \n" "tag" "create a tag"
+  printf "  ${green_cor}%-$spaces${reset_cor} = %s \n" "tags" "display latest tags"
   
   if ! pause_output_; then return 0; fi
   
-  display_line_ "special task" "${blue_cor}"
+  display_line_ "special task" "${hi_magenta_cor}"
   print ""
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "cov <b>" "compare test coverage with another branch"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "jira" "clone/checkout work for a jira ticket"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "pra" "set assignee to all pull requests"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "refix" "reset last commit, run fix then re-push"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "recommit" "reset last commit then commit changes to index again"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "release" "bump version and create a release on github"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "repush" "reset last commit then push changes again"
-  printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a pull request for review on code editor or browser"
-  
-  if ! pause_output_; then return 0; fi
-  
-  display_line_ "general" "${solid_yellow_cor}"
-  print ""
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "cl" "clear terminal"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "colors" "display colors from 0 to 255"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "del" "delete utility"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "fl" "list folders"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "help" "display this help"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "hg <text>" "history | grep text"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "kill <port>" "kill port"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "ll" "ls -la"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "nver" "node version"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "nlist" "npm list global"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "refresh" "source .zshrc"
-  printf "  ${solid_yellow_cor}%-$spaces${reset_cor} = %s \n" "upgrade" "omz update + pump update"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "cov <b>" "compare test coverage with another branch"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "gha" "view workflow runs"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "jira" "manage jira tickets"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "pra" "set assignee to all pull requests"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "refix" "reset last commit, run fix then re-push"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "recommit" "reset last commit then commit changes to index again"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "release" "bump version and create a release on github"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "repush" "reset last commit then push changes again"
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "rev" "open a pull request for review on code editor or browser"
 
   print ""
   print "  use ${yellow_cor}-h${reset_cor} after any command to see more usage details"
@@ -10002,7 +9987,7 @@ function validate_proj_cmd_strict_() {
 
 function validate_proj_cmd_() {
   local proj_cmd="$1"
-  local qty=${2:-$MAX_NAME_COUNT}
+  local qty=${2:-10}
 
   local error_msg=""
 
@@ -10033,7 +10018,7 @@ function validate_proj_cmd_() {
   return 0;
 }
 
-function colors() {
+function colors_() {
   for i in {0..255}; do print -P "%F{$i}Color $i%f"; done
 }
 
@@ -10183,7 +10168,7 @@ function fl() {
   (( fl_is_d )) && set -x
 
   if (( fl_is_h )); then
-    print "  ${yellow_cor}fl ${solid_yellow_cor}[<folder>]${reset_cor} : to list folders"
+    print "  ${yellow_cor}fl ${hi_yellow_cor}[<folder>]${reset_cor} : to list folders"
     print "  ${yellow_cor}fl -p${reset_cor} : to order by priority: special folders first"
     print "  ${yellow_cor}fl -on${reset_cor} : to order by name"
     print "  ${yellow_cor}fl -On${reset_cor} : to order by name (reverse order)"
@@ -10257,7 +10242,7 @@ function fl() {
     if (( fl_is_q )); then
       echo "$name"
     else
-      echo "${bright_cyan_cor}${name}${reset_cor}"
+      echo "${bold_cyan_cor}${name}${reset_cor}"
     fi
   done
   # if ordered was an array
