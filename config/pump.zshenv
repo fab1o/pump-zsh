@@ -393,19 +393,6 @@ PUMP_GHA_INTERVAL_8=
 PUMP_GHA_INTERVAL_9=
 
 # optional
-# default empty (will ask)
-# workflow to check for command 'gha'
-PUMP_GHA_WORKFLOW_1=
-PUMP_GHA_WORKFLOW_2=
-PUMP_GHA_WORKFLOW_3=
-PUMP_GHA_WORKFLOW_4=
-PUMP_GHA_WORKFLOW_5=
-PUMP_GHA_WORKFLOW_6=
-PUMP_GHA_WORKFLOW_7=
-PUMP_GHA_WORKFLOW_8=
-PUMP_GHA_WORKFLOW_9=
-
-# optional
 # default: empty (will ask)
 # 0 or empty to look for Node.js version in project's engine and nvm list
 # 1 to skip lookup
