@@ -1,4 +1,4 @@
-## Example of a PR template
+## PR template
 
 Description:
 

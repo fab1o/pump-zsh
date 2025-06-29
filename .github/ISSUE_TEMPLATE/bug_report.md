@@ -7,14 +7,14 @@ assignees: 'fab1o'
 
 ---
 
-## 🧩 Description
+## Description
 
 A clear and concise description of what the bug is:
 
 
 ---
 
-## ✅ Steps to Reproduce
+## Steps to Reproduce
 
 1. Type '...'
 2. Go to '...'
@@ -36,21 +36,21 @@ What actually happened?
 
 ---
 
-## 💻 Environment
+## Environment
 
 - pump-zsh version:
 - OS & OS version: [e.g., macOS, Windows..]
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 If applicable, add screenshots or logs to help explain your problem.
 
 
 ---
 
-## ⚙️ Configuration File
+## Configuration File
 
 Copy the contents of your `pump.zshenv` file and paste it inside the quotes:
 

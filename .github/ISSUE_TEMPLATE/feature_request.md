@@ -7,24 +7,24 @@ assignees: 'fab1o'
 
 ---
 
-## ✨ Description
+## Description
 
 What's the new feature or improvement?
 
 ---
 
-## 📈 Motivation
+## Motivation
 
 Why is this feature important? What problem does it solve?
 
 ---
 
-## 🧠 Alternatives Considered
+## Alternatives Considered
 
 Have you considered other solutions or workarounds?
 
 ---
 
-## 🔗 Additional Context
+## Additional Context
 
 Any extra info, screenshots, references, etc.
