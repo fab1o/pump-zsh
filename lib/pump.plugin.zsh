@@ -3871,12 +3871,11 @@ function del_files_() {
 }
 
 function del() {
-  eval "$(parse_flags_ "del_" "saq" "" "$@")"
+  eval "$(parse_flags_ "del_" "sq" "" "$@")"
   (( del_is_debug )) && set -x
 
   if (( del_is_h )); then
-    print "  ${yellow_cor}del ${low_yellow_cor}<glob>${reset_cor} : to delete files"
-    print "  ${yellow_cor}del -a${reset_cor} : include hidden files"
+    print "  ${yellow_cor}del ${low_yellow_cor}[<glob>]${reset_cor} : to delete files"
     print "  ${yellow_cor}del -q${reset_cor} : quietly, no output"
     print "  ${yellow_cor}del -s${reset_cor} : skip confirmation"
     return 0;
@@ -3885,33 +3884,25 @@ function del() {
   rm -rf -- ".DS_Store"
 
   local files=()
-  local pattern=""
 
   if [[ -z "$1" ]]; then
     setopt null_glob
-    if (( del_is_a )); then
-      setopt dot_glob
-    else
-      setopt no_dot_glob
-    fi
+    setopt dot_glob
+    # setopt no_dot_glob
 
     # capture all files in current folder
     files=(*)
 
-    unsetopt null_glob
-    if (( del_is_a )); then
-      unsetopt dot_glob
-    else
-      unsetopt no_dot_glob
-    fi
+    # unsetopt null_glob
+    # unsetopt dot_glob
+    # unsetopt no_dot_glob
 
     if (( ${#files[@]} > 1 )); then
       files=("${(@f)$(choose_multiple_ "files to delete" "${files[@]}")}")
     fi
   else
     # capture all arguments (quoted or not) as a single pattern
-    pattern="$*"
-  
+    local pattern="$*"
     # expand the pattern — if it's a glob, this expands to matches
     files=(${(z)~pattern})
   fi
@@ -4543,7 +4534,7 @@ function e2eui() {
 
   if (( e2eui_is_h )); then
     print "  ${yellow_cor}e2eui${reset_cor} : to run PUMP_E2EUI"
-    print "  ${yellow_cor}e2eui ${low_yellow_cor}<test_project>${reset_cor} : to run PUMP_E2EUI --project"
+    print "  ${yellow_cor}e2eui ${low_yellow_cor}[<test_project>]${reset_cor} : to run PUMP_E2EUI --project"
     return 0;
   fi
 
@@ -4559,22 +4550,278 @@ function e2eui() {
 # github functions =========================================================
 function add() {
   set +x
-  eval "$(parse_flags_ "add_" "" "" "$@")"
+  eval "$(parse_flags_ "add_" "taqsb" "" "$@")"
   (( add_is_debug )) && set -x
 
   if (( add_is_h )); then
-    print "  ${yellow_cor}add${reset_cor} : to add all files to index"
-    print "  ${yellow_cor}add <glob>${reset_cor} : to add certain files to index"
+    print "  ${yellow_cor}add ${low_yellow_cor}[<glob>]${reset_cor} : to add files to index"
+    print "  ${yellow_cor}add -a${reset_cor} : add all tracked and untracked files"
+    print "  ${yellow_cor}add -t${reset_cor} : add only tracked files"
+    print "  ${yellow_cor}add -ta${reset_cor} : add all tracked files (not untracked)"
+    print "  ${yellow_cor}add -q${reset_cor} : --quiet"
+    print "  ${yellow_cor}add -sb${reset_cor} : show git status in short-format"
     return 0;
   fi
 
   if ! is_folder_git_; then return 1; fi
 
-  if [[ -n "$1" && $1 != -*  ]]; then
-    git add "$1" ${@:2}
+  local files=()
+
+  if [[ -z "$1" ]]; then
+    setopt null_glob
+    setopt dot_glob
+
+    # add -t
+    if (( add_is_t )); then
+      files=("${(@f)$(git diff --name-only)}")
+    else
+      files=("${(@f)$(git status --porcelain | awk '$1 == "??" || $1 == "M" { print $2 }')}")
+    fi
+
+    if (( ! add_is_a && ${#files[@]} > 1 )); then
+      files=("${(@f)$(choose_multiple_ "files to add" "${files[@]}")}")
+    fi
   else
-    git add . $@
+    local pattern="$*"
+    files=(${(z)~pattern})
   fi
+
+  if [[ -z "$files" ]]; then
+    if (( ! add_is_q )); then
+      print " no files to add" >&2
+    fi
+    return 0;
+  fi
+
+  git add -- "${files[@]}"
+
+  if (( ! add_is_q )); then
+    if (( add_is_s && add_is_b )); then
+      st -sb
+    else
+      st
+    fi
+  fi
+}
+
+# remove files from index
+function rem() {
+  set +x
+  eval "$(parse_flags_ "rem_" "taqsb" "" "$@")"
+  (( rem_is_debug )) && set -x
+
+  if (( rem_is_h )); then
+    print "  ${yellow_cor}rem ${low_yellow_cor}[<glob>]${reset_cor} : to remove files from index"
+    print "  ${yellow_cor}rem -a${reset_cor} : remove all tracked and untracked files"
+    print "  ${yellow_cor}rem -t${reset_cor} : remove only tracked files"
+    print "  ${yellow_cor}rem -ta${reset_cor} : remove all tracked files (not untracked)"
+    print "  ${yellow_cor}rem -q${reset_cor} : --quiet"
+    print "  ${yellow_cor}rem -sb${reset_cor} : show git status in short-format"
+    return 0;
+  fi
+
+  if ! is_folder_git_; then return 1; fi
+
+  local files=()
+
+  if [[ -z "$1" ]]; then
+    setopt null_glob
+    setopt dot_glob
+
+    # rem -t
+    if (( rem_is_t )); then
+      files=("${(@f)$(git diff --name-only)}")
+    else
+      files=("${(@f)$(git diff --name-only --cached)}")
+    fi
+
+    if (( ! rem_is_a && ${#files[@]} > 1 )); then
+      files=("${(@f)$(choose_multiple_ "files to remove" "${files[@]}")}")
+      if [[ -z "$files" ]]; then return 0; fi;
+    fi
+  else
+    local pattern="$*"
+    files=(${(z)~pattern})
+  fi
+
+  if [[ -z "$files" ]]; then
+    if (( ! rem_is_q )); then
+      print " no files to remove" >&2
+    fi
+    return 0;
+  fi
+
+  local f=""
+  for f in "${files[@]}"; do
+    if git ls-files --error-unmatch -- "$f" &>/dev/null; then
+      git rm --cached -- "$f"
+    else
+      git restore --staged -- "$f"
+    fi
+  done
+
+  if (( ! rem_is_q )); then
+    if (( rem_is_s && rem_is_b )); then
+      st -sb
+    else
+      st
+    fi
+  fi
+}
+
+function reset1() {
+  set +x
+  eval "$(parse_flags_ "reset1_" "" "" "$@")"
+  (( reset1_is_debug )) && set -x
+
+  if (( reset1_is_h )); then
+    print "  ${yellow_cor}reset1 ${low_yellow_cor}[<folder>]${reset_cor} : to reset last commit"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}reset1 -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  git -C "$folder" --no-pager log --oneline --graph --decorate -1
+  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
+  
+  git -C "$folder" reset --quiet --soft HEAD~1 $@
+}
+
+function reset2() {
+  set +x
+  eval "$(parse_flags_ "reset2_" "" "" "$@")"
+  (( reset2_is_debug )) && set -x
+
+  if (( reset2_is_h )); then
+    print "  ${yellow_cor}reset2 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 2 last commits"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}reset2 -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  git -C "$folder" --no-pager log --oneline --graph --decorate -2
+  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
+  
+  git -C "$folder" reset --quiet --soft HEAD~2 $@
+}
+
+function reset3() {
+  set +x
+  eval "$(parse_flags_ "reset3_" "" "" "$@")"
+  (( reset3_is_debug )) && set -x
+
+  if (( reset3_is_h )); then
+    print "  ${yellow_cor}reset3 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 3 last commits"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}reset3 -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  git -C "$folder" --no-pager log --oneline --graph --decorate -3
+  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
+  
+  git -C "$folder" reset --quiet --soft HEAD~3 $@
+}
+
+function reset4() {
+  set +x
+  eval "$(parse_flags_ "reset4_" "" "" "$@")"
+  (( reset4_is_debug )) && set -x
+
+  if (( reset4_is_h )); then
+    print "  ${yellow_cor}reset4 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 4 last commits"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}reset4 -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  git -C "$folder" --no-pager log --oneline --graph --decorate -4
+  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
+  
+  git -C "$folder" reset --quiet --soft HEAD~4 $@
+}
+
+function reset5() {
+  set +x
+  eval "$(parse_flags_ "reset5_" "" "" "$@")"
+  (( reset5_is_debug )) && set -x
+
+  if (( reset5_is_h )); then
+    print "  ${yellow_cor}reset5 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 5 last commits"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}reset5 -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  git -C "$folder" --no-pager log --oneline --graph --decorate -5
+  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
+  
+  git -C "$folder" reset --quiet --soft HEAD~5 $@
 }
 
 function read_commits_() {
@@ -4991,11 +5238,11 @@ function run() {
     print "  --"
     if [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
       print "  ${yellow_cor}run <folder>${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on dev environment"
-      print "  ${yellow_cor}run <folder> ${low_yellow_cor}<env>${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on given environment"
+      print "  ${yellow_cor}run <folder> ${low_yellow_cor}[<env>]${reset_cor} : to run a ${CURRENT_PUMP_SHORT_NAME}'s folder on given environment"
       print "  --"
     fi
     print "  ${yellow_cor}run <pro> <folder>${reset_cor} : to run a project's folder on dev environment"
-    print "  ${yellow_cor}run <pro> <folder> ${low_yellow_cor}<env>${reset_cor} : to run a project's folder on a given environment"
+    print "  ${yellow_cor}run <pro> <folder> ${low_yellow_cor}[<env>]${reset_cor} : to run a project's folder on a given environment"
     return 0;
   fi
 
@@ -5150,7 +5397,7 @@ function setup() {
       fi
       print "  --"
     print "  ${yellow_cor}setup <pro>${reset_cor} : to setup a project"
-    print "  ${yellow_cor}setup <pro> ${low_yellow_cor}<folder>${reset_cor} : to setup a project's folder"
+    print "  ${yellow_cor}setup <pro> ${low_yellow_cor}[<folder>]${reset_cor} : to setup a project's folder"
     return 0;
   fi
 
@@ -5428,7 +5675,7 @@ function rev() {
     print "  ${yellow_cor}rev -a${reset_cor} : approve pull request"
     print "  --"
     print "  ${yellow_cor}rev <pro>${reset_cor} : to open a review for a project"
-    print "  ${yellow_cor}rev <pro> ${low_yellow_cor}<branch>${reset_cor} : to open a review for a project's branch"
+    print "  ${yellow_cor}rev <pro> ${low_yellow_cor}[<branch>]${reset_cor} : to open a review for a project's branch"
     return 0;
   fi
 
@@ -6557,161 +6804,6 @@ function cont() {
   fi
 }
 
-function reset1() {
-  set +x
-  eval "$(parse_flags_ "reset1_" "" "" "$@")"
-  (( reset1_is_debug )) && set -x
-
-  if (( reset1_is_h )); then
-    print "  ${yellow_cor}reset1 ${low_yellow_cor}[<folder>]${reset_cor} : to reset last commit"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reset1 -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  git -C "$folder" --no-pager log --oneline --graph --decorate -1
-  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
-  
-  git -C "$folder" reset --quiet --soft HEAD~1 $@
-}
-
-function reset2() {
-  set +x
-  eval "$(parse_flags_ "reset2_" "" "" "$@")"
-  (( reset2_is_debug )) && set -x
-
-  if (( reset2_is_h )); then
-    print "  ${yellow_cor}reset2 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 2 last commits"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reset2 -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  git -C "$folder" --no-pager log --oneline --graph --decorate -2
-  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
-  
-  git -C "$folder" reset --quiet --soft HEAD~2 $@
-}
-
-function reset3() {
-  set +x
-  eval "$(parse_flags_ "reset3_" "" "" "$@")"
-  (( reset3_is_debug )) && set -x
-
-  if (( reset3_is_h )); then
-    print "  ${yellow_cor}reset3 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 3 last commits"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reset3 -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  git -C "$folder" --no-pager log --oneline --graph --decorate -3
-  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
-  
-  git -C "$folder" reset --quiet --soft HEAD~3 $@
-}
-
-function reset4() {
-  set +x
-  eval "$(parse_flags_ "reset4_" "" "" "$@")"
-  (( reset4_is_debug )) && set -x
-
-  if (( reset4_is_h )); then
-    print "  ${yellow_cor}reset4 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 4 last commits"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reset4 -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  git -C "$folder" --no-pager log --oneline --graph --decorate -4
-  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
-  
-  git -C "$folder" reset --quiet --soft HEAD~4 $@
-}
-
-function reset5() {
-  set +x
-  eval "$(parse_flags_ "reset5_" "" "" "$@")"
-  (( reset5_is_debug )) && set -x
-
-  if (( reset5_is_h )); then
-    print "  ${yellow_cor}reset5 ${low_yellow_cor}[<folder>]${reset_cor} : to reset 5 last commits"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reset5 -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  git -C "$folder" --no-pager log --oneline --graph --decorate -5
-  git -C "$folder" log -1 --pretty=format:'%s' | pbcopy
-  
-  git -C "$folder" reset --quiet --soft HEAD~5 $@
-}
-
 function repush() {
   set +x
   eval "$(parse_flags_ "repush_" "s" "q" "$@")"
@@ -6903,7 +6995,7 @@ function glog() {
   (( glog_is_debug )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : to log last 10 commits"
+    print "  ${yellow_cor}glog ${low_yellow_cor}[<n>] [<branch>] [<folder>]${reset_cor} : to log last n commits (7 by default)"
     print "  ${yellow_cor}glog -c <branch>${reset_cor} : log branch's commits since a given branch"
     print "  ${yellow_cor}glog -c${reset_cor} : log branch's commits since default branch"
     print "  ${yellow_cor}glog -n${reset_cor} : log n number of commits"
@@ -6915,27 +7007,52 @@ function glog() {
 
   local base_branch=""
   local arg_count=0
+  local n=7
 
-  if [[ -n "$2" && $2 != -* ]]; then
-    if [[ -d "$2" ]]; then
-      folder="$2"
-    elif [[ $2 == <-> ]]; then
-      print " fatal: argument is invalid" >&2
-      print " run ${yellow_cor}glog $1 -$2${reset_cor}" >&2
-      return 1;
+  if [[ -n "$3" && $3 != -* ]]; then
+    if [[ -d "$3" ]]; then
+      folder="$3"
     else
       print " fatal: not a valid folder argument: $2" >&2
       print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
       return 1;
     fi
+
+    branch_arg="$2"
     
-    if [[ -n "$1" && $1 != -* ]]; then
+    if [[ $1 == <-> ]]; then
+      n="$1"
+    else
+      print " fatal: not a valid n argument: $1" >&2
+      print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+
+    arg_count=3
+  
+  elif [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+    else
       if [[ $1 == <-> ]]; then
-        print " fatal: argument is invalid" >&2
-        print " run ${yellow_cor}glog -$1${reset_cor}" >&2
+        branch_arg="$2"
+      else
+        print " fatal: not a valid folder argument: $2" >&2
+        print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
         return 1;
       fi
-      branch_arg="$1"
+    fi
+
+    if [[ -n "$1" && $1 != -* ]]; then
+      if [[ $1 == <-> ]]; then
+        n="$1"
+      else
+        if [[ -n "$folder" ]]; then
+          branch_arg="$1"
+        else
+          folder="$1"
+        fi
+      fi
     fi
     
     arg_count=2
@@ -6944,18 +7061,12 @@ function glog() {
     if [[ -d "$1" ]]; then
       folder="$1"
     elif [[ $1 == <-> ]]; then
-      print " fatal: argument is invalid" >&2
-      print " run ${yellow_cor}glog -$1${reset_cor}" >&2
-      return 1;
+      n="$1"
     else
       branch_arg="$1"
     fi
     
     arg_count=1
-  elif [[ -n "$1" && $1 != -* && $1 == <-> ]]; then
-    print " fatal: argument is invalid" >&2
-    print " run ${yellow_cor}glog -$1${reset_cor}" >&2
-    return 1;
   fi
 
   shift $arg_count
@@ -6974,7 +7085,11 @@ function glog() {
 
     git -C "$folder" --no-pager log $branch_arg..$my_branch --oneline --graph --decorate $@
   else
-    git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate $@
+    if (( n )); then
+      git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate -n $n $@
+    else
+      git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate $@
+    fi
   fi
 }
 
@@ -7346,7 +7461,7 @@ function drelease() {
 
   if (( drelease_is_h )); then
     print "  ${yellow_cor}drelease ${low_yellow_cor}[<pro>] [<tag>]${reset_cor} : to delete a project's release and the tag"
-    print "  ${yellow_cor}drelease ${low_yellow_cor}<tag>${reset_cor} : to delete a project's release and the tag directly"
+    print "  ${yellow_cor}drelease ${low_yellow_cor}[<tag>]${reset_cor} : to delete a project's release and the tag directly"
     return 0;
   fi
 
@@ -7420,7 +7535,7 @@ function release() {
 
   if (( release_is_h )); then
     print "  ${yellow_cor}release ${low_yellow_cor}[<pro>] [<version>]${reset_cor} : to create a new release of package.json version"
-    print "  ${yellow_cor}release ${low_yellow_cor}<version>${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
+    print "  ${yellow_cor}release ${low_yellow_cor}[<version>]${reset_cor} : to create a new release, version format: <major>.<minor>.<patch> i.e: 1.0.0"
     print "  ${yellow_cor}release -r${reset_cor} : re-release if version is already released"
     print "  ${yellow_cor}release -s${reset_cor} : skip confirmation"
     print "  --"
@@ -7600,13 +7715,12 @@ function release() {
     fi
   fi
 
-  if ! tag "$proj_arg" "$tag"; then return 1; fi
-  if ! push --tags --quiet "$proj_folder"; then return 1; fi
+  # if ! tag "$proj_arg" "$tag"; then return 1; fi
+  # if ! push --tags --quiet "$proj_folder"; then return 1; fi
 
-  # if gh release create "$tag" --repo "$proj_repo" --title="$tag" --generate-notes; then
-  #   push $proj_folder"
-  # fi
-  gh release create "$tag" --repo "$proj_repo" --title="$tag" --generate-notes
+  if gh release create "$tag" --repo "$proj_repo" --title="$tag" --generate-notes; then
+    push "$proj_folder"
+  fi
 }
 
 function tag() {
@@ -7616,7 +7730,7 @@ function tag() {
 
   if (( tag_is_h )); then
     print " release_ = ${yellow_cor}tag ${low_yellow_cor}[<pro>] [<name>]${reset_cor} : to create a new tag for a project"
-    print " release_ = ${yellow_cor}tag ${low_yellow_cor}<name>${reset_cor} : to create a new tag directly"
+    print " release_ = ${yellow_cor}tag ${low_yellow_cor}[<name>]${reset_cor} : to create a new tag directly"
     print " release_ = ${yellow_cor}tag -s${reset_cor} : skip confirmation"
     print " release_ = ${yellow_cor}tag -q${reset_cor} : tag --quiet"
     return 0;
@@ -7752,19 +7866,65 @@ function tags() {
 # end of tagging functions ===============================================
 
 function print_clean_() {
-  print "  ${orange_cor}soft${reset_cor}   : $(clean -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/  :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
+  print "  ${yellow_cor}softer${reset_cor} : $(clean -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/  :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
+  print "  ${orange_cor}soft${reset_cor}   : $(restore -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/:/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
   print "  ${dark_orange_cor}medium${reset_cor} : $(discard -hq | sed 's/\[\<folder\>\]//g' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
   print "  ${hi_red_cor}hard${reset_cor}   : $(reseta -hq | sed 's/\[\<folder\>\]//g' | sed 's/:/ :/' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | head -n 1)"
 }
 
+function restore() {
+  set +x
+  eval "$(parse_flags_ "restore_" "a" "q" "$@")"
+  (( restore_is_debug )) && set -x
+
+  if (( restore_is_h )); then
+    print "  ${yellow_cor}restore ${low_yellow_cor}[<folder>]${reset_cor} : to clean staged files only"
+    print "  ${yellow_cor}restore -a${low_yellow_cor}[<folder>]${reset_cor} : include untracked files in working tree"
+    print "  ${yellow_cor}restore -q${reset_cor} : restore --quiet"
+    if (( ! restore_is_q )); then
+      print " --"
+      print_clean_
+    fi
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}restore -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local staged_files=("${(@f)$(git -C "$folder" diff --name-only --cached)}")
+
+  if [[ -z "$staged_files" ]]; then
+    print " no tracked files to restore" >&2
+    return 0;
+  fi
+
+  if git -C "$folder" restore --staged -- "${staged_files[@]}" $@; then
+    if (( restore_is_a )); then
+      git -C "$folder" restore --worktree -- "${staged_files[@]}" &>/dev/null
+    fi
+  fi
+}
+
 function clean() {
   set +x
-  eval "$(parse_flags_ "clean_" "q" "q" "$@")"
+  eval "$(parse_flags_ "clean_" "" "q" "$@")"
   (( clean_is_debug )) && set -x
 
   if (( clean_is_h )); then
-    print "  ${yellow_cor}clean ${low_yellow_cor}[<folder>]${reset_cor} : to clean unstaged files"
-    print "  ${yellow_cor}clean -q${reset_cor} : to clean --quiet"
+    print "  ${yellow_cor}clean ${low_yellow_cor}[<folder>]${reset_cor} : to clean untracked files"
+    print "  ${yellow_cor}clean -q${reset_cor} : clean --quiet"
     if (( ! clean_is_q )); then
       print " --"
       print_clean_
@@ -7787,18 +7947,18 @@ function clean() {
 
   if ! is_folder_git_ "$folder"; then return 1; fi
   
-  git -C "$folder" clean -fd --quiet $@
-  git -C "$folder" restore --quiet . $@
+  git -C "$folder" clean -fd $@
+  git -C "$folder" restore --worktree . $@
 }
 
 function discard() {
   set +x
-  eval "$(parse_flags_ "discard_" "q" "q" "$@")"
+  eval "$(parse_flags_ "discard_" "" "q" "$@")"
   (( discard_is_debug )) && set -x
 
   if (( discard_is_h )); then
-    print "  ${yellow_cor}discard ${low_yellow_cor}[<folder>]${reset_cor} : to discard staged and unstaged files"
-    print "  ${yellow_cor}discard -q${reset_cor} : to discard --quiet"
+    print "  ${yellow_cor}discard ${low_yellow_cor}[<folder>]${reset_cor} : to discard tracked and untracked files"
+    print "  ${yellow_cor}discard -q${reset_cor} : discard --quiet"
     if (( ! discard_is_q )); then
       print " --"
       print_clean_
@@ -7828,13 +7988,13 @@ function discard() {
 
 function reseta() {
   set +x
-  eval "$(parse_flags_ "reseta_" "oq" "q" "$@")"
+  eval "$(parse_flags_ "reseta_" "o" "q" "$@")"
   (( reseta_is_debug )) && set -x
 
   if (( reseta_is_h )); then
     print "  ${yellow_cor}reseta ${low_yellow_cor}[<folder>]${reset_cor} : to erase everything and match HEAD to latest commit of current branch"
-    print "  ${yellow_cor}reseta -o${reset_cor} : to erase everything and match HEAD to origin"
-    print "  ${yellow_cor}reseta -q${reset_cor} : to reset --quiet"
+    print "  ${yellow_cor}reseta -o${reset_cor} : erase everything and match HEAD to origin"
+    print "  ${yellow_cor}reseta -q${reset_cor} : reset --quiet"
     if (( ! reseta_is_q )); then
       print " --"
       print_clean_
@@ -8002,9 +8162,9 @@ function gha() {
 
   if (( gha_is_h )); then
     print "  ${yellow_cor}gha${reset_cor} : to check status of a workflow in current project"
-    print "  ${yellow_cor}gha ${low_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow in current project"
-    print "  ${yellow_cor}gha <pro> ${low_yellow_cor}<workflow>${reset_cor} : to check status of a given workflow for a project"
-    print "  ${yellow_cor}gha -a${reset_cor} : to run in auto mode"
+    print "  ${yellow_cor}gha ${low_yellow_cor}[<workflow>]${reset_cor} : to check status of a given workflow in current project"
+    print "  ${yellow_cor}gha <pro> ${low_yellow_cor}[<workflow>]${reset_cor} : to check status of a given workflow for a project"
+    print "  ${yellow_cor}gha -a${reset_cor} : run in auto mode"
     return 0;
   fi
 
@@ -8081,21 +8241,21 @@ function gha() {
 
 function co() {
   set +x
-  eval "$(parse_flags_ "co_" "alprebcqmx" "q" "$@")"
+  eval "$(parse_flags_ "co_" "alprebcmx" "q" "$@")"
   (( co_is_debug )) && set -x
 
   if (( co_is_h )); then
     print "  ${yellow_cor}co${reset_cor} : to switch to a branch"
-    print "  --"
-    print "  ${yellow_cor}co -a${reset_cor} : to list all branches (default)"
-    print "  ${yellow_cor}co -l${reset_cor} : to list only local branches"
-    print "  ${yellow_cor}co -pr${reset_cor} : to list pull requests instead (for quick code reviews)"
-    print "  --"
-    print "  ${yellow_cor}co -m${reset_cor} : to switch to the default branch"
-    print "  ${yellow_cor}co -e <branch>${reset_cor} : to switch to an exact branch, no lookup"
-    print "  ${yellow_cor}co -c <branch>${reset_cor} : to create a new branch (switch -c)"
-    print "  ${yellow_cor}co -b <branch>${reset_cor} : to create a new branch (checkout -b)"
     print "  ${yellow_cor}co <branch> <base_branch>${reset_cor} : to create a new branch off of base branch"
+    print "  --"
+    print "  ${yellow_cor}co -a${reset_cor} : list all branches (default)"
+    print "  ${yellow_cor}co -l${reset_cor} : list only local branches"
+    print "  ${yellow_cor}co -pr${reset_cor} : list pull requests and detach branch (for quick code reviews)"
+    print "  --"
+    print "  ${yellow_cor}co -m${reset_cor} : switch to the default branch"
+    print "  ${yellow_cor}co -e <branch>${reset_cor} : switch to an exact branch, no lookup"
+    print "  ${yellow_cor}co -c <branch>${reset_cor} : create a new branch (switch -c)"
+    print "  ${yellow_cor}co -b <branch>${reset_cor} : create a new branch (checkout -b)"
     return 0;
   fi
 
@@ -8458,7 +8618,7 @@ function rebase() {
 
   if (( rebase_is_h )); then
     print "  ${yellow_cor}rebase${reset_cor} : to apply the commits from your branch on top of the HEAD of default branch"
-    print "  ${yellow_cor}rebase ${low_yellow_cor}<base_branch> [<folder>]${reset_cor} : to apply the commits on top of the HEAD of base branch"
+    print "  ${yellow_cor}rebase ${low_yellow_cor}[<base_branch>] [<folder>]${reset_cor} : to apply the commits on top of the HEAD of base branch"
     print "  ${yellow_cor}rebase -a${reset_cor} : rebase multiple branches"
     print "  ${yellow_cor}rebase -m${reset_cor} : rebase --merge"
     print "  ${yellow_cor}rebase -p${reset_cor} : push after rebase if succeeds with no conflicts"
@@ -8563,7 +8723,7 @@ function merge() {
 
   if (( merge_is_h )); then
     print "  ${yellow_cor}merge${reset_cor} : to create a new merge commit from default branch"
-    print "  ${yellow_cor}merge ${low_yellow_cor}<base_branch> [<folder>]${reset_cor} : to create a new merge commit from base branch"
+    print "  ${yellow_cor}merge ${low_yellow_cor}[<base_branch>] [<folder>]${reset_cor} : to create a new merge commit from base branch"
     print "  ${yellow_cor}merge -a${reset_cor} : merge multiple branches"
     print "  ${yellow_cor}merge -s <strategy>${reset_cor} : merge --strategy"
     print "  ${yellow_cor}merge -p${reset_cor} : push after merge succeeds with no conflicts"
@@ -8863,7 +9023,7 @@ function st() {
 
   if (( st_is_h )); then
     print "  ${yellow_cor}st ${low_yellow_cor}[<folder>]${reset_cor} : to show git status"
-    print "  ${yellow_cor}st -sb${reset_cor} : to show git status in short-format"
+    print "  ${yellow_cor}st -sb${reset_cor} : show git status in short-format"
     return 0;
   fi
 
@@ -9610,7 +9770,7 @@ function __commit() {
 
   if (( commit_is_h )); then
     print "  ${yellow_cor}${COMMIT1}${reset_cor} : commit with https://www.conventionalcommits.org"
-    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : to commit  --no-verify --message"
+    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : commit  --no-verify --message"
     print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
     print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
     return 0;
@@ -9855,9 +10015,9 @@ function help() {
   
   display_line_ "git clean" "${hi_cyan_cor}"
   print ""
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "clean" "clean unstaged files"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "clean" "clean untracked files only"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "delb" "delete branches"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "discard" "discard staged and unstaged files"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "discard" "discard tracked and untracked files"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "prune" "prune branches and tags"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset1" "reset soft 1 commit"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset2" "reset soft 2 commits"
@@ -9865,6 +10025,17 @@ function help() {
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset4" "reset soft 4 commits"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reset5" "reset soft 5 commits"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "reseta" "erase everything, reset to last commit"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "restore" "clean tracked files only"
+
+  if ! pause_output_; then return 0; fi
+  
+  display_line_ "git commit" "${hi_cyan_cor}"
+  print ""
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rem" "remove files from index"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "add + commit wizard"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "add + commit message"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "recommit" "ammend last commit + add"
 
   if ! pause_output_; then return 0; fi
   
@@ -9914,10 +10085,6 @@ function help() {
   
   display_line_ "git push" "${hi_cyan_cor}"
   print ""
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "add + commit wizard"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "add + commit message"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "recommit" "ammend last commit, re-commit changes to index"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pr" "create pull request on github"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "push" "push branch to remote"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "pushf" "force push branch to remote"
