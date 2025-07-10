@@ -57,6 +57,10 @@ function parse_flags_exclusive_() {
   fi
 }
 
+function parse_no_flags_() {
+  parse_flags__ "$1" "" "" "${@:2}"
+}
+
 function parse_flags_() {
   parse_flags__ "$1" "$2$3" "$3" "${@:4}"
 }
@@ -377,6 +381,8 @@ function filter_one_() {
     local RET=$?
     if (( RET != 0 )); then return $RET; fi
     
+    clear_last_line_2_
+
     echo "$choice"
     return 0;
   fi
@@ -528,6 +534,56 @@ function update_config_short_name_() {
   fi
 }
 
+function update_file_() {
+  local key="$1"
+  local value="$2"
+  local file="$3"
+
+  value=$(echo $value | xargs -0)
+
+  if grep -q "^${key}=" "$file"; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+      # macOS (BSD sed) requires correct handling of patterns
+      sed -i '' "s|^$key=.*|$key=$value|" "$file"
+    else
+      # Linux (GNU sed)
+      sed -i "s|^$key=.*|$key=$value|" "$file"
+    fi
+  else
+    echo "$key=$value" >> "$file"
+  fi
+
+  if (( $? != 0 )); then
+    print "  ${yellow_cor}warning: failed to update ${key} in file${reset_cor}" >&2
+    print "   • check if you have write permissions to: $file" >&2
+    print "   • re-install pump-zsh" >&2
+  else
+    print " ${gray_cor}updated: ${key}=${value}${reset_cor}"
+  fi
+}
+
+function update_setting_() {
+  if ! check_settings_file_; then
+    print " ${red_cor}fatal: settings file is invalid, cannot update config: $PUMP_SETTINGS_FILE${reset_cor}" >&2
+    print " re-install pump:" >&2
+    print " curl -fsSL https://raw.githubusercontent.com/fab1o/pump-zsh/refs/heads/main/scripts/install.zsh | zsh && zsh" >&2
+    return 1;
+  fi
+
+  local key="$1"
+  local value="$2"
+  local disclaimer="${3:1}"
+
+  update_file_ "$key" "$value" "$PUMP_SETTINGS_FILE"
+
+  eval "${key}=\"$value\""
+
+  if (( disclaimer )) && [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
+    print " ${gray_cor}run ${hi_gray_cor}${CURRENT_PUMP_SHORT_NAME} -u${reset_cor}${gray_cor} to reset settings${reset_cor}"
+  fi
+
+}
+
 function update_config_() {
   if ! check_config_file_; then
     print " ${red_cor}fatal: config file is invalid, cannot update config: $PUMP_CONFIG_FILE${reset_cor}" >&2
@@ -539,7 +595,6 @@ function update_config_() {
   local i="$1"
   local key="$2"
   local value="$3"
-  local display_disclaimer="${4:-1}"
 
   value=$(echo $value | xargs -0)
 
@@ -549,15 +604,10 @@ function update_config_() {
 
   if (( i == 0 )); then
     return 0;
-  # local _value=""
-  # eval "_value=\${${key}[$i]}"
-  # if [[ "$value" == "$_value" ]]; then
-  #   return 0; # no change
-  # fi
   fi
 
   # set the key variable
-  if [[ -n "$CURRENT_PUMP_SHORT_NAME" && "$CURRENT_PUMP_SHORT_NAME" == "${PUMP_SHORT_NAME[$i]}" ]]; then
+  if [[ -n "$CURRENT_PUMP_SHORT_NAME" && -n "${PUMP_SHORT_NAME[$i]}" && "$CURRENT_PUMP_SHORT_NAME" == "${PUMP_SHORT_NAME[$i]}" ]]; then
     if [[ -z "$value" ]]; then
       eval "CURRENT_${key}=\${${key}[0]}"
     else
@@ -570,30 +620,11 @@ function update_config_() {
   # set the config file
   local key_i="${key}_${i}"
 
-  if grep -q "^${key_i}=" "$PUMP_CONFIG_FILE"; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-      # macOS (BSD sed) requires correct handling of patterns
-      sed -i '' "s|^$key_i=.*|$key_i=$value|" "$PUMP_CONFIG_FILE"
-    else
-      # Linux (GNU sed)
-      sed -i "s|^$key_i=.*|$key_i=$value|" "$PUMP_CONFIG_FILE"
-    fi
-  else
-    echo "$key_i=$value" >> "$PUMP_CONFIG_FILE"
-  fi
+  update_file_ "$key_i" "$value" "$PUMP_CONFIG_FILE" ${@:4}
 
-  if (( $? != 0 )); then
-    print "  ${yellow_cor}warning: failed to update ${key}_i in config${reset_cor}" >&2
-    print "   • check if you have write permissions to the file: $PUMP_CONFIG_FILE" >&2
-    print "   • re-install pump-zsh" >&2
-  else
-    print " ${gray_cor}updated config: ${key}_$i=${value}${reset_cor}"
-  fi
-  if (( display_disclaimer )); then
+  if (( disclaimer )) && [[ -n "${PUMP_SHORT_NAME[$i]}" ]]; then
     print " ${gray_cor}run ${hi_gray_cor}${PUMP_SHORT_NAME[$i]} -u${reset_cor}${gray_cor} to reset config${reset_cor}"
   fi
-
-  return 0;
 }
 
 function input_branch_name_() {
@@ -603,7 +634,7 @@ function input_branch_name_() {
 
   while true; do
     local typed_value=""
-    typed_value=$(input_from_ "$header" "$placeholder" 60)
+    typed_value=$(input_from_ "$header" "$placeholder" 199)
     if (( $? == 130 || $? == 2 )); then return 130; fi
     
     if [[ -n "$typed_value" ]] && git -C "$git_proj_folder" check-ref-format --branch "$typed_value" &>/dev/null; then
@@ -1832,13 +1863,13 @@ function save_pkg_manager_() {
   
   if [[ -z "$pkg_manager" ]]; then return 1; fi
 
-  update_config_ $i "PUMP_PKG_MANAGER" "$pkg_manager" &>/dev/null
+  TEMP_PUMP_PKG_MANAGER="$pkg_manager"
 
   if (( save_pkg_manager_is_q )); then
     return 0;
   fi
 
-  print "  ${SAVE_COR}package manager:${reset_cor} ${pkg_manager}${reset_cor}" >&1
+  print "  ${SAVE_COR}package manager:${reset_cor} ${TEMP_PUMP_PKG_MANAGER}${reset_cor}" >&1
 }
 
 function save_proj_f_() {
@@ -1868,11 +1899,10 @@ function save_proj_f_() {
   TEMP_PUMP_FOLDER=""
   TEMP_PUMP_REPO=""
   TEMP_SINGLE_MODE=""
+  TEMP_PUMP_PKG_MANAGER=""
 
   # all the config setting comes from $PWD
   if (( save_proj_f_is_e )); then
-    update_config_ $i "PUMP_SHORT_NAME" "$proj_cmd" &>/dev/null
-
     if ! save_pkg_manager_ -fq $i "$PWD" "$proj_repo"; then return 1; fi
   else
     remove_proj_ $i
@@ -1882,18 +1912,25 @@ function save_proj_f_() {
 
     if ! save_pkg_manager_ -fa $i "$PWD" "$proj_repo"; then return 1; fi
     if ! save_proj_cmd_ -f $i "$proj_cmd"; then return 1; fi
+  fi
+  
+  remove_proj_ -u $i  
+  
+  if ! update_config_ $i "PUMP_FOLDER" "$PWD" &>/dev/null; then return 1; fi
+  if ! update_config_ $i "PUMP_REPO" "$TEMP_PUMP_REPO" &>/dev/null; then return 1; fi
+  if ! update_config_ $i "PUMP_PKG_MANAGER" "$TEMP_PUMP_PKG_MANAGER" &>/dev/null; then return 1; fi
+  if ! update_config_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null; then return 1; fi
+  if ! update_config_ $i "PUMP_SINGLE_MODE" 1 &>/dev/null; then return 1; fi
 
+  if (( save_proj_f_is_e )); then
+    if ! update_config_ $i "PUMP_SHORT_NAME" "$proj_cmd" &>/dev/null; then return 1; fi
+  else
     if ! update_config_ $i "PUMP_SHORT_NAME" "$TEMP_PUMP_SHORT_NAME" &>/dev/null; then return 1; fi
     
     print "" >&1
     print "  ${SAVE_COR}project saved!${reset_cor}" >&1
     display_line_ "" "${SAVE_COR}"
   fi
-  
-  update_config_ $i "PUMP_FOLDER" "$PWD" &>/dev/null
-  update_config_ $i "PUMP_REPO" "$proj_repo" &>/dev/null
-  update_config_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
-  update_config_ $i "PUMP_SINGLE_MODE" 1 &>/dev/null
 
   load_config_entry_ $i
 
@@ -1930,6 +1967,7 @@ function save_proj_() {
   TEMP_PUMP_FOLDER=""
   TEMP_PUMP_REPO=""
   TEMP_SINGLE_MODE=""
+  TEMP_PUMP_PKG_MANAGER=""
 
   if (( save_proj_is_e )); then
     # editing a project
@@ -1963,6 +2001,8 @@ function save_proj_() {
 
   local pkg_name=$(get_pkg_name_ "$TEMP_PUMP_FOLDER" "$TEMP_PUMP_REPO")
   
+  remove_proj_ -u $i
+
   if [[ -n "$pkg_name" ]]; then
     update_config_ $i "PUMP_PKG_NAME" "$pkg_name" &>/dev/null
   fi
@@ -1971,6 +2011,7 @@ function save_proj_() {
   if ! update_config_ $i "PUMP_REPO" "$TEMP_PUMP_REPO" &>/dev/null; then return 1; fi
   if ! update_config_ $i "PUMP_FOLDER" "$TEMP_PUMP_FOLDER" &>/dev/null; then return 1; fi
   if ! update_config_ $i "PUMP_SHORT_NAME" "$TEMP_PUMP_SHORT_NAME" &>/dev/null; then return 1; fi
+  if ! update_config_ $i "PUMP_PKG_MANAGER" "$TEMP_PUMP_PKG_MANAGER" &>/dev/null; then return 1; fi
 
   print "" >&1
   print "  ${SAVE_COR}project saved!${reset_cor}" >&1
@@ -2084,6 +2125,7 @@ function set_aliases_() {
   alias rstart="$pkg_manager run start"
   alias sb="$pkg_manager run storybook"
   alias sbb="$pkg_manager run storybook:build"
+  alias start="$pkg_manager run start"
   alias tsc="$pkg_manager run tsc"
   alias watch="$pkg_manager run watch"
 
@@ -2106,7 +2148,7 @@ function set_aliases_() {
 
 function remove_proj_() {
   set +x
-  eval "$(parse_flags_ "$0" "r" "" "$@")"
+  eval "$(parse_flags_ "$0" "ru" "" "$@")"
   (( remove_proj_is_debug )) && set -x
 
   local i="$1"
@@ -2132,42 +2174,75 @@ function remove_proj_() {
 
   unset_aliases_
 
-  update_config_ $i "PUMP_SHORT_NAME" "" 1>/dev/null # let this one
-  update_config_ $i "PUMP_FOLDER" "" &>/dev/null
-  update_config_ $i "PUMP_REPO" "" &>/dev/null
-  update_config_ $i "PUMP_SINGLE_MODE" "" &>/dev/null
-  update_config_ $i "PUMP_PKG_MANAGER" "" &>/dev/null
-  update_config_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
-  update_config_ $i "PUMP_CLONE" "" &>/dev/null
-  update_config_ $i "PUMP_SETUP" "" &>/dev/null
-  update_config_ $i "PUMP_FIX" "" &>/dev/null
-  update_config_ $i "PUMP_RUN" "" &>/dev/null
-  update_config_ $i "PUMP_RUN_STAGE" "" &>/dev/null
-  update_config_ $i "PUMP_RUN_PROD" "" &>/dev/null
-  update_config_ $i "PUMP_PRO" "" &>/dev/null
-  update_config_ $i "PUMP_USE" "" &>/dev/null
-  update_config_ $i "PUMP_TEST" "" &>/dev/null
-  update_config_ $i "PUMP_RETRY_TEST" "" &>/dev/null
-  update_config_ $i "PUMP_COV" "" &>/dev/null
-  update_config_ $i "PUMP_OPEN_COV" "" &>/dev/null
-  update_config_ $i "PUMP_TEST_WATCH" "" &>/dev/null
-  update_config_ $i "PUMP_E2E" "" &>/dev/null
-  update_config_ $i "PUMP_E2EUI" "" &>/dev/null
-  update_config_ $i "PUMP_PR_TEMPLATE_FILE" "" &>/dev/null
-  update_config_ $i "PUMP_PR_REPLACE" "" &>/dev/null
-  update_config_ $i "PUMP_PR_APPEND" "" &>/dev/null
-  update_config_ $i "PUMP_GHA_INTERVAL" "" &>/dev/null
-  update_config_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
-  update_config_ $i "PUMP_PRINT_README" "" &>/dev/null
-  update_config_ $i "PUMP_PKG_NAME" "" &>/dev/null
-  update_config_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
-  update_config_ $i "PUMP_JIRA_IN_REVIEW" "" &>/dev/null
-  update_config_ $i "PUMP_JIRA_DONE" "" &>/dev/null
-  update_config_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
-  update_config_ $i "PUMP_NVM_USE_V" "" &>/dev/null
-  update_config_ $i "PUMP_HEAD_BRANCH" "" &>/dev/null
-  update_config_ $i "PUMP_MAIN_BRANCH" "" &>/dev/null
-  update_config_ $i "PUMP_NO_MONOGRAM" "" &>/dev/null
+  if (( remove_proj_is_u )); then
+    update_config_ $i "PUMP_SHORT_NAME" "" 1>/dev/null # let this one
+    update_config_ $i "PUMP_FOLDER" "" &>/dev/null
+    update_config_ $i "PUMP_REPO" "" &>/dev/null
+    update_config_ $i "PUMP_SINGLE_MODE" "" &>/dev/null
+    update_config_ $i "PUMP_PKG_MANAGER" "" &>/dev/null
+    update_config_ $i "PUMP_CODE_EDITOR" "" &>/dev/null
+    update_config_ $i "PUMP_CLONE" "" &>/dev/null
+    update_config_ $i "PUMP_SETUP" "" &>/dev/null
+    update_config_ $i "PUMP_FIX" "" &>/dev/null
+    update_config_ $i "PUMP_RUN" "" &>/dev/null
+    update_config_ $i "PUMP_RUN_STAGE" "" &>/dev/null
+    update_config_ $i "PUMP_RUN_PROD" "" &>/dev/null
+    update_config_ $i "PUMP_PRO" "" &>/dev/null
+    update_config_ $i "PUMP_USE" "" &>/dev/null
+    update_config_ $i "PUMP_TEST" "" &>/dev/null
+    update_config_ $i "PUMP_RETRY_TEST" "" &>/dev/null
+    update_config_ $i "PUMP_COV" "" &>/dev/null
+    update_config_ $i "PUMP_OPEN_COV" "" &>/dev/null
+    update_config_ $i "PUMP_TEST_WATCH" "" &>/dev/null
+    update_config_ $i "PUMP_E2E" "" &>/dev/null
+    update_config_ $i "PUMP_E2EUI" "" &>/dev/null
+    update_config_ $i "PUMP_PR_TEMPLATE_FILE" "" &>/dev/null
+    update_config_ $i "PUMP_PR_REPLACE" "" &>/dev/null
+    update_config_ $i "PUMP_PR_APPEND" "" &>/dev/null
+    update_config_ $i "PUMP_GHA_INTERVAL" "" &>/dev/null
+    update_config_ $i "PUMP_COMMIT_ADD" "" &>/dev/null
+    update_config_ $i "PUMP_PRINT_README" "" &>/dev/null
+    update_config_ $i "PUMP_PKG_NAME" "" &>/dev/null
+    update_config_ $i "PUMP_JIRA_IN_PROGRESS" "" &>/dev/null
+    update_config_ $i "PUMP_JIRA_IN_REVIEW" "" &>/dev/null
+    update_config_ $i "PUMP_JIRA_DONE" "" &>/dev/null
+    update_config_ $i "PUMP_NVM_SKIP_LOOKUP" "" &>/dev/null
+    update_config_ $i "PUMP_NVM_USE_V" "" &>/dev/null
+  else
+    PUMP_SHORT_NAME[$i]=""
+    PUMP_FOLDER[$i]=""
+    PUMP_REPO[$i]=""
+    PUMP_SINGLE_MODE[$i]=""
+    PUMP_PKG_MANAGER[$i]=""
+    PUMP_CODE_EDITOR[$i]=""
+    PUMP_CLONE[$i]=""
+    PUMP_SETUP[$i]=""
+    PUMP_FIX[$i]=""
+    PUMP_RUN[$i]=""
+    PUMP_RUN_STAGE[$i]=""
+    PUMP_RUN_PROD[$i]=""
+    PUMP_PRO[$i]=""
+    PUMP_USE[$i]=""
+    PUMP_TEST[$i]=""
+    PUMP_RETRY_TEST[$i]=""
+    PUMP_COV[$i]=""
+    PUMP_OPEN_COV[$i]=""
+    PUMP_TEST_WATCH[$i]=""
+    PUMP_E2E[$i]=""
+    PUMP_E2EUI[$i]=""
+    PUMP_PR_TEMPLATE_FILE[$i]=""
+    PUMP_PR_REPLACE[$i]=""
+    PUMP_PR_APPEND[$i]=""
+    PUMP_GHA_INTERVAL[$i]=""
+    PUMP_COMMIT_ADD[$i]=""
+    PUMP_PRINT_README[$i]=""
+    PUMP_PKG_NAME[$i]=""
+    PUMP_JIRA_IN_PROGRESS[$i]=""
+    PUMP_JIRA_IN_REVIEW[$i]=""
+    PUMP_JIRA_DONE[$i]=""
+    PUMP_NVM_SKIP_LOOKUP[$i]=""
+    PUMP_NVM_USE_V[$i]=""
+  fi
 }
 
 function set_current_proj_() {
@@ -2215,9 +2290,6 @@ function set_current_proj_() {
   CURRENT_PUMP_JIRA_DONE="${PUMP_JIRA_DONE[$i]}"
   CURRENT_PUMP_NVM_SKIP_LOOKUP="${PUMP_NVM_SKIP_LOOKUP[$i]}"
   CURRENT_PUMP_NVM_USE_V="${PUMP_NVM_USE_V[$i]}"
-  CURRENT_PUMP_HEAD_BRANCH="${PUMP_HEAD_BRANCH[$i]}"
-  CURRENT_PUMP_MAIN_BRANCH="${PUMP_MAIN_BRANCH[$i]}"
-  CURRENT_PUMP_NO_MONOGRAM="${PUMP_NO_MONOGRAM[$i]}"
 
   set_aliases_ $i
 
@@ -2457,9 +2529,6 @@ function print_current_proj_() {
     print " [${hi_magenta_cor}PUMP_JIRA_DONE_$i=${reset_cor}${hi_gray_cor}${PUMP_JIRA_DONE[$i]}${reset_cor}]"
     print " [${hi_magenta_cor}PUMP_SKIP_NVM_LOOKUP_$i=${reset_cor}${hi_gray_cor}${PUMP_NVM_SKIP_LOOKUP[$i]}${reset_cor}]"
     print " [${hi_magenta_cor}PUMP_NVM_USE_V$i=${reset_cor}${hi_gray_cor}${PUMP_NVM_USE_V[$i]}${reset_cor}]"
-    print " [${hi_magenta_cor}PUMP_HEAD_BRANCH_$i=${reset_cor}${hi_gray_cor}${PUMP_HEAD_BRANCH[$i]}${reset_cor}]"
-    print " [${hi_magenta_cor}PUMP_MAIN_BRANCH_$i=${reset_cor}${hi_gray_cor}${PUMP_MAIN_BRANCH[$i]}${reset_cor}]"
-    print " [${hi_magenta_cor}PUMP_NO_MONOGRAM_$i=${reset_cor}${hi_gray_cor}${PUMP_NO_MONOGRAM[$i]}${reset_cor}]"
 
     return 0;
   fi
@@ -2497,9 +2566,6 @@ function print_current_proj_() {
   print " [${hi_magenta_cor}CURRENT_PUMP_JIRA_DONE=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_JIRA_DONE}${reset_cor}]"
   print " [${hi_magenta_cor}CURRENT_PUMP_NVM_SKIP_LOOKUP=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_NVM_SKIP_LOOKUP}${reset_cor}]"
   print " [${hi_magenta_cor}CURRENT_PUMP_NVM_USE_V=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_NVM_USE_V}${reset_cor}]"
-  print " [${hi_magenta_cor}CURRENT_PUMP_HEAD_BRANCH=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_HEAD_BRANCH}${reset_cor}]"
-  print " [${hi_magenta_cor}CURRENT_PUMP_MAIN_BRANCH=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_MAIN_BRANCH}${reset_cor}]"
-  print " [${hi_magenta_cor}CURRENT_PUMP_NO_MONOGRAM=${reset_cor}${hi_gray_cor}${CURRENT_PUMP_NO_MONOGRAM}${reset_cor}]"
 }
 
 function which_pro_index_pwd_() {
@@ -2796,19 +2862,21 @@ function get_proj_for_git_() {
 function is_folder_git_() {
   local folder="${1:-$PWD}"
 
-  folder="$(realpath -- "$folder" 2>/dev/null)"
-
   if [[ -z "$folder" ]]; then
-    print " fatal: not a git repository: $folder" >&2 
+    print " fatal: not a git repository (or any of the parent directories): .git" >&2 
     return 1;
   fi
 
-  if ! git -C "$folder" rev-parse --is-inside-work-tree 1>/dev/null; then 
+  if ! git -C "$folder" rev-parse --is-inside-work-tree &>/dev/null; then
+    print " fatal: not a git repository (or any of the parent directories): .git" >&2 
     return 1;
   fi
 }
 
 function get_local_branch_() {
+  set +x
+  eval "$(parse_no_flags_ "$0" "$@")"
+
   local branch="$1"
   local proj_folder="${2-$PWD}"
 
@@ -2823,6 +2891,9 @@ function get_local_branch_() {
 }
 
 function get_remote_origin_() {
+  set +x
+  eval "$(parse_no_flags_ "$0" "$@")"
+
   local folder="${1-$PWD}"
 
   local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
@@ -2847,12 +2918,20 @@ function get_remote_origin_() {
   echo "origin"
 }
 
-function get_branch_head_() {
+function get_local_branch_head_() {
+  set +x
+  eval "$(parse_no_flags_ "$0" "$@")"
+
   local branch="$1"
   local folder="${2-$PWD}"
 
   local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
   if [[ -z "$git_folder" ]]; then return 1; fi
+
+  if [[ -z "$branch" ]]; then
+    branch=$(git -C "$git_folder" branch --show-current 2>/dev/null)
+    if [[ -z "$branch" ]]; then return 1; fi
+  fi
 
   local remote_name=$(get_remote_origin_ "$git_folder")
   local branch_head=$(git -C "$git_folder" ls-remote --heads $remote_name $branch | awk '{print $2}' 2>/dev/null)
@@ -2865,10 +2944,62 @@ function get_branch_head_() {
   return 1;
 }
 
+function determine_default_branch_() {
+  local folder="$1"
+  
+  local default_branch=""
+  local base_branch=""
+  local my_branch=""
+
+  if ! is_folder_git_ "$folder" &>/dev/null; then
+    return 1;
+  #   local i="$2"
+  #   local branch="$3"
+
+  #   local proj_repo="${PUMP_REPO[$i]}"
+  #   local proj_folder="${PUMP_FOLDER[$i]}"
+
+  #   if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+  #     echo "$branch"
+  #     return 0;
+  #   fi
+
+  #   if command -v gum &>/dev/null; then
+  #     gum spin --title="cleaning the temp folder..." -- rm -rf -- "${proj_folder}/.temp"
+  #     if ! gum spin --title="determining the default branch..." -- git clone "$proj_repo" "${proj_folder}/.temp" --quiet; then return 1; fi
+  #   else
+  #     print " determining the default branch..." >&2
+  #     rm -rf -- "${proj_folder}/.temp"
+  #     if ! git clone "$proj_repo" "${proj_folder}/.temp" --quiet; then return 1; fi
+  #   fi
+    
+  #   base_branch=$(get_base_branch_ "${proj_folder}/.temp" 2>/dev/null)
+  #   default_branch=$(get_default_branch_ "${proj_folder}/.temp" 2>/dev/null)
+  #   my_branch=$(git -C "${proj_folder}/.temp" branch --show-current 2>/dev/null)
+
+  #   rm -rf -- "${proj_folder}/.temp"
+  else
+    default_branch=$(get_default_branch_ "$folder" 2>/dev/null)
+    base_branch=$(get_base_branch_ "$folder" 2>/dev/null)
+    my_branch=$(git -C "$folder" branch --show-current 2>/dev/null)
+  fi
+
+  if [[ -z "$base_branch" && -z "$default_branch" ]]; then return 1; fi
+
+  local branches=("${(@f)$(printf "%s\n" "$default_branch" "$base_branch" "$my_branch" | sort -u)}")
+
+  local selected_branch=""
+  selected_branch=$(choose_one_ -i "base branch" "${branches[@]}")
+  if (( $? == 130 )); then return 130; fi
+
+  if [[ -z "$selected_branch" ]]; then return 1; fi
+
+  echo "$selected_branch"
+}
+
 function get_remote_branch_() {
   set +x
-  eval "$(parse_flags_ "$0" "f" "" "$@")"
-  (( get_remote_branch_is_debug )) && set -x
+  eval "$(parse_flags_ "$0" "fo" "" "$@")"
 
   local branch="$1"
   local folder="${2-$PWD}"
@@ -2876,13 +3007,20 @@ function get_remote_branch_() {
   local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
   if [[ -z "$git_folder" ]]; then return 1; fi
 
+  if [[ -z "$branch" ]]; then
+    branch=$(git -C "$git_folder" branch --show-current 2>/dev/null)
+    if [[ -z "$branch" ]]; then return 1; fi
+  fi
+
   local ref=""
-  for ref in refs/{remotes/{origin,upstream},heads}/$branch; do
+  for ref in refs/remotes/{origin,upstream}/$branch; do
     if git -C "$git_folder" show-ref -q --verify $ref; then
       if (( get_remote_branch_is_f )); then
         echo "$ref"
+      elif (( get_remote_branch_is_o )); then
+        echo "${ref:h:t}/${ref:t}"
       else
-        echo "$branch"
+        echo "${ref:t}"
       fi
       return 0
     fi
@@ -2891,91 +3029,116 @@ function get_remote_branch_() {
   return 1;
 }
 
-function get_clone_default_branch_() {
-  local i="$1"
-  local branch="$2"
+function get_main_branch_() {
+  set +x
+  eval "$(parse_flags_ "$0" "fo" "" "$@")"
 
-  local proj_repo="${PUMP_REPO[$i]}"
-  local proj_folder="${PUMP_FOLDER[$i]}"
-
-  if [[ "$branch" == "main" || "$branch" == "master" ]]; then
-    echo "$branch"
-    return 0;
-  fi
-
-  if command -v gum &>/dev/null; then
-    gum spin --title="cleaning the temp folder..." -- rm -rf -- "${proj_folder}/.temp"
-    if ! gum spin --title="determining the default branch..." -- git clone "$proj_repo" "${proj_folder}/.temp" --quiet; then return 1; fi
-  else
-    print " determining the default branch..." >&2
-    rm -rf -- "${proj_folder}/.temp"
-    if ! git clone "$proj_repo" "${proj_folder}/.temp" --quiet; then return 1; fi
-  fi
+  local folder="${1:-$PWD}"
   
-  local default_branch=$(get_default_branch_ "${proj_folder}/.temp")
-  local my_branch=$(git -C "${proj_folder}/.temp" branch --show-current)
-
-  rm -rf -- "${proj_folder}/.temp"
-
-  local selected_default_branch=""
-
-  if [[ "$default_branch" != "$my_branch" ]]; then
-    selected_default_branch=$(choose_one_ -i "default branch" "$default_branch" "$my_branch")
-    if (( $? == 130 )); then return 130; fi
-
-    if [[ "$selected_default_branch" == "$my_branch" ]]; then
-      update_config_ $i "PUMP_MAIN_BRANCH" "$default_branch" &>/dev/null
-    else
-      update_config_ $i "PUMP_MAIN_BRANCH" "$my_branch" &>/dev/null
-    fi
-  elif [[ -n "$default_branch" ]]; then
-    selected_default_branch="$default_branch";
-  else
-    selected_default_branch="$my_branch";
+  local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
+  if [[ -z "$git_folder" ]]; then
+    print " fatal: not a git repository: $folder" >&2
+    return 1;
   fi
 
-  echo "$selected_default_branch"
+  local ref=""
+  for ref in refs/remotes/{origin,upstream}/{main,master,trunk,mainline,default,stable}; do
+    if git -C "$git_folder" show-ref -q --verify $ref; then
+      if (( get_main_branch_is_f )); then
+        echo "$ref"
+      elif (( get_main_branch_is_o )); then
+        echo "${ref:h:t}/${ref:t}"
+      else
+        echo "${ref:t}"
+      fi
+      return 0;
+    fi
+  done
+
+  print " fatal: could not determine main branch" >&2
+  return 1;
 }
 
-function get_default_branch_() {
+function get_base_branch_() {
   set +x
-  eval "$(parse_flags_ "$0" "r" "" "$@")"
-  (( get_default_branch_is_debug )) && set -x
+  eval "$(parse_flags_ "$0" "fo" "" "$@")"
 
   local folder="${1:-$PWD}"
 
   local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
   if [[ -z "$git_folder" ]]; then
-    echo "main"
-    return 0;
+    print " fatal: not a git repository: $folder" >&2
+    return 1;
   fi
 
-  local remote_name=$(get_remote_origin_ "$git_folder")
-  local default_branch="$(LC_ALL=C git -C "$git_folder" symbolic-ref refs/remotes/${remote_name}/HEAD 2>/dev/null)"
+  local base_branch=$(git -C "$git_folder" reflog show --pretty='%gs' | grep 'checkout: moving from' | tail -n1 | sed -E 's/.*from ([^ ]+) to.*/\1/' 2>/dev/null)
   
-  if [[ -z "$default_branch" ]]; then
-    default_branch=$(LC_ALL=C git -C "$git_folder" remote show $remote_name 2>/dev/null | awk '/HEAD branch/ {print $NF}')
-
-    if [[ -z "$default_branch" ]]; then
-      default_branch=$(git -C "$git_folder" config --get init.defaultBranch 2>/dev/null)
-
-      if [[ -z "$default_branch" ]]; then
-        default_branch="main"
-      fi
-
-      if (( get_default_branch_is_r  )); then
-        default_branch=$(get_remote_branch_ -f "$default_branch" "$folder")
-        
-        if [[ -z "$default_branch" ]]; then default_branch="main"; fi
+  if [[ -z "$base_branch" ]]; then
+    base_branch=$(git -C "$git_folder" config --get branch.${my_branch}.gh-merge-base)
+    
+    if [[ -z "$base_branch" ]]; then
+      base_branch=$(git -C "$git_folder" config --get init.defaultBranch 2>/dev/null)
+      
+      if [[ -z "$base_branch" ]]; then
+        print " fatal: could not determine base branch" >&2
+        return 1;
       fi
     fi
   fi
 
-  if (( get_default_branch_is_r )); then
-    echo "$default_branch"
-  else
-    echo "${default_branch:t}"
+  if [[ -n "$base_branch" ]]; then
+    if (( get_base_branch_is_f )); then
+      echo $(get_remote_branch_ -f "$base_branch" "$git_folder")
+    elif (( get_base_branch_is_o )); then
+      echo $(get_remote_branch_ -o "$base_branch" "$git_folder")
+    else
+      echo "$base_branch"
+    fi
+    return 0;
   fi
+
+  print " fatal: could not determine base branch" >&2
+  return 1;
+}
+
+function get_default_branch_() {
+  set +x
+  eval "$(parse_flags_ "$0" "fo" "" "$@")"
+
+  local folder="${1:-$PWD}"
+
+  local git_folder=$(get_proj_for_git_ "$folder" 2>/dev/null)
+  if [[ -z "$git_folder" ]]; then
+    print " fatal: not a git repository: $folder" >&2
+    return 1;
+  fi
+
+  local default_branch=$(git -C "$git_folder" config --get init.defaultBranch 2>/dev/null)
+  if [[ -n "$default_branch" ]]; then
+    default_branch=$(get_remote_branch_ -f "$default_branch" "$git_folder")
+  fi
+  
+  if [[ -z "$default_branch" ]]; then
+    default_branch=$(git -C "$git_folder" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null)
+    
+    if [[ -z "$default_branch" ]]; then
+      default_branch=$(get_main_branch_ -f "$git_folder")
+    fi
+  fi
+
+  if [[ -n "$default_branch" ]]; then
+    if (( get_default_branch_is_f )); then
+      echo "$default_branch"
+    elif (( get_default_branch_is_o )); then
+        echo "${default_branch:h:t}/${default_branch:t}"
+    else
+      echo "${default_branch:t}"
+    fi
+    return 0;
+  fi
+
+  print " fatal: could not determine default branch" >&2
+  return 1;
 }
 
 function get_repo_() {
@@ -3013,7 +3176,7 @@ function get_repo_name_() {
 
 function select_branches_() {
   set +x
-  eval "$(parse_flags_ "$0" "alries" "" "$@")"
+  eval "$(parse_flags_ "$0" "alrixs" "" "$@")"
   (( select_branches_is_debug )) && set -x
 
   local search_arg="$1"
@@ -3024,9 +3187,9 @@ function select_branches_() {
 
   local branch_results=()
 
-  local search_text="**"
+  local search_text="*$search_arg*"
 
-  if [[ -n "$search_arg" ]]; then
+  if [[ -n "$search_arg" ]] && (( select_branches_is_x )); then
     search_text="$search_arg"
   fi
 
@@ -3074,14 +3237,24 @@ function select_branches_() {
   fi
 
   if [[ -z "$filtered_branches" ]]; then
-    print -n " fatal: did not find any branch" >&2
-    if [[ -n "$exclude_branches" ]]; then
-      print -n ", excluding some special branches," >&2
+    if (( ! select_branches_is_q )); then
+      if (( select_branches_is_s )); then
+        print -n " fatal: excluding special branches," >&2
+      else
+        print -n " fatal:" >&2
+      fi
+
+      if [[ -n "$search_arg" ]]; then
+        if (( select_branches_is_x )); then
+          print -n " did not match any branch known to git: $search_arg" >&2
+        else
+          print -n " did not match any branch known to git matching: $search_arg" >&2
+        fi
+      else
+        print -n " did not find any branch known to git" >&2
+      fi
+      print "" >&2
     fi
-    if [[ -n "$search_text" ]]; then
-      print -n " matching: $search_text" >&2
-    fi
-    print " known to git" >&2
     return 1;
   fi
 
@@ -3098,7 +3271,7 @@ function select_branches_() {
 
 function select_branch_() {
   set +x
-  eval "$(parse_flags_ "$0" "alrqiexsc" "" "$@")"
+  eval "$(parse_flags_ "$0" "alriexsc" "" "$@")"
   (( select_branch_is_debug )) && set -x
 
   local search_arg="$1"
@@ -3162,24 +3335,32 @@ function select_branch_() {
   fi
 
   if [[ -z "$filtered_branches" ]]; then
-    if (( ! select_branch_is_q )); then
-      if (( select_branch_is_s )); then
-        print -n " fatal: excluding special branches," >&2
-      else
-        print -n " fatal:" >&2
-      fi
-
-      if [[ -n "$search_arg" ]]; then
-        if (( select_branch_is_x )); then
-          print -n " did not match any branch known to git: $search_arg" >&2
-        else
-          print -n " did not match any branch known to git matching: $search_arg" >&2
-        fi
-      else
-        print -n " did not find any branch known to git" >&2
-      fi
-      print "" >&2
+    if (( select_branch_is_s )); then
+      print -n " fatal: excluding special branches, " >&2
+    else
+      print -n " fatal: " >&2
     fi
+
+    print -n "did not find " >&2
+
+    if (( select_branch_is_a )); then
+      print -n "any branch " >&2
+    elif (( select_branch_is_r )); then
+      print -n "a branch remotely " >&2
+    else
+      print -n "a branch locally " >&2
+    fi
+
+    print -n "known to git " >&2
+
+    if [[ -n "$search_arg" ]]; then
+      if (( select_branch_is_x )); then
+        print -n ": $search_arg" >&2
+      else
+        print -n "matching: $search_arg" >&2
+      fi
+    fi
+    print "" >&2
     return 1;
   fi
 
@@ -3347,9 +3528,6 @@ function load_config_entry_() {
     PUMP_JIRA_DONE
     PUMP_NVM_SKIP_LOOKUP
     PUMP_NVM_USE_V
-    PUMP_HEAD_BRANCH
-    PUMP_MAIN_BRANCH
-    PUMP_NO_MONOGRAM
   )
 
   local key=""
@@ -3490,15 +3668,6 @@ function load_config_entry_() {
       PUMP_NVM_USE_V)
         PUMP_NVM_USE_V[$i]="$value"
         ;;
-      PUMP_HEAD_BRANCH)
-        PUMP_HEAD_BRANCH[$i]="$value"
-        ;;
-      PUMP_MAIN_BRANCH)
-        PUMP_MAIN_BRANCH[$i]="$value"
-        ;;
-      PUMP_NO_MONOGRAM)
-        PUMP_NO_MONOGRAM[$i]="$value"
-        ;;
     esac
     # print "$i - key: [$key], value: [$value]"
   done
@@ -3508,9 +3677,23 @@ function load_settings_() {
   check_settings_file_
 
   PUMP_PUSH_NO_VERIFY=$(sed -n "s/^PUMP_PUSH_NO_VERIFY${i}=\\([^ ]*\\)/\\1/p" "$PUMP_SETTINGS_FILE" 2>/dev/null)
-
   if [[ "$PUMP_PUSH_NO_VERIFY" -ne 0 && "$PUMP_PUSH_NO_VERIFY" -ne 1 ]]; then
-    PUMP_PUSH_NO_VERIFY=1
+    PUMP_PUSH_NO_VERIFY=""
+  fi
+
+  PUMP_PUSH_SET_UPSTREAM=$(sed -n "s/^PUMP_PUSH_SET_UPSTREAM${i}=\\([^ ]*\\)/\\1/p" "$PUMP_SETTINGS_FILE" 2>/dev/null)
+  if [[ "$PUMP_PUSH_SET_UPSTREAM" -ne 0 && "$PUMP_PUSH_SET_UPSTREAM" -ne 1 ]]; then
+    PUMP_PUSH_SET_UPSTREAM=""
+  fi
+
+  PUMP_RUN_OPEN_COV=$(sed -n "s/^PUMP_RUN_OPEN_COV${i}=\\([^ ]*\\)/\\1/p" "$PUMP_SETTINGS_FILE" 2>/dev/null)
+  if [[ "$PUMP_RUN_OPEN_COV" -ne 0 && "$PUMP_RUN_OPEN_COV" -ne 1 ]]; then
+    PUMP_RUN_OPEN_COV=""
+  fi
+
+  PUMP_USE_MONOGRAM=$(sed -n "s/^PUMP_USE_MONOGRAM${i}=\\([^ ]*\\)/\\1/p" "$PUMP_SETTINGS_FILE" 2>/dev/null)
+  if [[ "$PUMP_USE_MONOGRAM" -ne 0 && "$PUMP_USE_MONOGRAM" -ne 1 ]]; then
+    PUMP_USE_MONOGRAM=""
   fi
 }
 
@@ -3578,10 +3761,6 @@ function get_branch_status_() {
   local my_branch="$1"
   local base_branch="$2"
   local folder="${3:-$PWD}"
-
-  if [[ -z "$base_branch" ]]; then
-    base_branch=$(get_default_branch_ -r "$folder")
-  fi
   
   read behind ahead < <(git -C "$folder" rev-list --left-right --count ${base_branch}...HEAD)
 
@@ -3795,6 +3974,7 @@ function del() {
 
   if (( del_is_h )); then
     print "  ${yellow_cor}del ${low_yellow_cor}[<glob>]${reset_cor} : delete files"
+    print "  --" >&1
     print "  ${yellow_cor}del -s${reset_cor} : skip confirmation"
     return 0;
   fi
@@ -3941,6 +4121,7 @@ function refix() {
 
   if (( refix_is_h )); then
     print "  ${yellow_cor}refix ${low_yellow_cor}[<folder>]${reset_cor} : reset last commit then run fix lint and format then re-push"
+    print "  --" >&1
     print "  ${yellow_cor}refix -n${reset_cor} : create a new commit instead of amending"
     print "  ${yellow_cor}refix -q${reset_cor} : no output"
     return 0;
@@ -4016,6 +4197,14 @@ function refix() {
     print " ${red_cor}fatal: refix encountered an issue${reset_cor}" >&2
 
     return $RET;
+  fi
+
+  if [[ -z "$(git -C "$folder" status --porcelain 2>/dev/null)" ]]; then
+    if (( ! refix_is_q )); then
+      print "" >&2
+      print " nothing to commit, working tree clean" >&2
+    fi
+    return 0
   fi
 
   if ! git -C "$folder" add .; then return 1; fi
@@ -4103,8 +4292,52 @@ function covc_() {
   local pipe_name=$(mktemp -u)
   mkfifo "$pipe_name" &>/dev/null
 
-  gum spin --title="running test coverage... ${branch_arg}" -- sh -c "read < $pipe_name" &
+  gum spin --title="running test coverage... ${my_branch}" -- sh -c "read < $pipe_name" &
   local spin_pid=$!
+
+  if ! eval "$pump_setup" &>/dev/null; then
+    echo "done" > "$pipe_name" &>/dev/null
+    rm "$pipe_name"
+    wait $spin_pid &>/dev/null
+
+    print " ${red_cor}fatal: could not run setup script: $pump_setup ${reset_cor}" >&2
+    return 1;
+  fi
+
+  if ! eval "$pump_cov" --coverageReporters=text-summary > "coverage-summary.txt" 2>&1; then
+    # run twice just in case the first run fails
+    if ! eval "$pump_cov" --coverageReporters=text-summary > "coverage-summary.txt" 2>&1; then
+      echo "done" > "$pipe_name" &>/dev/null
+      rm "$pipe_name"
+      wait $spin_pid &>/dev/null
+
+      print " ${red_cor}fatal: could not run coverage script PUMP_COV_$i ${reset_cor}" >&2
+      return 1;
+    fi
+  fi
+
+  print "   running test coverage... ${my_branch}"
+
+  echo "done" > "$pipe_name" &>/dev/null
+  # kill $spin_pid &>/dev/null
+  rm "$pipe_name"
+  wait $spin_pid &>/dev/null
+
+  local summary2=$(grep -A 4 "Coverage summary" "coverage-summary.txt")
+
+  # extract each coverage percentage
+  local statements2=$(echo "$summary2" | grep "Statements" | awk '{print $3}' | tr -d '%')
+  local branches2=$(echo "$summary2" | grep "Branches" | awk '{print $3}' | tr -d '%')
+  local funcs2=$(echo "$summary2" | grep "Functions" | awk '{print $3}' | tr -d '%')
+  local lines2=$(echo "$summary2" | grep "Lines" | awk '{print $3}' | tr -d '%')
+
+  rm -f -- "coverage-summary.txt" &>/dev/null
+
+  pipe_name=$(mktemp -u)
+  mkfifo "$pipe_name" &>/dev/null
+
+  gum spin --title="running test coverage... ${branch_arg}" -- sh -c "read < $pipe_name" &
+  spin_pid=$!
 
   if is_folder_git_ "$cov_folder" &>/dev/null; then
     reseta -o "$cov_folder" --quiet &>/dev/null
@@ -4201,50 +4434,6 @@ function covc_() {
     return 1;
   fi
 
-  pipe_name=$(mktemp -u)
-  mkfifo "$pipe_name" &>/dev/null
-
-  gum spin --title="running test coverage... ${my_branch}" -- sh -c "read < $pipe_name" &
-  spin_pid=$!
-
-  if ! eval "$pump_setup" &>/dev/null; then
-    echo "done" > "$pipe_name" &>/dev/null
-    rm "$pipe_name"
-    wait $spin_pid &>/dev/null
-
-    print " ${red_cor}fatal: could not run setup script: $pump_setup ${reset_cor}" >&2
-    return 1;
-  fi
-
-  if ! eval "$pump_cov" --coverageReporters=text-summary > "coverage-summary.txt" 2>&1; then
-    # run twice just in case the first run fails
-    if ! eval "$pump_cov" --coverageReporters=text-summary > "coverage-summary.txt" 2>&1; then
-      echo "done" > "$pipe_name" &>/dev/null
-      rm "$pipe_name"
-      wait $spin_pid &>/dev/null
-
-      print " ${red_cor}fatal: could not run coverage script PUMP_COV_$i ${reset_cor}" >&2
-      return 1;
-    fi
-  fi
-
-  print "   running test coverage... ${my_branch}"
-
-  echo "done" > "$pipe_name" &>/dev/null
-  # kill $spin_pid &>/dev/null
-  rm "$pipe_name"
-  wait $spin_pid &>/dev/null
-
-  local summary2=$(grep -A 4 "Coverage summary" "coverage-summary.txt")
-
-  # extract each coverage percentage
-  local statements2=$(echo "$summary2" | grep "Statements" | awk '{print $3}' | tr -d '%')
-  local branches2=$(echo "$summary2" | grep "Branches" | awk '{print $3}' | tr -d '%')
-  local funcs2=$(echo "$summary2" | grep "Functions" | awk '{print $3}' | tr -d '%')
-  local lines2=$(echo "$summary2" | grep "Lines" | awk '{print $3}' | tr -d '%')
-
-  rm -f -- "coverage-summary.txt" &>/dev/null
-
   print ""
   display_line_ "coverage" "${hi_gray_cor}" 68
   display_double_line_ "${1:0:22}" "${hi_gray_cor}" "${my_branch:0:22}" "${hi_gray_cor}" 70
@@ -4299,21 +4488,8 @@ function test() {
   (( test_is_debug )) && set -x
 
   if (( test_is_h )); then
-    print "  ${yellow_cor}test ${low_yellow_cor}[<folder>]${reset_cor} : run PUMP_TEST"
+    print "  ${yellow_cor}test${reset_cor} : run PUMP_TEST"
     return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}reseta -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
   fi
 
   trap 'print ""; return 130' INT # for some reason it returns 2
@@ -4356,10 +4532,24 @@ function cov() {
   eval "$(parse_flags_ "$0" "o" "" "$@")"
   (( cov_is_debug )) && set -x
 
+  if [[ -z "$PUMP_RUN_OPEN_COV" ]]; then
+    confirm_ "run PUMP_OPEN_COV script after coverage is done?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_RUN_OPEN_COV" 1 >&2
+    else
+      update_setting_ "PUMP_RUN_OPEN_COV" 0 >&2
+    fi
+  fi
+
   if (( cov_is_h )); then
-    print "  ${yellow_cor}cov${reset_cor} : run PUMP_COV"
-    print "  ${yellow_cor}cov -o${reset_cor} : do not run PUMP_OPEN_COV script after coverage is done"
     print "  ${yellow_cor}cov <branch>${reset_cor} : compare test coverage with another branch"
+    print "  ${yellow_cor}cov${reset_cor} : run PUMP_COV"
+    print "  --" >&1
+    (( PUMP_RUN_OPEN_COV )) && print "  ${yellow_cor}cov -o${reset_cor} : do not run PUMP_OPEN_COV script after coverage is done"
+    (( ! PUMP_RUN_OPEN_COV )) && print "  ${yellow_cor}cov -o${reset_cor} : to run PUMP_OPEN_COV script after coverage is done"
     return 0;
   fi
 
@@ -4380,10 +4570,15 @@ function cov() {
   if (( RET == 0 )); then
     print " ${green_cor}✓ test coverage passed on first run${reset_cor}"
 
-    if (( ! cov_is_o )) && [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
+    if (( PUMP_RUN_OPEN_COV && ! cov_is_o )) || (( ! PUMP_RUN_OPEN_COV && cov_is_o )); then
+      if [[ -z "$CURRENT_PUMP_OPEN_COV" ]]; then
+        print " PUMP_OPEN_COV is not set" >&2
+        print " edit config: $PUMP_CONFIG_FILE then run ${yellow_cor}refresh${reset_cor}" >&2
+        return 1;
+      fi
       eval "$CURRENT_PUMP_OPEN_COV"
     fi
-    return 0
+    return 0;
   fi
 
   if (( CURRENT_PUMP_RETRY_TEST )); then
@@ -4393,7 +4588,12 @@ function cov() {
     if (( RET == 0 )); then
       print " ${green_cor}✓ test coverage passed on second run${reset_cor}"
       
-      if (( ! cov_is_o )) && [[ -n "$CURRENT_PUMP_OPEN_COV" ]]; then
+      if (( PUMP_RUN_OPEN_COV && ! cov_is_o )) || (( ! PUMP_RUN_OPEN_COV && cov_is_o )); then
+        if [[ -z "$CURRENT_PUMP_OPEN_COV" ]]; then
+          print " PUMP_OPEN_COV is not set" >&2
+          print " edit config: $PUMP_CONFIG_FILE then run ${yellow_cor}refresh${reset_cor}" >&2
+          return 1;
+        fi
         eval "$CURRENT_PUMP_OPEN_COV"
       fi
       return 0;
@@ -4470,6 +4670,7 @@ function add() {
 
   if (( add_is_h )); then
     print "  ${yellow_cor}add ${low_yellow_cor}[<glob>]${reset_cor} : add files to index"
+    print "  --" >&1
     print "  ${yellow_cor}add -a${reset_cor} : add all tracked and untracked files"
     print "  ${yellow_cor}add -t${reset_cor} : add only tracked files"
     print "  ${yellow_cor}add -ta${reset_cor} : add all tracked files (not untracked)"
@@ -4527,6 +4728,7 @@ function rem() {
 
   if (( rem_is_h )); then
     print "  ${yellow_cor}rem ${low_yellow_cor}[<glob>]${reset_cor} : remove files from index"
+    print "  --" >&1
     print "  ${yellow_cor}rem -a${reset_cor} : remove all tracked and untracked files"
     print "  ${yellow_cor}rem -t${reset_cor} : remove only tracked files"
     print "  ${yellow_cor}rem -ta${reset_cor} : remove all tracked files (not untracked)"
@@ -4740,12 +4942,8 @@ function read_commits_() {
     my_branch="HEAD"
   fi
 
-  local default_branch=$(git config --get "branch.${my_branch}.gh-merge-base")
-
-  if [[ -z "$default_branch" ]]; then
-    default_branch=$(get_default_branch_ -r)
-    # get_branch_head_
-  fi
+  local base_branch=$(get_base_branch_ -f "$(pwd)")
+  if [[ -z "$base_branch" ]]; then return 1; fi
 
   if [[ -z "$my_branch"  ]]; then
     print " fatal: cannot determine remote or default branch" >&2
@@ -4753,7 +4951,7 @@ function read_commits_() {
     return 1;
   fi
 
-  if [[ "${my_branch:t}" == "${default_branch:t}" ]]; then
+  if [[ "${my_branch:t}" == "${base_branch:t}" ]]; then
     print " fatal: your branch is the same as base branch" >&2
     return 1;
   fi
@@ -4761,7 +4959,7 @@ function read_commits_() {
   local pr_title=""
 
   git log --no-merges --pretty=format:'%H%x1F%s%x00' \
-    "${default_branch}..${my_branch}" | while IFS= read -r -d '' line; do
+    "${base_branch}..${my_branch}" | while IFS= read -r -d '' line; do
     
     local commit_hash="${line%%$'\x1F'*}"
     commit_hash="${commit_hash//$'\n'/}"
@@ -4817,7 +5015,7 @@ function extract_jira_key_() {
   local text="$1"
   local folder="$2"
 
-  if [[ -n "$text" && $text =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+  if [[ -n "$text" && $text =~ ([A-Z]+-[0-9]+) ]]; then
     local jira_key="$(echo "${match[1]}" | xargs -0)"
 
     echo "$jira_key"
@@ -4826,7 +5024,7 @@ function extract_jira_key_() {
 
   if [[ -n "$folder" ]]; then
     local folder_name="$(basename "$folder")"
-    if [[ $folder_name =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
+    if [[ -n "$folder_name" && $folder_name =~ ([A-Z]+-[0-9]+) ]]; then
       local jira_key="$(echo "${match[1]}" | xargs -0)"
       
       echo "$jira_key"
@@ -4844,9 +5042,10 @@ function pr() {
 
   if (( pr_is_h )); then
     print "  ${yellow_cor}pr${reset_cor} : create pull request"
+    print "  --" >&1
     print "  ${yellow_cor}pr -t${reset_cor} : run tests before creating pull request"
     print "  ${yellow_cor}pr -s${reset_cor} : skip confirmation"
-    print "  --"
+    print "  --" >&1
     print "  ${yellow_cor}pr -l${reset_cor} : set labels"
     print "  ${yellow_cor}pr -lb${reset_cor} : set label type: bug"
     print "  ${yellow_cor}pr -lf${reset_cor} : set label type: feature"
@@ -5067,13 +5266,13 @@ function run() {
       print "  ${yellow_cor}run dev${reset_cor} : run dev in current folder"
       print "  ${yellow_cor}run stage${reset_cor} : run stage in current folder"
       print "  ${yellow_cor}run prod${reset_cor} : run prod in current folder"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}run <folder>${reset_cor} : run ${CURRENT_PUMP_SHORT_NAME}'s folder on dev environment"
       print "  ${yellow_cor}run <folder> ${low_yellow_cor}[<env>]${reset_cor} : run ${CURRENT_PUMP_SHORT_NAME}'s folder on given environment"
     else
       print "  ${yellow_cor}run <folder>${reset_cor} : run dev in a folder"
     fi
-    print "  --"
+    print "  --" >&1
     print "  ${yellow_cor}run <project>${reset_cor} : run a project's on dev environment if single mode"
     print "  ${yellow_cor}run <project> [<env>]${reset_cor} : run a project's on an environment if single mode"
     print "  ${yellow_cor}run <project> <folder> ${low_yellow_cor}[<env>]${reset_cor} : run a project's folder on an environment"
@@ -5237,7 +5436,7 @@ function setup() {
     else
       print "  ${yellow_cor}setup <folder>${reset_cor} : run setup script in a folder"
     fi
-    print "  --"
+    print "  --" >&1
     print "  ${yellow_cor}setup <project>${reset_cor} : run setup script in a project's folder if single mode"
     print "  ${yellow_cor}setup <project> <folder>${reset_cor} : run setup script in a project's folder"
     return 0;
@@ -5389,10 +5588,11 @@ function setup() {
       if [[ "$name" == "lint" && -n "$cmd" ]]; then print "  • ${yellow_cor}lint${reset_cor} (alias for \"$pkg_manager run lint\")"; fi
       if [[ "$name" == "prod" && -n "$cmd" ]]; then print "  • ${yellow_cor}run prod${reset_cor} (alias for \"$pkg_manager run prod\")"; fi
       if [[ "$name" == "stage" && -n "$cmd" ]]; then print "  • ${yellow_cor}run stage${reset_cor} (alias for \"$pkg_manager run stage\")"; fi
+      if [[ "$name" == "start" && -n "$cmd" ]]; then print "  • ${yellow_cor}start${reset_cor} (alias for \"$pkg_manager run start\")"; fi
       if [[ "$name" == "test" && -n "$cmd" ]]; then print "  • ${yellow_cor}test${reset_cor} (alias for \"$pkg_manager test\")"; fi
       if [[ "$name" == "tsc" && -n "$cmd" ]]; then print "  • ${yellow_cor}tsc${reset_cor} (alias for \"$pkg_manager run tsc\")"; fi
     done
-    print "  --"
+    print "  --" >&1
   fi
 
   print "  • ${yellow_cor}pro -h${reset_cor} for project management options"
@@ -5555,7 +5755,7 @@ function proj_rev_() {
   
   if (( proj_rev_is_a )); then
     print "  ${red_cor}fatal: invalid option: -a${reset_cor}" >&2
-    print "  --"
+    print "  --" >&1
     $proj_cmd -h | grep -w --color=never -E '\brev\b'
     return 1;
   fi
@@ -5634,7 +5834,7 @@ function proj_rev_() {
       trimmed="${trimmed%% }"
 
       if [[ "$trimmed" != *" "* ]]; then
-        branch=$(select_branch_ -riqs "$branch_arg" "branch to review" "$proj_folder")
+        branch=$(select_branch_ -ris "$branch_arg" "branch to review" "$proj_folder" 2>/dev/null)
       fi
     fi
     if (( $? == 130 )); then return 130; fi
@@ -5692,7 +5892,7 @@ function proj_rev_() {
         
         if confirm_ "branch does not reflect pull request, erase changes and reset branch?" "reset" "do nothing"; then
           if reseta -o "$full_rev_folder" --quiet &>/dev/null; then
-            if ! pull "$full_rev_folder" --quiet; then
+            if ! pull -r "$full_rev_folder" --quiet; then
               skip_setup=1
               already_merged=1
             fi
@@ -5705,7 +5905,7 @@ function proj_rev_() {
           return 0;
         fi
       else
-        if ! pull "$full_rev_folder" --quiet; then
+        if ! pull -r "$full_rev_folder" --quiet; then
           skip_setup=1
           already_merged=1
         fi
@@ -5765,7 +5965,7 @@ function proj_rev_() {
 
   if (( ! skip_setup )); then
     setup "$full_rev_folder"
-    print "  --"
+    print "  --" >&1
     print "  • ${yellow_cor}$proj_cmd rev -e${reset_cor} to open an existing code review"
     if [[ -n "$pr_link" ]]; then
       print "  • ${yellow_cor}check out pull request${reset_cor}: ${blue_cor}$pr_link${reset_cor}"
@@ -5797,7 +5997,7 @@ function proj_rev_() {
 
 function proj_clone_() {
   set +x
-  eval "$(parse_flags_ "$0" "er" "" "$@")"
+  eval "$(parse_flags_ "$0" "" "" "$@")"
   (( proj_clone_is_debug )) && set -x
 
   local proj_cmd="$1"
@@ -5825,14 +6025,14 @@ function proj_clone_() {
 
   local pump_clone="${PUMP_CLONE[$i]}"
   local print_readme="${PUMP_PRINT_README[$i]}"
-  local pump_head_branch="${PUMP_HEAD_BRANCH[$i]}"
-  local pump_main_branch="${PUMP_MAIN_BRANCH[$i]}"
 
   if (( single_mode )) && [[ -n "$2" ]]; then
     print " fatal: not a valid argument: ${@:2}" >&2
     print " run ${yellow_cor}$proj_cmd clone -h${reset_cor} to see usage" >&2
     return 1;
   fi
+
+  local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
 
   local folder_to_clone=""
 
@@ -5848,29 +6048,23 @@ function proj_clone_() {
       rm -rf -- "${proj_folder}/.revs" &>/dev/null
     fi
     if [[ -n "$(ls -A -- "$proj_folder" 2>/dev/null)" ]]; then
-      if (( ! proj_clone_is_r )); then
-        confirm_ "project folder is not empty, create backup and re-clone?" "re-clone" "do nothing"; 
-        local RET=$?
-        if (( RET == 130 || RET == 2 )); then return 130; fi
-        if (( RET == 1 )); then
-          print " cannot clone $proj_cmd because it's set to ${purple_cor}single mode${reset_cor}" >&2
-          print " run ${yellow_cor}$proj_cmd -e${reset_cor} to switch to ${pink_cor}multiple mode${reset_cor}" >&2
-          return 0;
-        fi
+      confirm_ "project folder is not empty, create backup and re-clone?" "re-clone" "do nothing"; 
+      local _RET=$?
+      if (( _RET == 130 || _RET == 2 )); then return 130; fi
+      if (( _RET == 1 )); then
+        print " cannot clone $proj_cmd because it's set to ${purple_cor}single mode${reset_cor}" >&2
+        print " run ${yellow_cor}$proj_cmd -e${reset_cor} to switch to ${pink_cor}multiple mode${reset_cor}" >&2
+        return 0;
       fi
       create_backup=1
     fi
 
     folder_to_clone="$proj_folder"
   else
-    local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
-
     if [[ -n "$git_proj_folder" ]]; then
       if [[ -z "$branch_arg" ]]; then
-        branch_arg=$(input_branch_name_ "feature branch name" "$git_proj_folder")
+        branch_arg=$(input_branch_name_ "feature branch name" "" "$git_proj_folder")
         if [[ -z "$branch_arg" ]]; then return 1; fi
-
-        print " ${purple_cor}feature branch name:${reset_cor} $branch_arg"
       fi
 
       local branch_folder="${branch_arg//\\/-}"
@@ -5878,7 +6072,8 @@ function proj_clone_() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
 
-      rm -rf -- "${folder_to_clone}/.DS_Store"
+      rm -rf -- "${folder_to_clone}/.DS_Store" &>/dev/null
+
       if is_folder_git_ "$folder_to_clone" &>/dev/null; then
         skip_clone=1
       fi
@@ -5887,25 +6082,19 @@ function proj_clone_() {
 
   local default_branch=""
 
-  if (( skip_clone == 0 )); then
-    default_branch="${base_branch_arg:-$pump_head_branch}"
+  if (( ! skip_clone )); then
+    default_branch="$base_branch_arg"
 
     if [[ -z "$default_branch" ]]; then
-      default_branch=$(get_clone_default_branch_ $i "$branch_arg")
+      default_branch=$(determine_default_branch_ "$git_proj_folder" "$i" "$branch_arg")
       if (( $? == 130 )); then return 130; fi
+      # if [[ -z "$default_branch" ]]; then return 1; fi
 
       if [[ -z "$default_branch" ]]; then
-        local git_proj_folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
-        local placeholder=$(get_default_branch_ "$git_proj_folder")
-
-        default_branch=$(input_branch_name_ "type the default branch" "$placeholder" "$git_proj_folder")
-
+        local placeholder=$(get_default_branch_ "$git_proj_folder" 2>/dev/null)
+        default_branch=$(input_branch_name_ "type the base branch" "${placeholder:-main}" "$git_proj_folder")
         if [[ -z "$default_branch" ]]; then return 1; fi
       fi
-    fi
-
-    if [[ "$default_branch" != "$pump_head_branch" ]]; then
-      update_config_ $i "PUMP_HEAD_BRANCH" "$default_branch"
     fi
     
     if [[ -z "$branch_arg" ]]; then
@@ -5924,17 +6113,22 @@ function proj_clone_() {
 
       folder_to_clone="${proj_folder}/${branch_folder}"
     fi
+
   fi # end if (( ! skip_clone ))
 
-  if [[ "$branch_arg" != "$default_branch" ]]; then
+  if [[ -n "$branch_arg" && "$branch_arg" != "$default_branch" ]]; then
     local jira_key=$(extract_jira_key_ "$branch_arg" "$folder_to_clone")
-    if [[ -n "$jira_key" ]] && (( ! proj_clone_is_e )); then
-      branch_arg=$(get_branch_with_monogram_ $i "$branch_arg")
+    if [[ -n "$jira_key" ]]; then
+      branch_arg=$(get_branch_with_monogram_ "$branch_arg")
     fi
   fi
 
   if (( ! skip_clone )); then
-    print " preparing to clone branch: ${cyan_cor}${branch_arg}${reset_cor}"
+    if [[ -n "$branch_arg" ]]; then
+      print " cloning... ${purple_cor}${branch_arg}${reset_cor}"
+    else
+      print " cloning... "
+    fi
 
     if (( create_backup )); then
       if ! create_backup_ -s $i "$proj_folder"; then
@@ -5957,17 +6151,16 @@ function proj_clone_() {
   local RET=0
 
   local my_branch=$(git -C "$folder_to_clone" branch --show-current)
-  if [[ "$branch_arg" != "$my_branch" ]]; then
-    if [[ "$branch_arg" != "$default_branch" ]]; then
-      local remote_branch=$(get_remote_branch_ "$branch_arg" "$folder_to_clone")
-      if [[ -n "$remote_branch" ]]; then
-        git -C "$folder_to_clone" switch "$remote_branch" &>/dev/null
-      fi      
-    fi
+  
+  if [[ -n "$branch_arg" && "$branch_arg" != "$my_branch" ]]; then
+    # if [[ -n "$default_branch" && "$branch_arg" != "$default_branch" ]]; then
+    #   local remote_branch=$(get_remote_branch_ "$branch_arg" "$folder_to_clone")
+      
+    #   if [[ -n "$remote_branch" ]]; then
+    #     git -C "$folder_to_clone" switch "$remote_branch" &>/dev/null
+    #   fi      
+    # fi
     if ! git -C "$folder_to_clone" switch -c "$branch_arg" &>/dev/null; then
-      if (( ! proj_clone_is_e )); then
-        print " ${low_yellow_cor}warning: did not create a new branch because it already exists: $branch_arg${reset_cor}" >&2
-      fi
       if ! git -C "$folder_to_clone" switch "$branch_arg" &>/dev/null; then
         print " ${red_cor}fatal: failed to switch branch: $branch_arg" >&2
         RET=1
@@ -5983,14 +6176,14 @@ function proj_clone_() {
   if [[ "$default_branch" != "$branch_arg" ]]; then
     local existing_default_branch=$(get_remote_branch_ "$default_branch" "$folder_to_clone")
     
-    if [[ -z "$existing_default_branch" ]] && [[ "$default_branch" == "$base_branch_arg" || "$default_branch" == "$pump_head_branch" ]]; then
+    if [[ -z "$existing_default_branch" ]] && [[ "$default_branch" == "$base_branch_arg" ]]; then
       print " ${yellow_cor}warning: default branch does not exist in remote repository: $default_branch${reset_cor}" >&2
     else
       print " ${magenta_cor}git config init.defaultBranch $default_branch${reset_cor}"
-      print " ${magenta_cor}git config branfch.${branch_arg}.gh-merge-base $default_branch${reset_cor}"
+      print " ${magenta_cor}git config branch.${branch_arg}.gh-merge-base $default_branch${reset_cor}"
 
-      git -C "$folder_to_clone" config init.defaultBranch "$default_branch"
-      git -C "$folder_to_clone" config "branch.${branch_arg}.gh-merge-base" "$default_branch"
+      git -C "$folder_to_clone" config init.defaultBranch $default_branch
+      git -C "$folder_to_clone" config branch.${branch_arg}.gh-merge-base $default_branch
     fi
   fi
 
@@ -6005,7 +6198,28 @@ function proj_clone_() {
     fi
   fi
 
-  print " default branch is: ${cyan_cor}$(get_default_branch_ "$folder_to_clone")${reset_cor}"
+  local d_branch=$(get_default_branch_ "$folder_to_clone")
+  local b_branch=$(get_base_branch_ "$folder_to_clone")
+
+  if [[ -n "$d_branch" || -n "$d_branch" ]]; then
+    print ""
+  fi
+
+  if [[ -n "$d_branch" ]]; then
+    print -n " default branch: ${cyan_cor}${d_branch}${reset_cor}"
+    if [[ -n "$b_branch" ]]; then
+       if  [[ "$b_branch" != "$d_branch" ]]; then
+        print -n " and base branch: ${cyan_cor}${b_branch}${reset_cor}"
+      else
+        print -n " and base branch are the same"
+      fi
+    fi
+    print ""
+  else
+    if [[ -n "$b_branch" ]]; then
+      print " base branch: ${cyan_cor}${b_branch}${reset_cor}"
+    fi
+  fi
 
   print ""
   print " next thing to do:"
@@ -6023,8 +6237,15 @@ function proj_clone_() {
     fi
     print "    ${white_cor}edit PUMP_SETUP_$i in your pump.zshenv file to customize the setup script${reset_cor}"
   fi
-  print "  --"
+  print "  --" >&1
+  if [[ -n "$d_branch" ]]; then
+    print " • ${yellow_cor}main${reset_cor} (alias for \"git switch $d_branch\")"
+  fi
+  if [[ -n "$b_branch" ]]; then
+    print " • ${yellow_cor}base${reset_cor} (alias for \"git switch $b_branch\")"
+  fi
 
+  print "  --" >&1
   print "  • ${yellow_cor}${proj_cmd} -h${reset_cor} for project options"
   print "  • ${yellow_cor}pro -h${reset_cor} for other project management options"
   print "  • ${yellow_cor}help${reset_cor} for more help"
@@ -6042,7 +6263,7 @@ function proj_prs_() {
   local proj_cmd="$1"
 
   if (( proj_prs_is_h )); then
-    $proj_cmd -h | grep --color=never -E '\prs\b'
+    $proj_cmd -h | grep --color=never -E '\bprs\b'
     return 0;
   fi
 
@@ -6058,22 +6279,7 @@ function proj_prs_() {
 
   local proj_repo="${PUMP_REPO[$i]}"
 
-  if (( proj_prs_is_a )); then
-    local pr
-    pr=("${(@s:|:)$(select_pr_ "$2" "$proj_repo" "$proj_cmd prs")}")
-    if (( $? == 130 )); then return 130; fi
-    if [[ -z "$pr" ]]; then return 1; fi
-
-    local pr_number="${pr[1]}"
-    local pr_title="${pr[3]}"
-
-    if confirm_ "approve pull request ${cyan_cor}${pr_title}${reset_cor} ?" "approve" "do nothing"; then
-      gh pr review "$pr_number" --approve --repo "$proj_repo"
-    fi
-    return $?;
-  fi
-
-  if (( proj_prs_is_s )); then
+  if (( proj_prs_is_a && proj_prs_is_s )); then
     if ! command -v jq &>/dev/null; then
       print " fatal: command requires jq: $proj_cmd pr -s" >&2
       print " install jq: ${blue_cor}https://jqlang.org/download/${reset_cor}" >&2
@@ -6115,6 +6321,29 @@ function proj_prs_() {
     return 0;
   fi
 
+  if (( proj_prs_is_a )); then
+    local pr
+    pr=("${(@s:|:)$(select_pr_ "$2" "$proj_repo" "$proj_cmd prs")}")
+    if (( $? == 130 )); then return 130; fi
+    if [[ -z "$pr" ]]; then return 1; fi
+
+    local pr_number="${pr[1]}"
+    local pr_title="${pr[3]}"
+
+    if confirm_ "approve pull request ${cyan_cor}${pr_title}${reset_cor} ?" "approve" "do nothing"; then
+      gh pr review "$pr_number" --approve --repo "$proj_repo"
+    fi
+    return $?;
+  fi
+
+  if (( proj_prs_is_s )); then
+    print "  ${red_cor}fatal: invalid option: -s${reset_cor}" >&2
+    print "  --" >&1
+    $proj_cmd -h | grep -w --color=never -E '\bprs\b'
+    return 1;
+  fi
+
+
   gh pr list --repo "$proj_repo" --web
   return 0;
 }
@@ -6154,7 +6383,7 @@ function proj_bkp_() {
   if (( ! single_mode )); then
     local dirs=("${(@f)$(get_folders_ "$proj_folder")}")
     if [[ -z "$dirs" ]]; then
-      print " there is no folder to backup"
+      print " there is no folder to backup" >&2
       return 0;
     fi
 
@@ -6165,7 +6394,7 @@ function proj_bkp_() {
   fi
 
   if [[ -z "$(ls "$folder_to_backup")" ]]; then
-    print " project folder is empty: $folder_to_backup"
+    print " project folder is empty" >&2
     return 0;
   fi
 
@@ -6761,13 +6990,105 @@ function proj_releases_() {
   gh release list --repo "$proj_repo" | awk '{print $1 "\t" $2}'
 }
 
+function proj_jira_find_folder_() {
+  local jira_key="$1"
+  local proj_folder="$2"
+  local proj_jira_is_c="$3"
+
+  local dirs=("${(@f)$(get_folders_ -fj "$proj_folder" "$jira_key")}")
+
+  if [[ -z "$dirs" ]]; then
+    if (( proj_jira_is_c )); then
+      print " no ticket folders found in $proj_cmd" >&2
+      return 1;
+    fi
+    return 0;
+  fi
+
+  local folder=""
+  if [[ -n "$jira_key" ]]; then
+    folder=$(choose_one_ -i "folder" "${dirs[@]}")
+  else
+    folder=$(choose_one_ "folder" "${dirs[@]}")
+  fi
+  if [[ -z "$folder" ]]; then return 1; fi
+
+  local folder_to_jira="${proj_folder}/${folder}"
+
+  jira_key=$(extract_jira_key_ "$folder" "$folder_to_jira")
+
+  if [[ -z "$jira_key" ]]; then
+    if (( proj_jira_is_c )); then
+      print " fatal: cannot extract jira key from folder: $folder_to_jira" >&2
+      return 1;
+    fi
+    return 0;
+  fi
+
+  echo "$folder_to_jira"
+}
+
+function proj_jira_find_branch_() {
+  local jira_key="$1"
+  local proj_folder="$2"
+  local proj_jira_is_c="$3"
+
+  local branch_found=""
+  if [[ -n "$jira_key" ]]; then
+    if (( proj_jira_is_c )); then
+      branch_found=$(select_branch_ -le "$jira_key" "" "$proj_folder")
+    else
+      branch_found=$(select_branch_ -le "$jira_key" "" "$proj_folder" 2>/dev/null)
+    fi
+  else
+    if (( proj_jira_is_c )); then
+      branch_found=$(select_branch_ -l "" "branch" "$proj_folder")
+    else
+      branch_found=$(select_branch_ -l "" "branch" "$proj_folder" 2>/dev/null)
+    fi
+  fi
+  if [[ -z "$branch_found" ]]; then return 1; fi
+  
+  jira_key=$(extract_jira_key_ "$branch_found")
+
+  if [[ -z "$jira_key" ]]; then
+    if (( proj_jira_is_c )); then
+      print " fatal: cannot extract jira key from branch: $branch_found" >&2
+      return 1;
+    fi
+  fi
+
+  echo "$branch_found"
+}
+
+function get_jira_key_() {
+  local i="$1"
+  local jira_proj_or_key="$2"
+
+  local jira_key=""
+  
+  if [[ -n "$jira_proj_or_key" ]]; then
+    jira_key=$(extract_jira_key_ "$jira_proj_or_key")
+    if [[ -z "$jira_key" ]]; then
+      local jira_proj=$(select_jira_proj_ $i "$jira_proj_or_key")
+      if [[ -z "$jira_proj" ]]; then return 1; fi
+      
+      jira_key=$(select_jira_key_ -p $i "$jira_proj")
+    fi
+  else
+    jira_key=$(select_jira_key_ $i)
+  fi
+
+  echo "$jira_key"
+}
+
 function proj_jira_() {
   set +x
   eval "$(parse_flags_ "$0" "csrpva" "" "$@")"
   (( proj_jira_is_debug )) && set -x
 
   local proj_cmd="$1"
-  local jira_key_or_jira_proj="$2"
+  local jira_proj_or_key="$2"
   local jira_status="$3"
 
   if (( proj_jira_is_h )); then
@@ -6782,7 +7103,7 @@ function proj_jira_() {
       return 1;
     fi
   fi
-  
+
   if ! command -v acli &>/dev/null; then
     print " fatal: command requires acli: $proj_cmd jira" >&2
     print " install acli: ${blue_cor}https://developer.atlassian.com/cloud/acli/guides/install-acli/${reset_cor}" >&2
@@ -6803,21 +7124,38 @@ function proj_jira_() {
   local single_mode="${PUMP_SINGLE_MODE[$i]}"
 
   if (( proj_jira_is_v && proj_jira_is_a )); then
-    local jira_keys=()
-    local branches
+    local maybe_jira_keys
 
     if (( single_mode )); then
-      branches=($(select_branches_ -l "" "$proj_folder"))
+      local branches=$(git -C "$proj_folder/stage" branch --list --format="%(refname:short)" \
+        | grep -v 'detached' \
+        | grep -v 'HEAD' \
+        | sort -fu
+      )
+
+      if [[ -z "$branches" ]]; then
+        print " no branches of jira tickets found for $proj_cmd" >&2
+        return 0;
+      fi
+      maybe_jira_keys=("${(@f)$(printf "%s\n" "$branches")}")
     else
-      branches=("${(@f)$(get_folders_ -fj "$proj_folder")}")
+      local folders=$(get_folders_ -fj "$proj_folder")
+
+      if [[ -z "$folders" ]]; then
+        print " no folders of jira tickets found for $proj_cmd" >&2
+        return 0;
+      fi
+      maybe_jira_keys=("${(@f)$(printf "%s\n" "$folders")}")
     fi
 
     # for each branch, extract the jira key and save in jira_keys
-    local branch=""
-    for branch in "${branches[@]}"; do
-      local key=$(extract_jira_key_ "$branch")
+    local jira_keys=()
+
+    local maybe_jira_key=""
+    for maybe_jira_key in "${maybe_jira_keys[@]}"; do
+      local key=$(extract_jira_key_ "$maybe_jira_key")
       if [[ -n "$key" && ! " ${jira_keys[*]} " =~ " $key " ]]; then
-        jira_keys+=("$key")
+        jira_keys+=($key)
       fi
     done
 
@@ -6826,7 +7164,7 @@ function proj_jira_() {
     for jira_key in "${jira_keys[@]}"; do
       if update_jira_status_ -v $i "$jira_key"; then
         if [[ "$jira_key" != "${jira_keys[-1]}" ]]; then
-          print " --"
+          print "  --" >&1
         fi
       fi
     done
@@ -6836,7 +7174,7 @@ function proj_jira_() {
 
   if (( proj_jira_is_a )); then
     print "  ${red_cor}fatal: invalid option: -a${reset_cor}" >&2
-    print "  --"
+    print "  --" >&1
     $proj_cmd -h | grep -w --color=never -E '\bjira\b'
     return 1;
   fi
@@ -6846,83 +7184,57 @@ function proj_jira_() {
   # resolve jira_key from a branch or folder
   if (( proj_jira_is_c || proj_jira_is_p || proj_jira_is_r || proj_jira_is_s || proj_jira_is_v )); then
 
-    if [[ -n "$jira_key_or_jira_proj" ]]; then
-      jira_key=$(extract_jira_key_ "$jira_key_or_jira_proj")
+    if [[ -n "$jira_proj_or_key" ]]; then
+      jira_key=$(extract_jira_key_ "$jira_proj_or_key")
     fi
 
-    if (( single_mode )); then
-      if ! is_folder_git_ "$proj_folder"; then return 1; fi
+    if [[ -z "$jira_key" ]] || (( proj_jira_is_c )); then
+      if (( single_mode )); then
+        local branch_found=$(proj_jira_find_branch_ "$jira_key" "$proj_folder" "$proj_jira_is_c")
+        if (( proj_jira_is_c )); then
+          if [[ -z "$branch_found" ]]; then return 1; fi
 
-      local branch_found=""
-      if [[ -n "$jira_key" ]]; then
-        branch_found=$(select_branch_ -leq "$jira_key" "" "$proj_folder")
+          main "$proj_folder"
+          delb -e "$branch_found" "$proj_folder"
+          if (( $? == 130 )); then return 130; fi
+        fi
+
+        jira_key=$(extract_jira_key_ "$branch_found")
+
       else
-        branch_found=$(select_branch_ -lq "" "branch" "$proj_folder")
-      fi
-      if [[ -z "$branch_found" ]]; then return 1; fi
-      
-      jira_key=$(extract_jira_key_ "$branch_found")
+        local folder_to_jira=$(proj_jira_find_folder_ "$jira_key" "$proj_folder" "$proj_jira_is_c")
+        if (( proj_jira_is_c )); then
+          if [[ -z "$folder_to_jira" ]]; then return 1; fi
+          
+          del "$folder_to_jira"
+          if (( $? == 130 )); then return 130; fi
+        fi
 
-      if [[ -z "$jira_key" ]]; then
-        print " fatal: cannot extract jira key from branch: $branch_found" >&2
-        return 1;
+        jira_key=$(extract_jira_key_ "$folder" "$folder_to_jira")
       fi
 
       if (( proj_jira_is_c )); then
-        co -m "$proj_folder"
-        delb -e "$branch_found" "$proj_folder"
-        if (( $? == 130 )); then return 130; fi
+        if confirm_ "close jira ticket: $jira_key ?"; then
+          update_jira_status_ -c $i "$jira_key"
+        fi
+
+        return 0;
       fi
-
-    else
-      local dirs=("${(@f)$(get_folders_ -fj "$proj_folder" "$jira_key")}")
-
-      if [[ -z "$dirs" ]]; then
-        print " no ticket folders found in $proj_cmd" >&2
-        return 1;
-      fi
-
-      local folder=""
-      if [[ -n "$jira_key" ]]; then
-        folder=$(choose_one_ -i "folder" "${dirs[@]}")
-      else
-        folder=$(choose_one_ "folder" "${dirs[@]}")
-      fi
-      if [[ -z "$folder" ]]; then return 1; fi
-
-      local folder_to_jira="${proj_folder}/${folder}"
-
-      jira_key=$(extract_jira_key_ "$folder" "$folder_to_jira")
-
-      if [[ -z "$jira_key" ]]; then
-        print " fatal: cannot extract jira key from folder: $folder_to_jira" >&2
-        return 1;
-      fi
-
-      if (( proj_jira_is_c )); then
-        del "$folder_to_jira"
-        if (( $? == 130 )); then return 130; fi
-      fi
-
     fi
 
-    if (( proj_jira_is_c )); then
-      if confirm_ "close jira ticket: $jira_key ?"; then
-        update_jira_status_ -c $i "$jira_key"
-      fi
+    if [[ -z "$jira_key" ]]; then
+      jira_key=$(get_jira_key_ $i "$jira_proj_or_key")
+      if [[ -z "$jira_key" ]]; then return 1; fi
+    fi
 
-    elif (( proj_jira_is_p )); then
+    if (( proj_jira_is_p )); then
       update_jira_status_ -p $i "$jira_key"
-
     elif (( proj_jira_is_r )); then
       update_jira_status_ -r $i "$jira_key"
-
     elif (( proj_jira_is_s )); then
       update_jira_status_ -s $i "$jira_key" "$jira_status"
-
     elif (( proj_jira_is_v )); then
       update_jira_status_ -v $i "$jira_key"
-
     fi
 
     return $?;
@@ -6931,20 +7243,9 @@ function proj_jira_() {
   # jira - open a ticket
 
   if [[ -z "$jira_key" ]]; then
-    if [[ -n "$jira_key_or_jira_proj" ]]; then
-      jira_key=$(extract_jira_key_ "$jira_key_or_jira_proj")
-      if [[ -z "$jira_key" ]]; then
-        local jira_proj=$(select_jira_proj_ $i "$jira_key_or_jira_proj")
-        if [[ -z "$jira_proj" ]]; then return 1; fi
-        
-        jira_key=$(select_jira_key_ -p $i "$jira_proj")
-      fi
-    else
-      jira_key=$(select_jira_key_ $i)
-    fi
+    jira_key=$(get_jira_key_ $i "$jira_proj_or_key")
+    if [[ -z "$jira_key" ]]; then return 1; fi
   fi
-  
-  if [[ -z "$jira_key" ]]; then return 1; fi
 
   local folder_to_jira=""
 
@@ -6957,7 +7258,7 @@ function proj_jira_() {
       fi
     fi
 
-    local branch_found=$(select_branch_ -leq "$jira_key" "" "$proj_folder")
+    local branch_found=$(select_branch_ -le "$jira_key" "" "$proj_folder" 2>/dev/null)
 
     if [[ -n "$branch_found" ]]; then
       if ! co -e "$proj_folder" "$branch_found"; then
@@ -6985,7 +7286,7 @@ function proj_jira_() {
     folder_to_jira="${proj_folder}/${jira_key}"
   fi
 
-  if confirm_ "open jira ticket: $jira_key ?"; then
+  if confirm_ "open jira ticket: ${pink_cor}$jira_key${reset_cor}?"; then
     update_jira_status_ -p $i "$jira_key"
   fi
   
@@ -7005,26 +7306,28 @@ function update_jira_status_() {
   local jira_in_review="${PUMP_JIRA_IN_REVIEW[$i]:-"In Review"}"
   local jira_done="${PUMP_JIRA_DONE[$i]:-"Done"}"
 
-  local output=$(gum spin --title="retrieving current jira status..." -- acli jira workitem view "$jira_key")
+  gum spin --title="retrieving current jira status..." -- acli jira workitem view "$jira_key"
   if (( $? != 0 )); then
-    print " fatal: cannot retrieve jira ticket: $jira_key" >&2
+    print " cannot retrieve ticket: $jira_key" >&2
     return 1;
   fi
+
+  local output=$(gum spin --title="retrieving current jira status..." -- acli jira workitem view "$jira_key")
 
   local current_status=$(echo "$output" | grep -i '^Status:' | cut -d':' -f2- | xargs -0)
   local assignee=$(echo "$output" | grep -i '^Assignee:' | cut -d':' -f2- | xargs -0)
   local summary=$(echo "$output" | grep -i '^Summary:' | cut -d':' -f2- | xargs -0)
 
   if [[ -z "$current_status" ]]; then
-    print " fatal: cannot retrieve status of jira ticket: $jira_key" >&2
+    print " cannot retrieve status of ticket: $jira_key" >&1
     return 1;
   fi
 
   if (( update_jira_status_is_v )); then
     print " ${cyan_cor}ticket: ${reset_cor} $jira_key"
-    print " ${cyan_cor}summary:${reset_cor} $summary"
-    print " ${cyan_cor}assign: ${reset_cor} $assignee"
-    print " ${cyan_cor}status: ${reset_cor} $current_status"
+    print " ${cyan_cor}summary:${reset_cor}$summary"
+    print " ${cyan_cor}assign: ${reset_cor}$assignee"
+    print " ${cyan_cor}status: ${reset_cor}$current_status"
     return 0;
   fi
   
@@ -7050,7 +7353,7 @@ function update_jira_status_() {
     acli jira auth status | awk -F': ' '/Email:/ { print $2 }' 2>/dev/null)
 
   if [[ -z "$current_user" ]]; then
-    print " fatal: cannot retrieve current jira user" >&2
+    print " cannot retrieve current user" >&2
     print " run ${yellow_cor}acli jira auth login --web${reset_cor} to make sure you are authenticated" >&2
 
     return 1;
@@ -7071,7 +7374,7 @@ function update_jira_status_() {
         output=$(gum spin --title="assigning jira ticket..." -- \
           acli jira workitem assign --key="$jira_key" --assignee="@me" --yes)
       fi
-      print " $output" | grep -w "$jira_key"
+      print " $output" | grep -w "$jira_key" >&2
     fi
   fi
   
@@ -7082,12 +7385,12 @@ function update_jira_status_() {
 
   if [[ -n "$current_jira_assignee" && "$current_jira_assignee" != "$current_user" && "$current_status" == "$jira_done" ]]; then
     print " ✓ Work item $jira_key status: $jira_done" | grep -w "$jira_key"
-    print " cannot transition a closed jira ticket assigned to $current_jira_assignee" >&2
+    print " cannot transition a closed ticket assigned to $current_jira_assignee" >&2
     return 1;
   fi
 
   if [[ -n "$current_jira_assignee" && "$current_jira_assignee" != "$current_user" ]]; then
-    confirm_ "transition of jira ticket ${jira_key} (assigned to $current_jira_assignee) to status: ${cyan_cor}${jira_status}${reset_cor}?"
+    confirm_ "transition of ticket ${jira_key} (assigned to $current_jira_assignee) to status: ${cyan_cor}${jira_status}${reset_cor}?"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
     if (( RET == 1 )); then return 0; fi
@@ -7105,8 +7408,8 @@ function update_jira_status_() {
       output=$(gum spin --title="transitioning jira ticket..." -- \
           acli jira workitem transition --key="$jira_key" --status="$jira_status" --yes)
       if echo "$output" | grep -qE "Failure"; then
-        print " fatal: cannot transition jira ticket: $jira_key" >&2
-        print " output: $output" >&2
+        print " cannot transition ticket: $jira_key" >&2
+        print " $output" | grep -w "$jira_key" >&2
         return 1;
       fi
     fi
@@ -7215,35 +7518,53 @@ function select_jira_key_() {
     # search for all tickets in the project
     if command -v gum &>/dev/null; then
       tickets=$(gum spin --title="retrieving jira tickets..." -- \
-        acli jira workitem search --jql "project='$jira_proj' AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+        acli jira workitem search \
+        --jql "project='$jira_proj' AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1'2>/dev/null)
     else
       print " retrieving jira tickets..." >&2
-      tickets=$(acli jira workitem search --jql "project='$jira_proj' AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+      tickets=$(acli jira workitem search \
+        --jql "project='$jira_proj' AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1' 2>/dev/null)
     fi
 
   elif (( select_jira_key_is_r)); then
     # search for tickets not assigned to current user
     if command -v gum &>/dev/null; then
       tickets=$(gum spin --title="retrieving jira tickets..." -- \
-        acli jira workitem search --jql "project='$jira_proj' AND assignee!=currentUser() AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+        acli jira workitem search \
+        --jql "project='$jira_proj' AND assignee!=currentUser() AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1' 2>/dev/null)
     else
       print " retrieving jira tickets..." >&2
-      tickets=$(acli jira workitem search --jql "project='$jira_proj' AND assignee!=currentUser() AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+      tickets=$(acli jira workitem search \
+        --jql "project='$jira_proj' AND assignee!=currentUser() AND status!='$jira_done' AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1' 2>/dev/null)
     fi
   else
     # search for tickets assigned to current user or not assigned and in "To Do" status
     if command -v gum &>/dev/null; then
       tickets=$(gum spin --title="retrieving jira tickets..." -- \
-        acli jira workitem search --jql "project='$jira_proj' AND status!='$jira_done' AND (assignee=currentUser() OR (assignee IS EMPTY AND status='To Do')) AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+        acli jira workitem search \
+        --jql "project='$jira_proj' AND status!='$jira_done' AND (assignee=currentUser() OR (assignee IS EMPTY AND status='To Do')) AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1' 2>/dev/null)
     else
       print " retrieving jira tickets..." >&2
-      tickets=$(acli jira workitem search --jql "project='$jira_proj' AND status!='$jira_done' AND (assignee=currentUser() OR (assignee IS EMPTY AND status='To Do')) AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
-        --fields="key,summary,status,assignee" | awk 'NR > 1' 2>/dev/null)
+      tickets=$(acli jira workitem search \
+        --jql "project='$jira_proj' AND status!='$jira_done' AND (assignee=currentUser() OR (assignee IS EMPTY AND status='To Do')) AND Sprint IS NOT EMPTY ORDER BY priority DESC" \
+        --fields="key,summary,status,assignee" \
+        --limit 1000 \
+      | awk 'NR > 1' 2>/dev/null)
     fi
   fi
 
@@ -7253,7 +7574,11 @@ function select_jira_key_() {
   fi
 
   local ticket=""
-  ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
+  if (( $(echo "$tickets" | wc -l) > 20 )); then
+    ticket=$(filter_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
+  else
+    ticket=$(choose_one_ "jira ticket" "${(@f)$(printf "%s\n" "$tickets")}")
+  fi
   if [[ -z "$ticket" ]]; then return 1; fi
 
   local jira_key="${ticket%% *}"
@@ -7262,23 +7587,24 @@ function select_jira_key_() {
 }
 
 function get_branch_with_monogram_() {
-  local i="$1"
-  local pump_no_monogram="${PUMP_NO_MONOGRAM[$i]}"
+  local branch_name="$1"
+  local branch_name_monogram="${${USER:0:1}:l}-${branch_name}"
 
-  local branch_name="$2"
-
-  if [[ -z "$pump_no_monogram" ]]; then
-    confirm_ "use initials for the branch name: ${cyan_cor}${${USER:0:1}:l}-${branch_name}${reset_cor}?"
+  if [[ -z "$PUMP_USE_MONOGRAM" ]]; then
+    confirm_ "use initials for the branch name: ${cyan_cor}$branch_name_monogram${reset_cor}?"
     local RET=$?
     if (( RET == 130 || RET == 2 )); then return 130; fi
 
-    update_config_ $i "PUMP_NO_MONOGRAM" $RET >&2
-    
-    pump_no_monogram="${PUMP_NO_MONOGRAM[$i]}"
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_USE_MONOGRAM" 1 >&2
+    else
+      update_setting_ "PUMP_USE_MONOGRAM" 0 >&2
+    fi
   fi
 
-  if (( pump_no_monogram == 0 )); then
-    branch_name="${${USER:0:1}:l}-${branch_name}"
+  if (( PUMP_USE_MONOGRAM )); then
+    echo "$branch_name_monogram"
+    return 0;
   fi
 
   echo "$branch_name"
@@ -7290,7 +7616,7 @@ function abort() {
   (( abort_is_debug )) && set -x
 
   if (( abort_is_h )); then
-    print "  ${yellow_cor}abort ${low_yellow_cor}[<folder>]${reset_cor} : abort rebase, merge and cherry-pick in progress"
+    print "  ${yellow_cor}abort ${low_yellow_cor}[<folder>]${reset_cor} : abort rebase, merge, revert and cherry-pick in progress"
     return 0;
   fi
 
@@ -7311,8 +7637,10 @@ function abort() {
 
   if ! GIT_EDITOR=true git -C "$folder" rebase --abort $@ &>/dev/null; then
     if ! GIT_EDITOR=true git -C "$folder" merge --abort $@ &>/dev/null; then
-      if ! GIT_EDITOR=true git -C "$folder" cherry-pick --abort $@ &>/dev/null; then
-        return 1;
+      if ! GIT_EDITOR=true git -C "$folder" revert --abort $@ &>/dev/null; then
+        if ! GIT_EDITOR=true git -C "$folder" cherry-pick --abort $@ &>/dev/null; then
+          return 1;
+        fi
       fi
     fi
   fi
@@ -7325,7 +7653,8 @@ function renb() {
 
   if (( renb_is_h )); then
     print "  ${yellow_cor}renb <new_branch_name> ${low_yellow_cor}[<folder>]${reset_cor} : rename current branch locally"
-    print "  ${yellow_cor}renb -r${reset_cor} : also rename current branch remotelly"
+    print "  --" >&1
+    print "  ${yellow_cor}renb -r${reset_cor} : also rename remotelly"
     return 0;
   fi
 
@@ -7335,7 +7664,9 @@ function renb() {
   if [[ -n "$2" && $2 != -* ]]; then
     if [[ -d "$2" ]]; then
       folder="$2"
-      new_name="$1"
+      if [[ -n "$1" && $1 != -* ]]; then
+        new_name="$1"
+      fi
     else
       print " fatal: not a valid folder argument: $2" >&2
       print " run ${yellow_cor}renb -h${reset_cor} to see usage" >&2
@@ -7347,7 +7678,7 @@ function renb() {
   fi
 
   if [[ -z "$new_name" ]]; then
-    print " fatal: branch argument is required" >&2
+    print " fatal: not a valid branch argument" >&2
     print " run ${yellow_cor}renb -h${reset_cor} to see usage" >&2
     return 1;
   fi
@@ -7367,7 +7698,7 @@ function renb() {
     return 1;
   fi
 
-  local gh_branch=$(git -C "$folder" config --get "branch.${current_name}.gh-merge-base" 2>/dev/null)
+  local gh_branch=$(git -C "$folder" config --get branch.${current_name}.gh-merge-base 2>/dev/null)
 
   if [[ -n "$2" && $2 != -* ]]; then
     git -C "$folder" branch -m $new_name ${@:3}
@@ -7376,12 +7707,13 @@ function renb() {
   fi
 
   if (( $? == 0 )); then
-    git -C "$folder" config "branch.${new_name}.gh-merge-base" "$gh_branch" &>/dev/null
-    git -C "$folder" config --remove-section "branch.${current_name}" &>/dev/null
+    git -C "$folder" config branch.${new_name}.gh-merge-base $gh_branch &>/dev/null
+    git -C "$folder" config --remove-section branch.${current_name} &>/dev/null
 
     if (( renb_is_r )); then
-      if git -C "$folder" push origin :$current_name --quiet; then
-        git -C "$folder" push --set-upstream origin $new_name
+      local remote_name=$(get_remote_origin_ "$folder")
+      if git -C "$folder" push $remote_name :$current_name --quiet; then
+        git -C "$folder" push --set-upstream $remote_name $new_name
       fi
     fi
   fi
@@ -7389,11 +7721,14 @@ function renb() {
 
 function chp() {
   set +x
-  eval "$(parse_flags_ "$0" "" "s" "$@")"
+  eval "$(parse_flags_ "$0" "ac" "s" "$@")"
   (( chp_is_debug )) && set -x
 
   if (( chp_is_h )); then
-    print "  ${yellow_cor}chp <commit_hash> ${low_yellow_cor}[<folder>]${reset_cor} : cherry-pick a commit"
+    print "  ${yellow_cor}chp ${low_yellow_cor}[<commit_hash>] [<folder>]${reset_cor} : cherry-pick a commit"
+    print "  --" >&1
+    print "  ${yellow_cor}chp -a${reset_cor} : --abort"
+    print "  ${yellow_cor}chp -c${reset_cor} : --continue"
     return 0;
   fi
 
@@ -7404,7 +7739,9 @@ function chp() {
   if [[ -n "$2" && $2 != -* ]]; then
     if [[ -d "$2" ]]; then
       folder="$2"
-      hash_arg="$1"
+      if [[ -n "$1" && $1 != -* ]]; then
+        hash_arg="$1"
+      fi
     else
       print " fatal: not a valid folder argument: $2" >&2
       print " run ${yellow_cor}chp -h${reset_cor} to see usage" >&2
@@ -7422,112 +7759,123 @@ function chp() {
   
   shift $arg_count
 
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  if (( chp_is_a )); then
+    git -C "$folder" cherry-pick --abort $@ &>/dev/null
+    return $?;
+  fi
+
+  if (( chp_is_c )); then
+    if ! git -C "$folder" add .; then return 1; fi
+    GIT_EDITOR=true git -C "$folder" cherry-pick --continue --no-commit $@ &>/dev/null
+    return $?;
+  fi
+
+  local commit=""
+
+  # get commit message by hash
   if [[ -z "$hash_arg" ]]; then
-    print " fatal: commit hash argument is required" >&2
-    print " run ${yellow_cor}chp -h${reset_cor} to see usage" >&2
-    return 1;
+    # get a list of commits to revert
+    local commits=("${(@f)$(git -C "$folder" log --no-merges --oneline -100)}")
+
+    #use choose_multiple so user can select mutliple commits to revert
+    commit=($(filter_one_ "commit to revert" "${commits[@]}"))
+    if [[ -z "$commit" ]]; then return 1; fi
+
+    # get the hash of the commit to revert
+    local hash_arg=$(echo "$commit" | awk '{print $1}')
+  else
+    commit=$(git -C "$folder" log -1 --pretty=format:'%s' $hash_arg 2>/dev/null)
   fi
 
-  if ! is_folder_git_ "$folder"; then return 1; fi
+  if git -C "$folder" cherry-pick --no-commit $hash_arg $@; then
+    print "commit reverted: $commit"
+  fi
+}
+
+function revert() {
+  set +x
+  eval "$(parse_flags_ "$0" "ac" "" "$@")"
+  (( revert_is_debug )) && set -x
+
+  if (( revert_is_h )); then
+    print "  ${yellow_cor}revert ${low_yellow_cor}[<commit_hash>] [<folder>]${reset_cor} : revert a commit"
+    print "  --" >&1
+    print "  ${yellow_cor}revert -a${reset_cor} : --abort"
+    print "  ${yellow_cor}revert -c${reset_cor} : --continue"
+    return 0;
+  fi
+
+  local folder="$PWD"
+  local hash_arg=""
+  local arg_count=0
+
+  if [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+      if [[ -n "$1" && $1 != -* ]]; then
+        hash_arg="$1"
+      fi
+    else
+      print " fatal: not a valid folder argument: $2" >&2
+      print " run ${yellow_cor}chp -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    arg_count=2
+  elif [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      hash_arg="$1"
+    fi
+    arg_count=1
+  fi
   
-  git -C "$folder" cherry-pick "$hash_arg" ${@:2}
-}
-
-function chc() {
-  set +x
-  eval "$(parse_flags_ "$0" "" "s" "$@")"
-  (( chc_is_debug )) && set -x
-
-  if (( chc_is_h )); then
-    print "  ${yellow_cor}chc ${low_yellow_cor}[<folder>]${reset_cor} : continue cherry-pick in progress"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}chc -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
+  shift $arg_count
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
-  GIT_EDITOR=true git -C "$folder" cherry-pick --continue $@ &>/dev/null
+  if (( revert_is_a )); then
+    git -C "$folder" revert --abort $@ &>/dev/null
+    return $?;
+  fi
+
+  if (( revert_is_c )); then
+    if ! git -C "$folder" add .; then return 1; fi
+    GIT_EDITOR=true git -C "$folder" revert --continue --no-commit $@ &>/dev/null
+    return $?;
+  fi
+
+  local commit=""
+
+  # get commit message by hash
+  if [[ -z "$hash_arg" ]]; then
+    # get a list of commits to revert
+    local commits=("${(@f)$(git -C "$folder" log --no-merges --oneline -100)}")
+
+    #use choose_multiple so user can select mutliple commits to revert
+    commit=($(filter_one_ "commit to revert" "${commits[@]}"))
+    if [[ -z "$commit" ]]; then return 1; fi
+
+    # get the hash of the commit to revert
+    local hash_arg=$(echo "$commit" | awk '{print $1}')
+  else
+    commit=$(git -C "$folder" log -1 --pretty=format:'%s' $hash_arg 2>/dev/null)
+  fi
+  
+  if git -C "$folder" revert --no-commit $hash_arg $@; then
+    print "commit reverted: $commit"
+  fi
 }
 
-function mc() {
-  set +x
-  eval "$(parse_flags_ "$0" "" "" "$@")"
-  (( mc_is_debug )) && set -x
-
-  if (( mc_is_h )); then
-    print "  ${yellow_cor}mc ${low_yellow_cor}[<folder>]${reset_cor} : continue merge in progress"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}mc -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  if ! git -C "$folder" add .; then return 1; fi
-
-  GIT_EDITOR=true git -C "$folder" merge --continue $@ &>/dev/null
-}
-
-function rc() {
-  set +x
-  eval "$(parse_flags_ "$0" "" "" "$@")"
-  (( rc_is_debug )) && set -x
-
-  if (( rc_is_h )); then
-    print "  ${yellow_cor}rc ${low_yellow_cor}[<folder>]${reset_cor} : continue rebase in progress"
-    return 0;
-  fi
-
-  local folder="$PWD"
-
-  if [[ -n "$1" && $1 != -* ]]; then
-    if [[ -d "$1" ]]; then
-      folder="$1"
-    else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}rc -h${reset_cor} to see usage" >&2
-      return 1;
-    fi
-    shift
-  fi
-
-  if ! is_folder_git_ "$folder"; then return 1; fi
-
-  if ! git -C "$folder" add .; then return 1; fi
-
-  GIT_EDITOR=true git -C "$folder" rebase --continue $@ &>/dev/null
-}
-
-function cont() {
+function conti() {
   set +x
   eval "$(parse_flags_ "$0" "" "" "$@")"
   (( conti_is_debug )) && set -x
 
   if (( conti_is_h )); then
-    print "  ${yellow_cor}cont ${low_yellow_cor}[<folder>]${reset_cor} : continue rebase, merge or cherry-pick in progress"
+    print "  ${yellow_cor}conti ${low_yellow_cor}[<folder>]${reset_cor} : continue rebase, merge, revert or cherry-pick in progress"
     return 0;
   fi
 
@@ -7538,7 +7886,7 @@ function cont() {
       folder="$1"
     else
       print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}cont -h${reset_cor} to see usage" >&2
+      print " run ${yellow_cor}conti -h${reset_cor} to see usage" >&2
       return 1;
     fi
     shift
@@ -7550,8 +7898,10 @@ function cont() {
 
   if ! GIT_EDITOR=true git -C "$folder" rebase --continue $@ &>/dev/null; then
     if ! GIT_EDITOR=true git -C "$folder" merge --continue $@ &>/dev/null; then
-      if ! GIT_EDITOR=true git -C "$folder" cherry-pick --continue $@ &>/dev/null; then
-        return 1;
+      if ! GIT_EDITOR=true git -C "$folder" revert --continue $@ &>/dev/null; then
+        if ! GIT_EDITOR=true git -C "$folder" cherry-pick --continue $@ &>/dev/null; then
+          return 1;
+        fi
       fi
     fi
   fi
@@ -7564,6 +7914,7 @@ function recommit() {
 
   if (( recommit_is_h )); then
     print "  ${yellow_cor}recommit ${low_yellow_cor}[<folder>]${reset_cor} : reset last commit then re-commit all changes with the same message"
+    print "  --" >&1
     print "  ${yellow_cor}recommit -s${reset_cor} : only staged changes"
     print "  ${yellow_cor}recommit -q${reset_cor} : no output"
     return 0;
@@ -7586,7 +7937,7 @@ function recommit() {
 
   if [[ -z "$(git -C "$folder" status --porcelain 2>/dev/null)" ]]; then
     if (( ! recommit_is_q )); then
-      print " nothing to do, working tree clean" >&2
+      print " nothing to commit, working tree clean" >&2
     fi
     return 1;
   fi
@@ -7613,7 +7964,8 @@ function fetch() {
   (( fetch_is_debug )) && set -x
 
   if (( fetch_is_h )); then
-    print "  ${yellow_cor}fetch ${low_yellow_cor}[folder]${reset_cor} : fetch remote changes"
+    print "  ${yellow_cor}fetch ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : fetch remote changes"
+    print "  --" >&1
     print "  ${yellow_cor}fetch -a${reset_cor} : --all"
     print "  ${yellow_cor}fetch -f${reset_cor} : --force"
     print "  ${yellow_cor}fetch -p${reset_cor} : --prune"
@@ -7622,17 +7974,36 @@ function fetch() {
   fi
 
   local folder="$PWD"
+  local branch_arg=""
 
-  if [[ -n "$1" && $1 != -* ]]; then
+  local arg_count=0
+
+  if [[ -n "$2" && $2 != -* ]]; then
+    if [[ -d "$2" ]]; then
+      folder="$2"
+    else
+      print " fatal: not a valid folder argument: $2" >&2
+      print " run ${yellow_cor}pull -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    
+    if [[ -n "$1" && $1 != -* ]]; then
+      branch_arg="$1"
+    fi
+    
+    arg_count=2
+  
+  elif [[ -n "$1" && $1 != -* ]]; then
     if [[ -d "$1" ]]; then
       folder="$1"
     else
-      print " fatal: not a valid folder argument: $1" >&2
-      print " run ${yellow_cor}fetch -h${reset_cor} to see usage" >&2
-      return 1;
+      branch_arg="$1"
     fi
-    shift
+    
+    arg_count=1
   fi
+
+  shift $arg_count
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
@@ -7735,12 +8106,17 @@ function gconf() {
 
 function glog() {
   set +x
-  eval "$(parse_flags_ "$0" "c" "" "$@")"
+  eval "$(parse_flags_ "$0" "abcmr" "" "$@")"
   (( glog_is_debug )) && set -x
 
   if (( glog_is_h )); then
-    print "  ${yellow_cor}glog ${low_yellow_cor}[<n>] [<branch>] [<folder>]${reset_cor} : log last n commits (7 by default)"
-    print "  ${yellow_cor}glog -c${reset_cor} : log last n commits since a branch"
+    print "  ${yellow_cor}glog ${low_yellow_cor}[<branch>] [<folder>] [<n>]${reset_cor} : see commits of a given branch, last n commits (7 by default)"
+    print "  ${yellow_cor}glog -c ${low_yellow_cor}<branch>${reset_cor} : see commits of your branch after head of a given branch"
+    print "  --" >&1
+    print "  ${yellow_cor}glog -b${reset_cor} : see commits of your branch after head of base branch"
+    print "  ${yellow_cor}glog -m${reset_cor} : see commits of your branch after head of main branch"
+    print "  ${yellow_cor}glog -a${reset_cor} : --all"
+    print "  ${yellow_cor}glog -r${reset_cor} : --remotes"
     return 0;
   fi
 
@@ -7760,7 +8136,9 @@ function glog() {
       return 1;
     fi
 
-    branch_arg="$2"
+    if [[ -n "$2" && $2 != -* ]]; then
+      branch_arg="$2"
+    fi
     
     if [[ $1 == <-> ]]; then
       n=$1
@@ -7778,7 +8156,9 @@ function glog() {
       if [[ $1 == <-> ]]; then
         n=$1
       else
-        branch_arg="$1"
+        if [[ -n "$1" && $1 != -* ]]; then
+          branch_arg="$1"
+        fi
       fi
     else
       branch_arg="$2"
@@ -7809,25 +8189,68 @@ function glog() {
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
-  if (( glog_is_c )); then
+  local flags=()
+
+  if (( glog_is_a )); then
+    flags+=("--all")
+  fi
+
+  if (( glog_is_r )); then
+    flags+=("--remotes")
+  fi
+
+  if (( glog_is_b || glog_is_c || glog_is_m )); then
     local my_branch=$(git -C "$folder" branch --show-current)
     if [[ -z "$my_branch" ]]; then
       my_branch="HEAD"
     fi
 
-    if [[ -z "$branch_arg" ]]; then
-      branch_arg=$(get_default_branch_ "$folder")
+    if (( glog_is_b && glog_is_c )) || (( glog_is_b && glog_is_m )) || (( glog_is_m && glog_is_c )); then
+      print " fatal: cannot use -b, -c and -m cannot be used together" >&2
+      print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
+      return 1;
     fi
 
-    fetch --quiet "$folder"
+    if (( glog_is_b || glog_is_m )) && [[ -n "$branch_arg" ]]; then
+      print " fatal: branch argument is not valid with -b or -m" >&2
+      print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
 
-    git -C "$folder" --no-pager log $branch_arg..$my_branch --oneline --graph --decorate $@
-  else
+    if (( glog_is_b )); then
+      branch_arg=$(get_base_branch_ -o "$folder")
+      if [[ -z "$branch_arg" ]]; then return 1; fi
+    fi
+
+    if (( glog_is_m )); then
+      branch_arg=$(get_main_branch_ -o "$folder")
+      if [[ -z "$branch_arg" ]]; then return 1; fi
+    fi
+
+    if (( glog_is_c )); then
+      if [[ -z "$branch_arg" ]]; then
+        print " fatal: branch argument is required" >&2
+        print " run ${yellow_cor}glog -h${reset_cor} to see usage" >&2
+        return 1;
+      fi
+    fi
+
+    print " showing commits of ${cyan_cor}${my_branch}${reset_cor} after head of ${hi_cyan_cor}${branch_arg}${reset_cor}" >&1
+    print "" >&1
+
     if (( n )); then
-      git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate -n $n $@
+      git -C "$folder" --no-pager log $branch_arg..$my_branch --oneline --graph --decorate -n $n ${flags[@]} $@
     else
-      git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate $@
+      git -C "$folder" --no-pager log $branch_arg..$my_branch --oneline --graph --decorate ${flags[@]} $@
     fi
+
+    return $?;
+  fi
+
+  if (( n )); then
+    git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate -n $n ${flags[@]} $@
+  else
+    git -C "$folder" --no-pager log $branch_arg --oneline --graph --decorate ${flags[@]} $@
   fi
 }
 
@@ -7836,14 +8259,41 @@ function push() {
   eval "$(parse_flags_ "$0" "tfnvu" "qs" "$@")"
   (( push_is_debug )) && set -x
 
+  if [[ -z "$PUMP_PUSH_NO_VERIFY" ]]; then
+    confirm_ "bypass the execution of git hooks on ${yellow_cor}push${reset_cor} and ${yellow_cor}pushf${reset_cor} ?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_PUSH_NO_VERIFY" 1 >&2
+    else
+      update_setting_ "PUMP_PUSH_NO_VERIFY" 0 >&2
+    fi
+  fi
+
+  if [[ -z "$PUMP_PUSH_SET_UPSTREAM" ]]; then
+    confirm_ "automatically creates an upstream counterpart branch on ${yellow_cor}push${reset_cor} and ${yellow_cor}pushf${reset_cor} ?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_PUSH_SET_UPSTREAM" 1 >&2
+    else
+      update_setting_ "PUMP_PUSH_SET_UPSTREAM" 0 >&2
+    fi
+  fi
+
   local no_verify=""
 
-  if (( PUMP_PUSH_NO_VERIFY )); then
+  if (( PUMP_PUSH_NO_VERIFY && PUMP_PUSH_SET_UPSTREAM )); then
+    no_verify="--no-verify --set-upstream"
+  elif (( PUMP_PUSH_NO_VERIFY )); then
     no_verify="--no-verify"
   fi
 
   if (( push_is_h )); then
     print "  ${yellow_cor}push ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : push $no_verify"
+    print "  --" >&1
     print "  ${yellow_cor}push -f${reset_cor} : --force-with-lease"
     print "  ${yellow_cor}push -t${reset_cor} : --tags"
     if (( PUMP_PUSH_NO_VERIFY )); then
@@ -7851,7 +8301,7 @@ function push() {
     else
       print "  ${yellow_cor}push -nv${reset_cor} : --no-verify"
     fi
-    print "  ${yellow_cor}push -u${reset_cor} : --set-upstream"
+    (( ! PUMP_PUSH_SET_UPSTREAM )) && print "  ${yellow_cor}push -u${reset_cor} : --set-upstream"
     print "  ${yellow_cor}push -q${reset_cor} : --quiet"
     return 0;
   fi
@@ -7859,7 +8309,6 @@ function push() {
   local folder="$PWD"
   local branch_arg=""
 
-  local base_branch=""
   local arg_count=0
 
   if [[ -n "$2" && $2 != -* ]]; then
@@ -7899,6 +8348,9 @@ function push() {
     fi
   fi
 
+  # check if my branch is already upstreamed
+  # local upstream_branch=$(git -C "$folder" config --get "branch.${branch_arg}.remote" 2>/dev/null)
+  
   local flags=()
 
   if (( push_is_f )); then
@@ -7913,7 +8365,7 @@ function push() {
     flags+=("--no-verify")
   fi
 
-  if (( push_is_u )); then
+  if (( push_is_u || PUMP_PUSH_SET_UPSTREAM )); then
     flags+=("--set-upstream")
   fi
 
@@ -7947,14 +8399,41 @@ function pushf() {
   eval "$(parse_flags_ "$0" "tfnvu" "qs" "$@")"
   (( pushf_is_debug )) && set -x
 
+  if [[ -z "$PUMP_PUSH_NO_VERIFY" ]]; then
+    confirm_ "bypass the execution of git hooks on ${yellow_cor}pushf${reset_cor} and ${yellow_cor}push${reset_cor} ?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_PUSH_NO_VERIFY" 1 >&2
+    else
+      update_setting_ "PUMP_PUSH_NO_VERIFY" 0 >&2
+    fi
+  fi
+
+  if [[ -z "$PUMP_PUSH_SET_UPSTREAM" ]]; then
+    confirm_ "automatically creates an upstream counterpart branch on ${yellow_cor}pushf${reset_cor} and ${yellow_cor}push${reset_cor} ?"
+    local RET=$?
+    if (( RET == 130 || RET == 2 )); then return 130; fi
+
+    if (( RET == 0 )); then
+      update_setting_ "PUMP_PUSH_SET_UPSTREAM" 1 >&2
+    else
+      update_setting_ "PUMP_PUSH_SET_UPSTREAM" 0 >&2
+    fi
+  fi
+
   local no_verify=""
 
-  if (( PUMP_PUSH_NO_VERIFY )); then
+  if (( PUMP_PUSH_NO_VERIFY && PUMP_PUSH_SET_UPSTREAM )); then
+    no_verify="--no-verify --set-upstream"
+  elif (( PUMP_PUSH_NO_VERIFY )); then
     no_verify="--no-verify"
   fi
 
   if (( pushf_is_h )); then
     print "  ${yellow_cor}pushf ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : push $no_verify --force-with-lease"
+    print "  --" >&1
     print "  ${yellow_cor}pushf -f${reset_cor} : --force"
     print "  ${yellow_cor}pushf -t${reset_cor} : --tags"
     if (( PUMP_PUSH_NO_VERIFY )); then
@@ -7962,7 +8441,7 @@ function pushf() {
     else
       print "  ${yellow_cor}pushf -nv${reset_cor} : --no-verify"
     fi
-    print "  ${yellow_cor}pushf -u${reset_cor} : --set-upstream"
+    (( ! PUMP_PUSH_SET_UPSTREAM )) && print "  ${yellow_cor}pushf -u${reset_cor} : --set-upstream"
     print "  ${yellow_cor}pushf -q${reset_cor} : --quiet"
     return 0;
   fi
@@ -7970,7 +8449,6 @@ function pushf() {
   local folder="$PWD"
   local branch_arg=""
 
-  local base_branch=""
   local arg_count=0
 
   if [[ -n "$2" && $2 != -* ]]; then
@@ -8026,7 +8504,7 @@ function pushf() {
     flags+=("--no-verify")
   fi
 
-  if (( pushf_is_u )); then
+  if (( pushf_is_u || PUMP_PUSH_SET_UPSTREAM )); then
     flags+=("--set-upstream")
   fi
 
@@ -8052,6 +8530,7 @@ function repush() {
 
   if (( repush_is_h )); then
     print "  ${yellow_cor}repush ${low_yellow_cor}[<folder>]${reset_cor} : reset last commit without losing your changes then re-push all changes using the same message"
+    print "  --" >&1
     print "  ${yellow_cor}repush -s${reset_cor} : only staged changes"
     print "  ${yellow_cor}repush -q${reset_cor} : no output"
     return 0;
@@ -8088,6 +8567,7 @@ function pullr() {
 
   if (( pullr_is_h )); then
     print "  ${yellow_cor}pullr ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : pull --rebase"
+    print "  --" >&1
     print "  ${yellow_cor}pullr -q${reset_cor} : --quiet"
     return 0;
   fi
@@ -8102,6 +8582,7 @@ function pull() {
 
   if (( pull_is_h )); then
     print "  ${yellow_cor}pull ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : pull from remote"
+    print "  --" >&1
     print "  ${yellow_cor}pull -t${reset_cor} : --tags"
     print "  ${yellow_cor}pull -r${reset_cor} : --rebase"
     print "  ${yellow_cor}pull -rm${reset_cor} : --rebase=merges"
@@ -8112,7 +8593,6 @@ function pull() {
   local folder="$PWD"
   local branch_arg=""
 
-  local base_branch=""
   local arg_count=0
 
   if [[ -n "$2" && $2 != -* ]]; then
@@ -8214,10 +8694,11 @@ function restore() {
 
   if (( restore_is_h )); then
     print "  ${yellow_cor}restore ${low_yellow_cor}[<folder>]${reset_cor} : clean staged files only"
+    print "  --" >&1
     print "  ${yellow_cor}restore -a${low_yellow_cor}[<folder>]${reset_cor} : include untracked files in working tree"
     print "  ${yellow_cor}restore -q${reset_cor} : --quiet"
     if (( ! restore_is_q )); then
-      print " --"
+      print "  --" >&1
       print_clean_
     fi
     return 0;
@@ -8259,9 +8740,10 @@ function clean() {
 
   if (( clean_is_h )); then
     print "  ${yellow_cor}clean ${low_yellow_cor}[<folder>]${reset_cor} : clean untracked files"
+    print "  --" >&1
     print "  ${yellow_cor}clean -q${reset_cor} : --quiet"
     if (( ! clean_is_q )); then
-      print " --"
+      print "  --" >&1
       print_clean_
     fi
     return 0;
@@ -8293,9 +8775,10 @@ function discard() {
 
   if (( discard_is_h )); then
     print "  ${yellow_cor}discard ${low_yellow_cor}[<folder>]${reset_cor} : discard tracked and untracked files"
+    print "  --" >&1
     print "  ${yellow_cor}discard -q${reset_cor} : --quiet"
     if (( ! discard_is_q )); then
-      print " --"
+      print "  --" >&1
       print_clean_
     fi
     return 0;
@@ -8327,10 +8810,11 @@ function reseta() {
 
   if (( reseta_is_h )); then
     print "  ${yellow_cor}reseta ${low_yellow_cor}[<folder>]${reset_cor} : erase every change and match HEAD to latest commit of current branch"
+    print "  --" >&1
     print "  ${yellow_cor}reseta -o${reset_cor} : erase every change and match HEAD to origin"
     print "  ${yellow_cor}reseta -q${reset_cor} : --quiet"
     if (( ! reseta_is_q )); then
-      print " --"
+      print "  --" >&1
       print_clean_
     fi
     return 0;
@@ -8358,7 +8842,7 @@ function reseta() {
     local my_branch=$(git -C "$folder" branch --show-current)
 
     if [[ -z "$my_branch" ]]; then
-      print " current branch is detached, cannot reset to origin" >&2
+      print " current branch is detached, cannot reset to $remote_name" >&2
       return 1;
     fi
   
@@ -8376,9 +8860,10 @@ function reseto() {
 
   if (( reseto_is_h )); then
     print "  ${yellow_cor}reseto ${low_yellow_cor}[<folder>]${reset_cor} : erase every change and match HEAD to origin"
+    print "  --" >&1
     print "  ${yellow_cor}reseto -q${reset_cor} : --quiet"
     if (( ! reseto_is_q )); then
-      print " --"
+      print "  --" >&1
       print_clean_
     fi
     return 0;
@@ -8601,21 +9086,19 @@ function proj_gha_() {
 
 function co() {
   set +x
-  eval "$(parse_flags_ "$0" "alprebcmxu" "q" "$@")"
+  eval "$(parse_flags_ "$0" "bcelprux" "q" "$@")"
   (( co_is_debug )) && set -x
 
   if (( co_is_h )); then
     print "  ${yellow_cor}co ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : switch branches"
     print "  ${yellow_cor}co <branch> <base_branch>${reset_cor} : create new branch off of base branch"
-    print "  --"
-    print "  ${yellow_cor}co -a${reset_cor} : by all branches"
-    print "  ${yellow_cor}co -l${reset_cor} : by local branches"
-    print "  ${yellow_cor}co -pr${reset_cor} : by pull request (detaches branch)"
-    print "  --"
-    print "  ${yellow_cor}co -m${reset_cor} : switch to the default branch"
-    print "  ${yellow_cor}co -e <branch>${reset_cor} : switch to an exact branch, no lookup"
+    print "  --" >&1
+    print "  ${yellow_cor}co -l${reset_cor} : by local branches only"
+    print "  ${yellow_cor}co -pr${reset_cor} : by pull request (detaches pr)"
+    print "  --" >&1
+    print "  ${yellow_cor}co -e <branch_or_commit>${reset_cor} : switch to an exact branch or commit, no lookup"
     print "  ${yellow_cor}co -c <branch> ${low_yellow_cor}[<base_branch>]${reset_cor} : create new branch off of base branch"
-    print "  ${yellow_cor}co -u${reset_cor} : set up tracking information to remote"
+    print "  ${yellow_cor}co -u ${low_yellow_cor}[<branch>]${reset_cor} : --set-upstream-to (set up tracking information)"
     return 0;
   fi
 
@@ -8633,8 +9116,6 @@ function co() {
   if ! is_folder_git_ "$folder"; then; return 1; fi
 
   local i=$(find_proj_index_ -x "$CURRENT_PUMP_SHORT_NAME")
-  local pump_head_branch="${PUMP_HEAD_BRANCH[$i]}"
-  local pump_main_branch="${PUMP_MAIN_BRANCH[$i]}"
 
   # co -pr switch by pull request
   if (( co_is_p && co_is_r )); then
@@ -8692,54 +9173,34 @@ function co() {
     else
       print "  ${red_cor}fatal: invalid option: -r${reset_cor}" >&2
     fi
-    print "  --"
-    eval "$0 -h"
+    print "  --" >&1
+    co -h
     return 1;
   fi
 
   # co -u set upstream branch
   if (( co_is_u )); then
-    local remote_name=$(get_remote_origin_ "$folder")
-    local my_branch=$(git -C "$folder" branch --show-current)
-
-    if [[ -z "$my_branch" ]]; then
-      print " current branch is detached, cannot set upstream branch" >&2
-      return 1;
-    fi
-
-    git -C "$folder" branch --set-upstream-to=$remote_name/$my_branch $@
-
-    return $?;
-  fi
-
-  # co -a all branches
-  if (( co_is_a )); then
     local branch_arg=""
 
     if [[ -n "$1" && $1 != -* ]]; then
       branch_arg="$1"
-    fi
-
-    local branch_choice=""
-
-    if [[ -n "$branch_arg" ]]; then
-      branch_choice=$(select_branch_ -aic "$branch_arg" "branch to switch" "$folder")
     else
-      branch_choice=$(select_branch_ -a "$branch_arg" "branch to switch" "$folder")
+      branch_arg=$(git -C "$folder" branch --show-current)
     fi
-    if (( $? == 130 )); then return 1; fi
-    if [[ -z "$branch_choice" ]]; then return 1; fi
 
-    if [[ -n "$branch_arg" ]]; then
-      co -e "$folder" $branch_choice ${@:2}
-    else
-      co -e "$folder" $branch_choice $@
+    local remote_name=$(get_remote_origin_ "$folder")
+
+    if [[ -z "$branch_arg" ]]; then
+      print " current branch is detached, cannot set upstream branch" >&2
+      return 1;
     fi
+
+    git -C "$folder" branch --set-upstream-to=$remote_name/$branch_arg $@
 
     return $?;
   fi
 
-  # co -l local branches
+  # co -l local branches only
   if (( co_is_l )); then
     local branch_arg=""
     
@@ -8750,33 +9211,19 @@ function co() {
     local branch_choice=""
 
     if [[ -n "$branch_arg" ]]; then
-      branch_choice=$(select_branch_ -liqc "$branch_arg" "branch to switch" "$folder")
+      branch_choice=$(select_branch_ -lic "$branch_arg" "local branch to switch" "$folder")
     else
-      branch_choice=$(select_branch_ -lq "$branch_arg" "branch to switch" "$folder")
+      branch_choice=$(select_branch_ -l "$branch_arg" "local branch to switch" "$folder")
     fi
     if (( $? == 130 )); then return 1; fi
-    
-    if [[ -z "$branch_choice" ]]; then
-      co -a "$folder" $@
+    if [[ -z "$branch_choice" ]]; then return 1; fi
 
-      return $?;
-    fi
-
-    if [[ -n "$branch_arg" ]]; then
+    if [[ -n "$1" ]]; then
       co -e "$folder" $branch_choice ${@:2}
     else
       co -e "$folder" $branch_choice $@
     fi
 
-    return $?;
-  fi
-
-  # co -m switch to default branch
-  if (( co_is_m )); then
-    local default_branch=$(get_default_branch_ "$folder")
-
-    git -C "$folder" switch $default_branch $@
-    
     return $?;
   fi
 
@@ -8789,7 +9236,7 @@ function co() {
     fi
 
     if [[ -z "$branch_arg" ]]; then
-      print " fatal: branch argument is required" >&2
+      print " fatal: missing branch or commit argument" >&2
       print " run ${yellow_cor}co -h${reset_cor} to see usage" >&2
       return 1;
     fi
@@ -8820,26 +9267,52 @@ function co() {
 
     if [[ -z "$base_branch" ]]; then
       local default_branch=$(get_default_branch_ "$folder")
+      if [[ -z "$default_branch" ]]; then return 1; fi
+      
+      local base_branch=$(get_base_branch_ "$folder")
+      if [[ -z "$base_branch" ]]; then return 1; fi
+
       local my_branch=$(git -C "$folder" branch --show-current)
 
-      # create a list with unique pump_head_branch, pump_main_branch, default_branch and my_branch
-      local branches=("${(@f)$(printf "%s\n" "$pump_head_branch" "$pump_main_branch" "$default_branch" "$my_branch" | sort -u)}")
+      local branches=("${(@f)$(printf "%s\n" "$my_branch" "$default_branch" "$base_branch" | sort -u)}")
 
       base_branch=$(choose_one_ -i "base branch" "${branches[@]}")
       if [[ -z "$base_branch" ]]; then return 1; fi
     fi
 
+    local remote_base_branch=$(get_remote_branch_ -o "$base_branch" "$folder")
+
     if [[ -n "$2" && $2 != -* ]]; then
-      co -x "$folder" $branch_arg $base_branch ${@:3}
+      co -x "$folder" $branch_arg $remote_base_branch ${@:3}
     else
-      co -x "$folder" $branch_arg $base_branch ${@:2}
+      co -x "$folder" $branch_arg $remote_base_branch ${@:2}
     fi
     return $?;
   fi
 
-  # co $1 or co (no arguments)
+  # co $1 or co (no arguments) look all branches
   if [[ -z "$2" || "$2" == -* ]]; then
-    co -l "$folder" $@
+    local branch_arg=""
+
+    if [[ -n "$1" && $1 != -* ]]; then
+      branch_arg="$1"
+    fi
+
+    local branch_choice=""
+
+    if [[ -n "$branch_arg" ]]; then
+      branch_choice=$(select_branch_ -aic "$branch_arg" "branch to switch" "$folder")
+    else
+      branch_choice=$(select_branch_ -a "$branch_arg" "branch to switch" "$folder")
+    fi
+    if (( $? == 130 )); then return 1; fi
+    if [[ -z "$branch_choice" ]]; then return 1; fi
+
+    if [[ -n "$1" ]]; then
+      co -e "$folder" $branch_choice ${@:2}
+    else
+      co -e "$folder" $branch_choice $@
+    fi
 
     return $?;
   fi
@@ -8878,7 +9351,7 @@ function co() {
   if [[ -z "$base_branch" ]]; then return 1; fi
 
   if git -C "$folder" switch -c $branch_arg $base_branch ${@:3}; then
-    git -C "$folder" config "branch.${branch_arg}.gh-merge-base" "$base_branch"
+    git -C "$folder" config branch.${branch_arg}.gh-merge-base $base_branch
   else
     return 1;
   fi
@@ -8920,21 +9393,67 @@ function dev() {
   (( dev_is_debug )) && set -x
 
   if (( dev_is_h )); then
-    print "  ${yellow_cor}dev${reset_cor} : switch to a dev branch in current project"
+    print "  ${yellow_cor}dev ${low_yellow_cor}[<folder>]${reset_cor} : switch to a dev branch"
     return 0;
   fi
 
-  if ! is_folder_git_; then return 1; fi
+  local folder="$PWD"
 
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}dev -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local ref=""
   for ref in refs/{heads,remotes/{origin,upstream}}/{dev,devel,develop,development}; do
-    if git show-ref -q --verify $ref; then
-      git switch ${ref:t}
+    if git -C "$folder" show-ref -q --verify $ref; then
+      git -C "$folder" switch ${ref:t}
       return $?;
     fi
   done
 
-  print " fatal: did not match any branch known to git" >&2
+  print " fatal: did not match any branch known to git: dev, devel, develop or development" >&2
   return 1;
+}
+
+function base() {
+  # switch to base branch
+  set +x
+  eval "$(parse_flags_ "$0" "" "" "$@")"
+  (( base_is_debug )) && set -x
+
+  if (( main_is_h )); then
+    print "  ${yellow_cor}base ${low_yellow_cor}[<folder>]${reset_cor} : switch to base branch"
+    return 0;
+  fi
+
+  local folder="$PWD"
+
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}base -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local base_branch=$(get_base_branch_ "$folder")
+  if [[ -z "$base_branch" ]]; then return 1; fi
+
+  git -C "$folder" switch $base_branch
 }
 
 function main() {
@@ -8944,21 +9463,29 @@ function main() {
   (( main_is_debug )) && set -x
 
   if (( main_is_h )); then
-    print "  ${yellow_cor}main${reset_cor} : switch to main branch in current project"
+    print "  ${yellow_cor}main ${low_yellow_cor}[<folder>]${reset_cor} : switch to main branch"
     return 0;
   fi
 
-  if ! is_folder_git_; then return 1; fi
+  local folder="$PWD"
 
-  for ref in refs/{heads,remotes/{origin,upstream}}/{main,trunk,mainline,default,stable,master}; do
-    if git show-ref -q --verify $ref; then
-      git switch ${ref:t}
-      return $?;
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}main -h${reset_cor} to see usage" >&2
+      return 1;
     fi
-  done
+    shift
+  fi
 
-  print " fatal: did not match any branch known to git" >&2
-  return 1;
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local main_branch=$(get_main_branch_ "$folder")
+  if [[ -z "$main_branch" ]]; then return 1; fi
+
+  git -C "$folder" switch $main_branch
 }
 
 function prod() {
@@ -8968,20 +9495,34 @@ function prod() {
   (( prod_is_debug )) && set -x
 
   if (( prod_is_h )); then
-      print "  ${yellow_cor}prod${reset_cor} : switch to prod or production branch in current project"
+    print "  ${yellow_cor}prod ${low_yellow_cor}[<folder>]${reset_cor} : switch to prod or production branch"
     return 0;
   fi
 
-  if ! is_folder_git_; then return 1; fi
+  local folder="$PWD"
 
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}prod -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local ref=""
   for ref in refs/{heads,remotes/{origin,upstream}}/{prod,production}; do
-    if git show-ref -q --verify $ref; then
-      git switch ${ref:t}
+    if git -C "$folder" show-ref -q --verify $ref; then
+      git -C "$folder" switch ${ref:t}
       return $?;
     fi
   done
 
-  print " fatal: did not match any branch known to git" >&2
+  print " fatal: did not match any branch known to git: prod or production" >&2
   return 1;
 }
 
@@ -8992,72 +9533,159 @@ function stage() {
   (( stage_is_debug )) && set -x
 
   if (( stage_is_h )); then
-      print "  ${yellow_cor}stage${reset_cor} : switch to stage or staging branch in current project"
+    print "  ${yellow_cor}stage ${low_yellow_cor}[<folder>]${reset_cor} : switch to stage or staging branch"
     return 0;
   fi
 
-  if ! is_folder_git_; then return 1; fi
+  local folder="$PWD"
 
+  if [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      print " fatal: not a valid folder argument: $1" >&2
+      print " run ${yellow_cor}stage -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    shift
+  fi
+
+  if ! is_folder_git_ "$folder"; then return 1; fi
+
+  local ref=""
   for ref in refs/{heads,remotes/{origin,upstream}}/{stage,staging}; do
-    if git show-ref -q --verify $ref; then
-      git switch ${ref:t}
+    if git -C "$folder" show-ref -q --verify $ref; then
+      git -C "$folder" switch ${ref:t}
       return $?;
     fi
   done
 
-  print " fatal: did not match any branch known to git" >&2
+  print " fatal: did not match any branch known to git: stage or staging" >&2
   return 1;
 }
 
 function rebase() {
   set +x
-  eval "$(parse_flags_ "$0" "apq" "mpqi" "$@")"
+  eval "$(parse_flags_ "$0" "lacpqwd" "mpqi" "$@")"
   (( rebase_is_debug )) && set -x
 
-  local default_branch="default"
-
-  if is_folder_git_ &>/dev/null; then
-    default_branch=$(get_default_branch_)
-  fi
-
   if (( rebase_is_h )); then
-    print "  ${yellow_cor}rebase${reset_cor} : apply the commits from your branch on top of the HEAD of $default_branch branch"
-    print "  ${yellow_cor}rebase <base_branch> ${low_yellow_cor}[<folder>]${reset_cor} : use base_branch instead of $default_branch (must be different than current branch)"
-    print "  ${yellow_cor}rebase -a${reset_cor} : rebase multiple local branches"
-    print "  ${yellow_cor}rebase -m${reset_cor} : rebase --merge"
-    print "  ${yellow_cor}rebase -i${reset_cor} : rebase --interactive"
+    print "  ${yellow_cor}rebase ${low_yellow_cor}[<base_branch>] [<folder>]${reset_cor} : apply the commits from your branch on top of the HEAD of remote base branch"
+    print "  --" >&1
+    print "  ${yellow_cor}rebase -d${reset_cor} : apply the commits from your branch on top of the HEAD of default branch"
+    print "  ${yellow_cor}rebase -l${reset_cor} : rebase on top of local branch instead of remote branch"
+    print "  ${yellow_cor}rebase -a${reset_cor} : --abort"
+    print "  ${yellow_cor}rebase -c${reset_cor} : --continue"
+    print "  ${yellow_cor}rebase -i${reset_cor} : --interactive"
     print "  ${yellow_cor}rebase -p${reset_cor} : push after rebase if succeeds with no conflicts"
+    print "  ${yellow_cor}rebase -w${reset_cor} : rebase multiple local branches"
     return 0;
   fi
 
   local folder="$PWD"
+  local base_branch_arg=""
+
   local arg_count=0
 
   if [[ -n "$2" && $2 != -* ]]; then
     if [[ -d "$2" ]]; then
+      if [[ -n "$1" && $1 != -* ]]; then
+        base_branch_arg="$1"
+      fi
       folder="$2"
-      (( arg_count++ ))
     else
       print " fatal: not a valid folder argument: $2" >&2
       print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
       return 1;
     fi
+
+    arg_count=2
+  elif [[ -n "$1" && $1 != -* ]]; then
+    if [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      base_branch_arg="$1"
+    fi
+
+    arg_count=1
   fi
+  
+  shift $arg_count
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
-  local base_branch=""
-  local branch_arg=""
+  if [[ -n "$base_branch_arg" ]]; then
+    if (( rebase_is_d )); then
+      print " fatal: base branch cannot be defined with -d option" >&2
+      print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    base_branch="$base_branch_arg"
+  fi
 
-  if [[ -n "$3" && $3 != -* ]]; then
-    base_branch="$1"
-    branch_arg="$3"
-    (( arg_count+=2 ))
-  elif [[ -n "$1" && $1 != -* ]]; then
-    base_branch="$1"
-    (( arg_count++ ))
+  if (( rebase_is_s )) && [[ -z "$strategy" ]]; then
+    print " fatal: strategy argument is required" >&2
+    print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
+    return 1;
+  fi
+
+
+  if (( rebase_is_a )); then
+    git -C "$folder" rebase --abort $@ &>/dev/null
+    return $?;
+  fi
+
+  if (( rebase_is_c )); then
+    if ! git -C "$folder" add .; then return 1; fi
+    GIT_EDITOR=true git -C "$folder" rebase --continue $@ &>/dev/null
+    return $?;
+  fi
+
+  local RET=0
+
+  if (( rebase_is_w )); then
+    local selected_branches=($(select_branches_ -ls "" "$folder" "$base_branch"))
+    if [[ -z "$selected_branches" ]]; then return 1; fi
+
+    local branch=""
+    for branch in "${selected_branches[@]}"; do
+      if git -C "$folder" switch "$branch" --quiet; then
+        if ! rebase "$base_branch" "$folder" $@; then
+          RET=1
+          break;
+        fi
+      else
+        RET=1
+        break;
+      fi
+    done
+
+    return $RET;
+  fi
+  
+  local my_branch=$(git -C "$folder" branch --show-current)
+
+  if [[ "$my_branch" == "$base_branch" ]]; then
+    print " fatal: not a valid base branch argument: $my_branch" >&2
+    print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
+    return 1;
+  fi
+  
+  local remote_name=$(get_remote_origin_ "$folder")
+
+  if [[ -z "$base_branch_arg" ]]; then
+    if (( rebase_is_d )); then
+      base_branch=$(get_default_branch_ "$folder" 2>/dev/null)
+    else
+      base_branch=$(get_base_branch_ "$folder" 2>/dev/null)
+    fi
+    if [[ -z "$base_branch" ]]; then return 1; fi
+  fi
+
+  if (( rebase_is_l )); then
+    base_branch=$(echo "$base_branch" | sed "s/^${remote_name}\///")
   else
-    base_branch=$(get_default_branch_ "$folder")
+    base_branch="${remote_name}/${base_branch}"
   fi
 
   if [[ -z "$base_branch" ]]; then
@@ -9066,52 +9694,30 @@ function rebase() {
     return 1;
   fi
 
-  if [[ -n "$branch_arg" ]]; then
-    if ! git -C "$folder" switch "$branch_arg" --quiet; then return 1; fi
-  fi
-  
-  local remote_name=$(get_remote_origin_ "$folder")
-  base_branch=$(echo "$base_branch" | sed "s/^${remote_name}\///")
-
   local my_branch=$(git -C "$folder" branch --show-current)
 
-  shift $arg_count
-
-  local RET=0
-
-  if (( rebase_is_a )); then
-    local selected_branches=($(select_branches_ -ls "" "$folder" "$base_branch"))
-    if [[ -z "$selected_branches" ]]; then return 1; fi
-
-    local branch=""
-    for branch in "${selected_branches[@]}"; do
-      if ! rebase "$base_branch" "$folder" "$branch" $@; then
-        RET=1
-        break;
-      fi
-    done
-
-    return $RET;
+  local msg="rebasing branch ${cyan_cor}${my_branch}${reset_cor} on top of ${hi_cyan_cor}${base_branch}${reset_cor}"
+  
+  if (( rebase_is_p )); then
+    msg+=" then pushing"
   fi
 
-  if [[ "$my_branch" == "$base_branch" ]]; then
-    print " fatal: not a valid base branch argument: $my_branch" >&2
-    print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
-    return 1;
+  if [[ -z "$base_branch_arg" ]]; then
+    if ! confirm_ "$msg ?"; then
+      return 1;
+    fi
+  else
+    print " $msg"
   fi
 
-  print -n " rebasing branch ${cyan_cor}${my_branch}${reset_cor} on top of ${hi_cyan_cor}${base_branch}${reset_cor}"
-  if (( merge_is_p )); then
-    print -n " then pushing"
-  fi
-  print ""
-
-  git -C "$folder" rebase ${remote_name}/${base_branch} $@
+  git -C "$folder" rebase ${base_branch} $@
   RET=$?
 
-  if (( RET == 0 && rebase_is_p )); then
-    pushf "$my_branch" "$folder"
-    RET=$?
+  if (( RET == 0 )); then
+    if (( rebase_is_p )); then
+      push "$my_branch" "$folder"
+      RET=$?
+    fi
   fi
 
   return $RET;
@@ -9119,46 +9725,171 @@ function rebase() {
 
 function merge() {
   set +x
-  eval "$(parse_flags_ "$0" "apq" "spq" "$@")"
+  eval "$(parse_flags_ "$0" "lacpqwd" "spq" "$@")"
   (( merge_is_debug )) && set -x
 
   if (( merge_is_h )); then
-    print "  ${yellow_cor}merge${reset_cor} : create a new merge commit from default branch"
-    print "  ${yellow_cor}merge ${low_yellow_cor}[<base_branch>] [<folder>]${reset_cor} : create a new merge commit from base branch"
-    print "  ${yellow_cor}merge -a${reset_cor} : merge multiple branches"
-    print "  ${yellow_cor}merge -s <strategy>${reset_cor} : merge --strategy"
+    print "  ${yellow_cor}merge ${low_yellow_cor}[<base_branch>] [<folder>]${reset_cor} : create a new merge commit from remote base branch"
+    print "  --" >&1
+    print "  ${yellow_cor}merge -d${reset_cor} : create a new merge commit from default branch"
+    print "  ${yellow_cor}merge -l${reset_cor} : merge from local branch instead of remote branch"
+    print "  ${yellow_cor}merge -a${reset_cor} : --abort"
+    print "  ${yellow_cor}merge -c${reset_cor} : --continue"
+    print "  ${yellow_cor}merge -s <strategy>${reset_cor} : --strategy"
     print "  ${yellow_cor}merge -p${reset_cor} : push after merge succeeds with no conflicts"
+    print "  ${yellow_cor}merge -w${reset_cor} : merge multiple branches"
     return 0;
   fi
 
   local folder="$PWD"
+  local base_branch_arg=""
+  local strategy=""
+
   local arg_count=0
 
-  if [[ -n "$2" && $2 != -* ]]; then
-    if [[ -d "$2" ]]; then
-      folder="$2"
-      (( arg_count++ ))
+  if [[ -n "$3" && $3 != -* ]]; then
+    if (( merge_is_s )); then
+      strategy="$1"
+      if [[ -d "$2" ]]; then
+        folder="$2"
+      else
+        print " fatal: not a valid folder argument: $2" >&2
+        print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+        return 1;
+      fi
     else
-      print " fatal: not a valid folder argument: $2" >&2
-      print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
-      return 1;
+      if [[ -n "$1" && $1 != -* ]]; then
+        base_branch_arg="$1"
+      fi
+      if [[ -d "$2" ]]; then
+        folder="$2"
+      else
+        print " fatal: not a valid folder argument: $2" >&2
+        print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+        return 1;
+      fi
     fi
+
+    arg_count=3
+  elif [[ -n "$2" && $2 != -* ]]; then
+    if (( merge_is_s )); then
+      strategy="$1"
+      if [[ -d "$2" ]]; then
+        folder="$2"
+      else
+        if [[ -n "$2" && $2 != -* ]]; then
+          base_branch_arg="$2"
+        fi
+      fi
+    else
+      if [[ -d "$2" ]]; then
+        if [[ -n "$1" && $1 != -* ]]; then
+          base_branch_arg="$1"
+        fi
+        folder="$2"
+      else
+        print " fatal: not a valid folder argument: $2" >&2
+        print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+        return 1;
+      fi
+    fi
+
+    arg_count=2
+  elif [[ -n "$1" && $1 != -* ]]; then
+    if (( merge_is_s )); then
+      strategy="$1"
+    elif [[ -d "$1" ]]; then
+      folder="$1"
+    else
+      base_branch_arg="$1"
+    fi
+
+    arg_count=1
   fi
+  
+  shift $arg_count
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
-  local base_branch=""
-  local branch_arg=""
+  if [[ -n "$base_branch_arg" ]]; then
+    if (( merge_is_d )); then
+      print " fatal: base branch cannot be defined with -d option" >&2
+      print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+      return 1;
+    fi
+    base_branch="$base_branch_arg"
+  fi
 
-  if [[ -n "$3" && $3 != -* ]]; then
-    base_branch="$1"
-    branch_arg="$3"
-    (( arg_count+=2 ))
-  elif [[ -n "$1" && $1 != -* ]]; then
-    base_branch="$1"
-    (( arg_count++ ))
+  if (( merge_is_s )) && [[ -z "$strategy" ]]; then
+    print " fatal: strategy argument is required" >&2
+    print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+    return 1;
+  fi
+
+
+  if (( merge_is_a )); then
+    git -C "$folder" merge --abort $@ &>/dev/null
+    return $?;
+  fi
+
+  if (( merge_is_c )); then
+    if ! git -C "$folder" add .; then return 1; fi
+    GIT_EDITOR=true git -C "$folder" merge --continue $@ &>/dev/null
+    return $?;
+  fi
+
+  local RET=0
+
+  if (( merge_is_w )); then
+    local selected_branches=($(select_branches_ -ls "" "$folder" "$base_branch"))
+    if [[ -z "$selected_branches" ]]; then return 1; fi
+
+    local branch=""
+    for branch in "${selected_branches[@]}"; do
+      if git -C "$folder" switch "$branch" --quiet; then
+        if (( merge_is_s )); then
+          if ! merge -s "$strategy" "$base_branch" "$folder" $@; then
+            RET=1
+            break;
+          fi
+        else
+          if ! merge "$base_branch" "$folder" $@; then
+            RET=1
+            break;
+          fi
+        fi
+      else
+        RET=1
+        break;
+      fi
+    done
+
+    return $RET;
+  fi
+  
+  local my_branch=$(git -C "$folder" branch --show-current)
+
+  if [[ "$my_branch" == "$base_branch" ]]; then
+    print " fatal: not a valid base branch argument: $my_branch" >&2
+    print " run ${yellow_cor}merge -h${reset_cor} to see usage" >&2
+    return 1;
+  fi
+  
+  local remote_name=$(get_remote_origin_ "$folder")
+
+  if [[ -z "$base_branch_arg" ]]; then
+    if (( rebase_is_d )); then
+      base_branch=$(get_default_branch_ "$folder" 2>/dev/null)
+    else
+      base_branch=$(get_base_branch_ "$folder" 2>/dev/null)
+    fi
+    if [[ -z "$base_branch" ]]; then return 1; fi
+  fi
+
+  if (( merge_is_l )); then
+    base_branch=$(echo "$base_branch" | sed "s/^${remote_name}\///")
   else
-    base_branch=$(get_default_branch_ "$folder")
+    base_branch="${remote_name}/${base_branch}"
   fi
 
   if [[ -z "$base_branch" ]]; then
@@ -9167,52 +9898,35 @@ function merge() {
     return 1;
   fi
 
-  if [[ -n "$branch_arg" ]]; then
-    if ! git -C "$folder" switch "$branch_arg" --quiet; then return 1; fi
-  fi
-
-  local remote_name=$(get_remote_origin_ "$folder")
-  base_branch=$(echo "$base_branch" | sed "s/^${remote_name}\///")
-
   local my_branch=$(git -C "$folder" branch --show-current)
 
-  shift $arg_count
-
-  local RET=0
-
-  if (( merge_is_a )); then
-    local selected_branches=($(select_branches_ -ls "" "$folder" "$base_branch"))
-    if [[ -z "$selected_branches" ]]; then return 1; fi
-
-    local branch=""
-    for branch in "${selected_branches[@]}"; do
-      if ! merge "$base_branch" "$folder" "$branch" $@; then
-        RET=1
-        break;
-      fi
-    done
-
-    return $RET;
-  fi
-
-  if [[ "$my_branch" == "$base_branch" ]]; then
-    print " fatal: not a valid base branch argument: $my_branch" >&2
-    print " run ${yellow_cor}rebase -h${reset_cor} to see usage" >&2
-    return 1;
-  fi
-
-  print -n " merging branch ${cyan_cor}${my_branch}${reset_cor} from ${hi_cyan_cor}${base_branch}${reset_cor}"
+  local msg="merging branch ${cyan_cor}${my_branch}${reset_cor} from ${hi_cyan_cor}${base_branch}${reset_cor}"
+  
   if (( merge_is_p )); then
-    print -n " then pushing"
+    msg+=" then pushing"
   fi
-  print ""
 
-  git -C "$folder" merge ${remote_name}/${base_branch} --no-edit $@
+  if [[ -z "$base_branch_arg" ]]; then
+    if ! confirm_ "$msg ?"; then
+      return 1;
+    fi
+  else
+    print " $msg"
+  fi
+
+  if (( merge_is_s )); then
+    git -C "$folder" merge --no-edit --strategy="$strategy" $base_branch $@
+    return $?;
+  fi
+
+  git -C "$folder" merge ${base_branch} --no-edit $@
   RET=$?
 
-  if (( RET == 0 && merge_is_p )); then
-    push "$my_branch" "$folder"
-    RET=$?
+  if (( RET == 0 )); then
+    if (( merge_is_p )); then
+      push "$my_branch" "$folder"
+      RET=$?
+    fi
   fi
 
   return $RET;
@@ -9268,6 +9982,7 @@ function prune() {
   fetch -t --quiet "$folder"
   
   local default_branch=$(get_default_branch_ "$folder")
+  if [[ -z "$default_branch" ]]; then return 1; fi
 
   # lists all branches that have been merged into the currently checked-out branch
   # that can be safely deleted without losing any unmerged work and filters out the default branch
@@ -9302,7 +10017,8 @@ function delb() {
 
   if (( delb_is_h )); then
     print "  ${yellow_cor}delb ${low_yellow_cor}[<branch>] [<folder>]${reset_cor} : delete branches locally"
-    print "  ${yellow_cor}delb -e <branch>${reset_cor} : delete only if matches exact name"
+    print "  --" >&1
+    print "  ${yellow_cor}delb -e <branch>${reset_cor} : delete an exact branch, no lookup"
     print "  ${yellow_cor}delb -r${reset_cor} : also delete remotely (excludes main branches)"
     print "  ${yellow_cor}delb -a${reset_cor} : include all branches (use with -r)"
     print "  ${yellow_cor}delb -s${reset_cor} : skip confirmation (cannot use with -r)"
@@ -9354,9 +10070,9 @@ function delb() {
   if (( delb_is_r )); then
     if (( delb_is_e )); then
       if (( delb_is_a )); then
-        selected_branches=($(select_branches_ -re "$branch_arg" "$folder"))
+        selected_branches=($(select_branches_ -rix "$branch_arg" "$folder"))
       else
-        selected_branches=($(select_branches_ -res "$branch_arg" "$folder"))
+        selected_branches=($(select_branches_ -rixs "$branch_arg" "$folder"))
       fi
     else
       if (( delb_is_a )); then
@@ -9367,7 +10083,7 @@ function delb() {
     fi
   else
     if (( delb_is_e )); then
-      selected_branches=($(select_branches_ -le "$branch_arg" "$folder"))
+      selected_branches=($(select_branches_ -lix "$branch_arg" "$folder"))
     else
       selected_branches=($(select_branches_ -l "$branch_arg" "$folder"))
     fi
@@ -9428,6 +10144,7 @@ function st() {
 
   if (( st_is_h )); then
     print "  ${yellow_cor}st ${low_yellow_cor}[<folder>]${reset_cor} : show git status"
+    print "  --" >&1
     print "  ${yellow_cor}st -sb${reset_cor} : show git status in short-format"
     return 0;
   fi
@@ -9568,11 +10285,12 @@ function pro() {
 
   if (( pro_is_h )); then
     print "  ${yellow_cor}pro [<name>]${reset_cor} : set a project"
+    print "  --" >&1
     print "  ${yellow_cor}pro -l${reset_cor} : display all projects"
     print "  ${yellow_cor}pro -a ${low_yellow_cor}[<name>]${reset_cor} : add a new project"
     print "  ${yellow_cor}pro -e [<name>]${reset_cor} : edit a project"
-    print "  ${yellow_cor}pro -r [<name>]${reset_cor} : remove a project"
-    print "  --"
+    print "  ${yellow_cor}pro -r [<name>]${reset_cor} : remove projects"
+    print "  --" >&1
     print "  ${yellow_cor}pro -i ${low_yellow_cor}[<name>]${reset_cor} : display project config settings"
     print "  ${yellow_cor}pro -n ${low_yellow_cor}[<name>]${reset_cor} : set the project node version using nvm"
     print "  ${yellow_cor}pro -u ${low_yellow_cor}[<name>] [<setting>]${reset_cor} : reset project config settings"
@@ -9629,11 +10347,15 @@ function pro() {
     local setting_arg="$2"
 
     local settings=(
+      "PUMP_PUSH_NO_VERIFY"
+      "PUMP_PUSH_SET_UPSTREAM"
+      "PUMP_RUN_OPEN_COV"
+      "PUMP_USE_MONOGRAM"
+    )
+
+    local config_settings=(
       "PUMP_CODE_EDITOR"
       "PUMP_COMMIT_ADD"
-      "PUMP_HEAD_BRANCH"
-      "PUMP_MAIN_BRANCH"
-      "PUMP_NO_MONOGRAM"
       "PUMP_NVM_SKIP_LOOKUP"
       "PUMP_NVM_USE_V"
       "PUMP_PR_APPEND"
@@ -9641,23 +10363,30 @@ function pro() {
       "PUMP_PRINT_README"
     )
 
-    if [[ -n "$setting_arg" && " ${settings[*]} " != *" $setting_arg "* ]]; then
-      print " invalid setting argument" >&2
+    if [[ -n "$setting_arg" && " ${settings[*]} " != *" $setting_arg "* && " ${config_settings[*]} " != *" $setting_arg "* ]]; then
+      print " fatal: invalid setting argument" >&2
       return 1;
     fi
 
-    if [[ -n "$setting_arg" ]]; then
+    if [[ -n "$setting_arg" && " ${config_settings[*]} " == *" $setting_arg "* ]]; then
       update_config_ $i "$setting_arg" "" 0 2>/dev/null
       return $?;
     fi
 
-    local selected_settings=($(choose_multiple_ "settings to reset" "${settings[@]}"))
+    if [[ -n "$setting_arg" && " ${settings[*]} " == *" $setting_arg "* ]]; then
+      update_setting_ "$setting_arg" "" 0 2>/dev/null
+      return $?;
+    fi
+
+    local selected_settings=($(choose_multiple_ "settings to reset" "${settings[@]}" "${config_settings[@]}"))
     if [[ -z "$selected_settings" ]]; then return 1; fi
 
     local setting=""
     for setting in "${selected_settings[@]}"; do
       pro -u "$proj_arg" "$setting"
     done
+    
+    return $?;
   fi
 
   # pro -d [<name>] display project config
@@ -9717,7 +10446,7 @@ function pro() {
         done
 
         if (( foundI )); then
-          if confirm_ "current project exists: ${blue_cor}${proj_cmd}${reset_cor} - do you want to edit it?" "edit" "add"; then
+          if confirm_ "current project exists: ${blue_cor}${proj_cmd}${reset_cor} - do you want to edit it?" "edit" "add new"; then
             save_proj_ -e $foundI "$proj_cmd"
           else
             save_proj_ -a $emptyI
@@ -9767,7 +10496,7 @@ function pro() {
       refresh=1;
     fi
 
-    if ! remove_proj_ -r $i; then
+    if ! remove_proj_ -ur $i; then
       print " failed to remove: ${proj_arg}" >&2
       return 1;
     fi
@@ -9834,7 +10563,9 @@ function pro() {
           fi
         fi
       else
-        if [[ -z "$nvm_skip_lookup" ]]; then
+        if [[ -n "$old_nvm_use_v" ]] && nvm use "$old_nvm_use_v"; then
+          update_config_ $i "PUMP_NVM_SKIP_LOOKUP" 1
+        elif [[ -z "$nvm_skip_lookup" ]]; then
           print " ${low_yellow_cor}warning: could not find \"engines.node\" to detect node version in package.json${reset_cor}" >&2
           print " visit: ${blue_cor}https://docs.npmjs.com/cli/v11/configuring-npm/package-json#engines${reset_cor} for more info" >&2
     
@@ -9981,59 +10712,57 @@ function proj_handler() {
 
   local sub_cmds=("bkp" "clone" "gha" "jira" "prs" "release" "releases" "rev" "revs" "tag" "tags")
 
-  local item=$( (( single_mode )) && echo "branch" || echo "folder")
-  local items=$( (( single_mode )) && echo "branches" || echo "folders")
-
   if [[ " ${sub_cmds[*]} " != *" $1 "* ]]; then
     if (( proj_handler_is_h )); then
       print "  ${yellow_cor}${proj_cmd} ${low_yellow_cor}[<folder>]${reset_cor} : open project folder"
-      (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : open default folder"
-      print "  --"
+      print "  --" >&1
+      (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} -m${reset_cor} : open main folder"
       print "  ${yellow_cor}${proj_cmd} -e${reset_cor} : edit project"
       print "  ${yellow_cor}${proj_cmd} -f ${low_yellow_cor}[<folder>]${reset_cor} : open project folder"
       print "  ${yellow_cor}${proj_cmd} -i${reset_cor} : display project settings"
       print "  ${yellow_cor}${proj_cmd} -n${reset_cor} : set node version using nvm"
       print "  ${yellow_cor}${proj_cmd} -r${reset_cor} : remove project"
       print "  ${yellow_cor}${proj_cmd} -u ${low_yellow_cor}[<setting>]${reset_cor} : reset settings"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} bkp${reset_cor} : create backup of the project"
       print "  ${yellow_cor}${proj_cmd} bkp -d ${low_yellow_cor}[<folder>]${reset_cor} : delete backup folders"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} clone${reset_cor} : clone project"
       (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} clone <branch> [<base_branch>]${reset_cor} : clone branch"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} gha ${low_yellow_cor}[<workflow>]${reset_cor} : check status of workflow"
       print "  ${yellow_cor}${proj_cmd} gha -a ${low_yellow_cor}[<workflow>]${reset_cor} : run in auto mode"
-      print "  --"
-      print "  ${yellow_cor}${proj_cmd} jira ${low_yellow_cor}[<jira_key_or_proj>]${reset_cor} : open ticket"
-      print "  ${yellow_cor}${proj_cmd} jira -c ${low_yellow_cor}[<jira_key_or_proj>]${reset_cor} : close work $item"
-      print "  ${yellow_cor}${proj_cmd} jira -p ${low_yellow_cor}[<jira_key_or_proj>]${reset_cor} : move work $item to \"In Progress\" status"
-      print "  ${yellow_cor}${proj_cmd} jira -r ${low_yellow_cor}[<jira_key_or_proj>]${reset_cor} : move work $item to \"In Review\" status"
-      print "  ${yellow_cor}${proj_cmd} jira -s ${low_yellow_cor}[<jira_key_or_proj>] [<ticket_status>]${reset_cor} : move work $item to status"
-      print "  ${yellow_cor}${proj_cmd} jira -v ${low_yellow_cor}[<jira_key_or_proj>]${reset_cor} : view status of work $item"
-      print "  ${yellow_cor}${proj_cmd} jira -va${reset_cor} : view status of all work $items"
-      print "  --"
+      print "  --" >&1
+      print "  ${yellow_cor}${proj_cmd} jira ${low_yellow_cor}[<jira_proj_or_key>]${reset_cor} : open ticket"
+      print "  ${yellow_cor}${proj_cmd} jira -c ${low_yellow_cor}[<jira_proj_or_key>]${reset_cor} : close ticket"
+      print "  ${yellow_cor}${proj_cmd} jira -p ${low_yellow_cor}[<jira_proj_or_key>]${reset_cor} : move ticket to \"In Progress\" status"
+      print "  ${yellow_cor}${proj_cmd} jira -r ${low_yellow_cor}[<jira_proj_or_key>]${reset_cor} : move ticket to \"In Review\" status"
+      print "  ${yellow_cor}${proj_cmd} jira -s ${low_yellow_cor}[<jira_proj_or_key>] [<ticket_status>]${reset_cor} : move ticket to status"
+      print "  ${yellow_cor}${proj_cmd} jira -v ${low_yellow_cor}[<jira_proj_or_key>]${reset_cor} : view status of ticket"
+      (( single_mode )) && print "  ${yellow_cor}${proj_cmd} jira -va${reset_cor} : view ticket status of all your branches"
+      (( ! single_mode )) && print "  ${yellow_cor}${proj_cmd} jira -va${reset_cor} : view ticket status of all your folders"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} prs${reset_cor} : display pull requests in github"
       print "  ${yellow_cor}${proj_cmd} prs -a <branch_or_pr>${reset_cor} : approve a pull request"
-      print "  ${yellow_cor}${proj_cmd} prs -s${reset_cor} : set the assignee for all pull requests"
-      print "  --"
+      print "  ${yellow_cor}${proj_cmd} prs -as${reset_cor} : set the assignee for all pull requests"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} release ${low_yellow_cor}[<version>]${reset_cor} : create release version"
-      print "  ${yellow_cor}${proj_cmd} release -d ${low_yellow_cor}[<version>]${reset_cor} : delete release version"
+      print "  ${yellow_cor}${proj_cmd} release -d ${low_yellow_cor}[<version>]${reset_cor} : delete release versions"
       print "  ${yellow_cor}${proj_cmd} release -m${reset_cor} : create major release version"
       print "  ${yellow_cor}${proj_cmd} release -n${reset_cor} : create minor release version"
       print "  ${yellow_cor}${proj_cmd} release -p${reset_cor} : create patch release version"
       print "  ${yellow_cor}${proj_cmd} release -s${reset_cor} : skip confirmation"
       print "  ${yellow_cor}${proj_cmd} releases${reset_cor} : display releases"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} rev ${low_yellow_cor}[<pr_or_branch>]${reset_cor} : open code review by pull request or branch"
       print "  ${yellow_cor}${proj_cmd} rev -b ${low_yellow_cor}[<branch>]${reset_cor} : open code review by branch only"
       print "  ${yellow_cor}${proj_cmd} rev -j ${low_yellow_cor}[<jira_key>]${reset_cor} : open code review by ticket"
       print "  ${yellow_cor}${proj_cmd} revs ${low_yellow_cor}[<rev_folder>]${reset_cor} : open existing code review"
       print "  ${yellow_cor}${proj_cmd} revs -d${reset_cor} : delete code reviews"
       print "  ${yellow_cor}${proj_cmd} revs -da${reset_cor} : delete all code reviews"
-      print "  --"
+      print "  --" >&1
       print "  ${yellow_cor}${proj_cmd} tag ${low_yellow_cor}[<name>]${reset_cor} : create tag"
-      print "  ${yellow_cor}${proj_cmd} tag -d ${low_yellow_cor}[<name>]${reset_cor} : delete tag"
+      print "  ${yellow_cor}${proj_cmd} tag -d ${low_yellow_cor}[<name>]${reset_cor} : delete tags"
       print "  ${yellow_cor}${proj_cmd} tag -s${reset_cor} : skip confirmation"
       print "  ${yellow_cor}${proj_cmd} tags ${low_yellow_cor}[<n>]${reset_cor} : display n number of tags"
 
@@ -10062,7 +10791,7 @@ function proj_handler() {
     if (( proj_handler_is_m )); then
       if (( single_mode )); then
         print "  ${red_cor}fatal: invalid option: -m${reset_cor}" >&2
-        print "  --" >&2
+        print "  --" >&1
         $proj_cmd -h
         return 0;
       fi
@@ -10071,12 +10800,10 @@ function proj_handler() {
       local proj_folder="${PUMP_FOLDER[$i]}"
       
       local folder=""
-      if (( ! single_mode )); then
-        folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
+      folder=$(get_proj_for_git_ "$proj_folder" 2>/dev/null)
 
-        if [[ -n "$folder" ]]; then
-          folder="$(basename "$folder")"
-        fi
+      if [[ -n "$folder" ]]; then
+        folder="$(basename "$folder")"
       fi
 
       proj_handler_open_ $i "$proj_folder/$folder"
@@ -10214,7 +10941,7 @@ function proj_handler_open_() {
   local proj_folder="${PUMP_FOLDER[$i]}"
   
   if [[ "$folder_to_open" == "$proj_folder/" && -z "$(ls "$proj_folder")" ]]; then
-    print " project folder is empty: $proj_folder" >&2
+    print " project folder is empty!" >&2
     print " run: ${yellow_cor}${proj_cmd} clone${reset_cor}" >&2
   fi
 
@@ -10222,41 +10949,17 @@ function proj_handler_open_() {
 }
 
 # commit functions ====================================================
-typeset -g COMMIT1=""
-typeset -g COMMIT2=""
-
-if command -v c &>/dev/null; then
-  if (( ${+functions[c]} && -n "${functions[c]}" )); then
-    unset -f c
-    COMMIT1="c"
-    if ! command -v commit &>/dev/null; then
-      COMMIT2="commit"
-    fi
-  else
-    COMMIT1="commit"
-  fi
-else
-  COMMIT1="c"
-  if ! command -v commit &>/dev/null; then
-    COMMIT2="commit"
-  fi
-fi
-
-functions[$COMMIT1]="__commit \"\$@\";"
-if [[ -n "$COMMIT2" ]]; then
-  functions[$COMMIT2]="__commit \"\$@\";"
-fi
-
-function __commit() {
+function commit() {
   set +x
   eval "$(parse_flags_ "$0" "am" "s" "$@")"
   (( commit_is_debug )) && set -x
 
   if (( commit_is_h )); then
-    print "  ${yellow_cor}${COMMIT1}${reset_cor} : commit with https://www.conventionalcommits.org"
-    print "  ${yellow_cor}${COMMIT1} <message>${reset_cor} : commit  --no-verify --message"
-    print "  ${yellow_cor}${COMMIT1} -m <message>${reset_cor} : same as ${COMMIT1} <message>"
-    print "  ${yellow_cor}${COMMIT1} -a${reset_cor} : commit all files"
+    print "  ${yellow_cor}commit${reset_cor} : commit with https://www.conventionalcommits.org"
+    print "  ${yellow_cor}commit <message>${reset_cor} : commit  --no-verify --message"
+    print "  --" >&1
+    print "  ${yellow_cor}commit -m <message>${reset_cor} : same as commit <message>"
+    print "  ${yellow_cor}commit -a${reset_cor} : commit all files"
     return 0;
   fi
 
@@ -10282,7 +10985,7 @@ function __commit() {
 
   if [[ -z "$1" ]]; then
     if ! command -v gum &>/dev/null; then
-      print " fatal: command requires gum: $COMMIT1" >&2
+      print " fatal: command requires gum: commit" >&2
       print " install gum: ${blue_cor}https://github.com/charmbracelet/gum/${reset_cor}" >&2
       return 1;
     fi
@@ -10347,6 +11050,9 @@ function __commit() {
 # end of commit functions =============================================
 
 function help() {
+  set +x
+  eval "$(parse_no_flags_ "$0" "$@")"
+
   if command -v gum &>/dev/null; then
     gum style --border=rounded --margin=0 --padding="1 22" --border-foreground 212 --width=71 \
       --align=center "welcome to $(gum style --foreground 212 "pump my shell! $PUMP_VERSION")"
@@ -10402,6 +11108,7 @@ function help() {
 
   print ""
   print "  use ${yellow_cor}-h${reset_cor} after any command to see more usage"
+  print ""
   print "  visit: ${blue_cor}https://github.com/fab1o/pump-zsh/wiki${reset_cor}"
 }
 
@@ -10454,12 +11161,6 @@ function help_most_popular_() {
   print ""
   if [[ -n "$CURRENT_PUMP_SHORT_NAME" ]]; then
     printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "$CURRENT_PUMP_SHORT_NAME" "manage project $CURRENT_PUMP_SHORT_NAME"
-    if (( ! $CURRENT_PUMP_SINGLE_MODE )); then
-      printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "$CURRENT_PUMP_SHORT_NAME clone" "clone project"
-    fi
-    # printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "$CURRENT_PUMP_SHORT_NAME jira" "manage jira tickets"
-    # printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "$CURRENT_PUMP_SHORT_NAME release" "manage releases"
-    # printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "$CURRENT_PUMP_SHORT_NAME rev" "manage code reviews"
   else
     printf "  ${blue_cor}%-$spaces${reset_cor} = %s \n" "pro" "manage projects"
   fi
@@ -10476,7 +11177,7 @@ function help_most_popular_() {
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merge branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebase branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "abort merge/rebase/chp"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "continue merge/rebase/chp"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "conti" "continue merge/rebase/chp"
   print ""
   # if (( ${#CURRENT_PUMP_COV} > max )); then
   #   printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "cov" "run CURRENT_PUMP_COV"
@@ -10515,12 +11216,13 @@ function help_git_ {
   display_line_ "git branch" "${hi_cyan_cor}"
   print ""
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "back" "switch back to previous branch"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "co" "switch to branch and create new branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "base" "switch to base branch of current branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "co" "switch to branch or create new branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "dev" "switch to dev or develop branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "main" "switch to main branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "prod" "switch to prod or production branch"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "stage" "switch to stage or staging branch"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "renb <b>" "rename current branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "renb" "rename current branch"
 
   if ! pause_output_; then return 0; fi
   print ""
@@ -10547,8 +11249,8 @@ function help_git_ {
   print ""
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "add" "add files to index"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rem" "remove files from index"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1" "add + commit wizard"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "$COMMIT1 <m>" "add + commit message"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "commit" "add + commit wizard"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "commit <m>" "add + commit message"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "recommit" "add changes to last commit"
 
   if ! pause_output_; then return 0; fi
@@ -10573,14 +11275,12 @@ function help_git_ {
   print ""
   display_line_ "git merge" "${hi_cyan_cor}"
   print ""
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "abort rebase/merge/chp"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "chc" "continue cherry-pick"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "chp" "cherry-pick commit"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "cont" "continue rebase/merge/chp"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "mc" "continue merge"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "abort" "abort rebase/merge/revert/chp"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "chp" "cherry-pick a commit"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "conti" "continue rebase/merge/revert/chp"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "merge" "merge branch"
-  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rc" "continue rebase"
   printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "rebase" "rebase branch"
+  printf "  ${hi_cyan_cor}%-$spaces${reset_cor} = %s \n" "revert" "revert a commit"
 
   if ! pause_output_; then return 0; fi
   
@@ -10651,6 +11351,7 @@ function help_pkg_manager_() {
   else
     printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "setup" "$_setup"
   fi
+  printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "start" "$pkg_manager start"
   printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "tsc" "$pkg_manager run tsc"
   printf "  ${hi_magenta_cor}%-$spaces${reset_cor} = %s \n" "watch" "$pkg_manager run watch"
   
@@ -10853,9 +11554,8 @@ function get_folders_() {
     for name in "${folders[@]}"; do
       if [[ ! " ${priorities[@]} " == *" $name "* && ! " ${exclude_folders[@]} " == *" $name "* ]]; then
         if (( get_folders_is_j )); then
-          if [[ "$name" =~ ([[:alnum:]]+-[[:digit:]]+) ]]; then
-            filtered_folders+=("$name")
-          fi
+          local jira_key=$(extract_jira_key_ "$name")
+          if [[ -n "$jira_key" ]]; then filtered_folders+=("$name"); fi
         else
           filtered_folders+=("$name")
         fi
@@ -10966,6 +11666,9 @@ function nlist() {
 
 # general settings
 typeset -g PUMP_PUSH_NO_VERIFY
+typeset -g PUMP_PUSH_SET_UPSTREAM
+typeset -g PUMP_RUN_OPEN_COV
+typeset -g PUMP_USE_MONOGRAM
 
 # project config settinhs
 typeset -gA PUMP_SHORT_NAME
@@ -11000,9 +11703,6 @@ typeset -gA PUMP_JIRA_IN_REVIEW
 typeset -gA PUMP_JIRA_IN_DONE
 typeset -gA PUMP_NVM_SKIP_LOOKUP
 typeset -gA PUMP_NVM_USE_V
-typeset -gA PUMP_HEAD_BRANCH
-typeset -gA PUMP_MAIN_BRANCH
-typeset -gA PUMP_NO_MONOGRAM
 
 # ========================================================================
 
@@ -11040,9 +11740,6 @@ typeset -g CURRENT_PUMP_JIRA_IN_REVIEW=""
 typeset -g CURRENT_PUMP_JIRA_DONE=""
 typeset -g CURRENT_PUMP_NVM_SKIP_LOOKUP=""
 typeset -g CURRENT_PUMP_NVM_USE_V=""
-typeset -g CURRENT_PUMP_HEAD_BRANCH=""
-typeset -g CURRENT_PUMP_MAIN_BRANCH=""
-typeset -g CURRENT_PUMP_NO_MONOGRAM=""
 
 typeset -g PUMP_PAST_FOLDER=""
 typeset -g PUMP_PAST_BRANCH=""
@@ -11051,6 +11748,7 @@ typeset -g TEMP_PUMP_SHORT_NAME=""
 typeset -g TEMP_PUMP_FOLDER=""
 typeset -g TEMP_PUMP_REPO=""
 typeset -g TEMP_SINGLE_MODE=""
+typeset -g TEMP_PUMP_PKG_MANAGER=""
 
 typeset -g SAVE_COR=""
 typeset -g CHPWD_SILENT=0
@@ -11135,10 +11833,10 @@ function pump_chpwd_pwd_() {
 # cd pro pwd
 function pump_chpwd_() {
   set +x
-  local proj_arg=$(find_proj_by_folder_ "$(pwd)")
+  local proj=$(find_proj_by_folder_ "$(pwd)")
 
-  if [[ -n "$proj_arg" ]]; then
-    if pro "$proj_arg"; then
+  if [[ -n "$proj" ]]; then
+    if pro "$proj"; then
       fetch --quiet 2>/dev/null
     fi
   else

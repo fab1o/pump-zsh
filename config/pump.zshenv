@@ -382,45 +382,6 @@ PUMP_NVM_USE_V_8=
 PUMP_NVM_USE_V_9=
 
 # optional
-# default: empty
-# name of the head branch when cloning a repository
-PUMP_HEAD_BRANCH_1=
-PUMP_HEAD_BRANCH_2=
-PUMP_HEAD_BRANCH_3=
-PUMP_HEAD_BRANCH_4=
-PUMP_HEAD_BRANCH_5=
-PUMP_HEAD_BRANCH_6=
-PUMP_HEAD_BRANCH_7=
-PUMP_HEAD_BRANCH_8=
-PUMP_HEAD_BRANCH_9=
-
-# optional
-# default: empty
-# name of the main branch when cloning a repository
-PUMP_MAIN_BRANCH_1=
-PUMP_MAIN_BRANCH_2=
-PUMP_MAIN_BRANCH_3=
-PUMP_MAIN_BRANCH_4=
-PUMP_MAIN_BRANCH_5=
-PUMP_MAIN_BRANCH_6=
-PUMP_MAIN_BRANCH_7=
-PUMP_MAIN_BRANCH_8=
-PUMP_MAIN_BRANCH_9=
-
-# optional
-# default: empty (will ask)
-# 0 to use machine logged in user initial for the branch name when cloning and starting a job, 1 otherwise
-PUMP_NO_MONOGRAM_1=
-PUMP_NO_MONOGRAM_2=
-PUMP_NO_MONOGRAM_3=
-PUMP_NO_MONOGRAM_4=
-PUMP_NO_MONOGRAM_5=
-PUMP_NO_MONOGRAM_6=
-PUMP_NO_MONOGRAM_7=
-PUMP_NO_MONOGRAM_8=
-PUMP_NO_MONOGRAM_9=
-
-# optional
 # package.json name
 PUMP_PKG_NAME_1=
 PUMP_PKG_NAME_2=
