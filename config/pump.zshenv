@@ -288,6 +288,19 @@ PUMP_PR_TEMPLATE_FILE_8=
 PUMP_PR_TEMPLATE_FILE_9=
 
 # optional
+# Format for PR title. Available variables: <jira_key>, <jira_title>
+# default: <jira_key> <jira_title>
+PUMP_PR_TITLE_FORMAT_1=
+PUMP_PR_TITLE_FORMAT_2=
+PUMP_PR_TITLE_FORMAT_3=
+PUMP_PR_TITLE_FORMAT_4=
+PUMP_PR_TITLE_FORMAT_5=
+PUMP_PR_TITLE_FORMAT_6=
+PUMP_PR_TITLE_FORMAT_7=
+PUMP_PR_TITLE_FORMAT_8=
+PUMP_PR_TITLE_FORMAT_9=
+
+# optional
 # default: empty (no ask)
 # text to be matched in the PR template to append commit messages with command: pr
 PUMP_PR_REPLACE_1=
@@ -417,16 +430,16 @@ PUMP_JIRA_PROJECT_8=
 PUMP_JIRA_PROJECT_9=
 
 # optional
-# default jira team domain (will ask)
-PUMP_JIRA_BASE_URL_1=
-PUMP_JIRA_BASE_URL_2=
-PUMP_JIRA_BASE_URL_3=
-PUMP_JIRA_BASE_URL_4=
-PUMP_JIRA_BASE_URL_5=
-PUMP_JIRA_BASE_URL_6=
-PUMP_JIRA_BASE_URL_7=
-PUMP_JIRA_BASE_URL_8=
-PUMP_JIRA_BASE_URL_9=
+# jira api token (will ask)
+PUMP_JIRA_API_TOKEN_1=
+PUMP_JIRA_API_TOKEN_2=
+PUMP_JIRA_API_TOKEN_3=
+PUMP_JIRA_API_TOKEN_4=
+PUMP_JIRA_API_TOKEN_5=
+PUMP_JIRA_API_TOKEN_6=
+PUMP_JIRA_API_TOKEN_7=
+PUMP_JIRA_API_TOKEN_8=
+PUMP_JIRA_API_TOKEN_9=
 
 # optional
 # default empty (will ask)
@@ -453,6 +466,19 @@ PUMP_JIRA_IN_REVIEW_6=
 PUMP_JIRA_IN_REVIEW_7=
 PUMP_JIRA_IN_REVIEW_8=
 PUMP_JIRA_IN_REVIEW_9=
+
+# optional
+# default empty (will ask)
+# column name for the project in the Jira board.
+PUMP_JIRA_IN_TEST_1=
+PUMP_JIRA_IN_TEST_2=
+PUMP_JIRA_IN_TEST_3=
+PUMP_JIRA_IN_TEST_4=
+PUMP_JIRA_IN_TEST_5=
+PUMP_JIRA_IN_TEST_6=
+PUMP_JIRA_IN_TEST_7=
+PUMP_JIRA_IN_TEST_8=
+PUMP_JIRA_IN_TEST_9=
 
 # optional
 # default empty (will ask)
@@ -491,3 +517,16 @@ PUMP_JIRA_PULL_SUMMARY_6=
 PUMP_JIRA_PULL_SUMMARY_7=
 PUMP_JIRA_PULL_SUMMARY_8=
 PUMP_JIRA_PULL_SUMMARY_9=
+
+# optional
+# path to project's scripts to run via exec command.
+# example: /Users/admin/Developer/pump-zsh/scripts
+PUMP_SCRIPT_FOLDER_1=
+PUMP_SCRIPT_FOLDER_2=
+PUMP_SCRIPT_FOLDER_3=
+PUMP_SCRIPT_FOLDER_4=
+PUMP_SCRIPT_FOLDER_5=
+PUMP_SCRIPT_FOLDER_6=
+PUMP_SCRIPT_FOLDER_7=
+PUMP_SCRIPT_FOLDER_8=
+PUMP_SCRIPT_FOLDER_9=
