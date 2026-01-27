@@ -457,6 +457,19 @@ PUMP_JIRA_IN_REVIEW_9=
 # optional
 # default empty (will ask)
 # column name for the project in the Jira board.
+PUMP_JIRA_IN_TEST_1=
+PUMP_JIRA_IN_TEST_2=
+PUMP_JIRA_IN_TEST_3=
+PUMP_JIRA_IN_TEST_4=
+PUMP_JIRA_IN_TEST_5=
+PUMP_JIRA_IN_TEST_6=
+PUMP_JIRA_IN_TEST_7=
+PUMP_JIRA_IN_TEST_8=
+PUMP_JIRA_IN_TEST_9=
+
+# optional
+# default empty (will ask)
+# column name for the project in the Jira board.
 PUMP_JIRA_DONE_1=
 PUMP_JIRA_DONE_2=
 PUMP_JIRA_DONE_3=
@@ -491,3 +504,16 @@ PUMP_JIRA_PULL_SUMMARY_6=
 PUMP_JIRA_PULL_SUMMARY_7=
 PUMP_JIRA_PULL_SUMMARY_8=
 PUMP_JIRA_PULL_SUMMARY_9=
+
+# optional
+# path to project's scripts to run via exec command.
+# example: /Users/admin/Developer/pump-zsh/scripts
+PUMP_SCRIPT_FOLDER_1=
+PUMP_SCRIPT_FOLDER_2=
+PUMP_SCRIPT_FOLDER_3=
+PUMP_SCRIPT_FOLDER_4=
+PUMP_SCRIPT_FOLDER_5=
+PUMP_SCRIPT_FOLDER_6=
+PUMP_SCRIPT_FOLDER_7=
+PUMP_SCRIPT_FOLDER_8=
+PUMP_SCRIPT_FOLDER_9=
