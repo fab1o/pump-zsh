@@ -130,19 +130,6 @@ PUMP_FIX_8=
 PUMP_FIX_9=
 
 # optional
-# default: empty (will ask)
-# code editor for reviews of each project
-PUMP_CODE_EDITOR_1=
-PUMP_CODE_EDITOR_2=
-PUMP_CODE_EDITOR_3=
-PUMP_CODE_EDITOR_4=
-PUMP_CODE_EDITOR_5=
-PUMP_CODE_EDITOR_6=
-PUMP_CODE_EDITOR_7=
-PUMP_CODE_EDITOR_8=
-PUMP_CODE_EDITOR_9=
-
-# optional
 # default: empty (no ask)
 # script to run after command `clone`
 # example: echo 'Clone completed!'
@@ -288,6 +275,19 @@ PUMP_PR_TEMPLATE_FILE_8=
 PUMP_PR_TEMPLATE_FILE_9=
 
 # optional
+# Format for PR title. Available variables: <jira_key>, <jira_title>
+# default: <jira_key> <jira_title>
+PUMP_PR_TITLE_FORMAT_1=
+PUMP_PR_TITLE_FORMAT_2=
+PUMP_PR_TITLE_FORMAT_3=
+PUMP_PR_TITLE_FORMAT_4=
+PUMP_PR_TITLE_FORMAT_5=
+PUMP_PR_TITLE_FORMAT_6=
+PUMP_PR_TITLE_FORMAT_7=
+PUMP_PR_TITLE_FORMAT_8=
+PUMP_PR_TITLE_FORMAT_9=
+
+# optional
 # default: empty (no ask)
 # text to be matched in the PR template to append commit messages with command: pr
 PUMP_PR_REPLACE_1=
@@ -327,7 +327,7 @@ PUMP_PR_APPROVAL_MIN_8=
 PUMP_PR_APPROVAL_MIN_9=
 
 # optional
-# default empty (will ask)
+# default: empty (will ask)
 # set to 1 to add all changes to index before commit and recommit, 0 to not do anything.
 PUMP_COMMIT_ADD_1=
 PUMP_COMMIT_ADD_2=
@@ -340,7 +340,7 @@ PUMP_COMMIT_ADD_8=
 PUMP_COMMIT_ADD_9=
 
 # optional
-# default empty (will ask)
+# default: empty (will ask)
 # set to 1 to sign off all commits, 0 to not sign off.
 PUMP_COMMIT_SIGNOFF_1=
 PUMP_COMMIT_SIGNOFF_2=
@@ -405,7 +405,8 @@ PUMP_PKG_NAME_8=
 PUMP_PKG_NAME_9=
 
 # optional
-# jira project key (will ask)
+# default: empty (will ask)
+# jira project key
 PUMP_JIRA_PROJECT_1=
 PUMP_JIRA_PROJECT_2=
 PUMP_JIRA_PROJECT_3=
@@ -417,20 +418,47 @@ PUMP_JIRA_PROJECT_8=
 PUMP_JIRA_PROJECT_9=
 
 # optional
-# default jira team domain (will ask)
-PUMP_JIRA_BASE_URL_1=
-PUMP_JIRA_BASE_URL_2=
-PUMP_JIRA_BASE_URL_3=
-PUMP_JIRA_BASE_URL_4=
-PUMP_JIRA_BASE_URL_5=
-PUMP_JIRA_BASE_URL_6=
-PUMP_JIRA_BASE_URL_7=
-PUMP_JIRA_BASE_URL_8=
-PUMP_JIRA_BASE_URL_9=
+# default: empty (will ask)
+# jira api token
+PUMP_JIRA_API_TOKEN_1=
+PUMP_JIRA_API_TOKEN_2=
+PUMP_JIRA_API_TOKEN_3=
+PUMP_JIRA_API_TOKEN_4=
+PUMP_JIRA_API_TOKEN_5=
+PUMP_JIRA_API_TOKEN_6=
+PUMP_JIRA_API_TOKEN_7=
+PUMP_JIRA_API_TOKEN_8=
+PUMP_JIRA_API_TOKEN_9=
 
 # optional
-# default empty (will ask)
-# column name for the project in the Jira board.
+# default: empty (will ask)
+# column names in the Jira board.
+PUMP_JIRA_STATUSES_1=
+PUMP_JIRA_STATUSES_2=
+PUMP_JIRA_STATUSES_3=
+PUMP_JIRA_STATUSES_4=
+PUMP_JIRA_STATUSES_5=
+PUMP_JIRA_STATUSES_6=
+PUMP_JIRA_STATUSES_7=
+PUMP_JIRA_STATUSES_8=
+PUMP_JIRA_STATUSES_9=
+
+# optional
+# default: empty (will ask)
+# name for "To Do" column in the Jira board, if exists.
+PUMP_JIRA_TODO_1=
+PUMP_JIRA_TODO_2=
+PUMP_JIRA_TODO_3=
+PUMP_JIRA_TODO_4=
+PUMP_JIRA_TODO_5=
+PUMP_JIRA_TODO_6=
+PUMP_JIRA_TODO_7=
+PUMP_JIRA_TODO_8=
+PUMP_JIRA_TODO_9=
+
+# optional
+# default: empty (will ask)
+# name for "In Progress" column in the Jira board.
 PUMP_JIRA_IN_PROGRESS_1=
 PUMP_JIRA_IN_PROGRESS_2=
 PUMP_JIRA_IN_PROGRESS_3=
@@ -442,8 +470,8 @@ PUMP_JIRA_IN_PROGRESS_8=
 PUMP_JIRA_IN_PROGRESS_9=
 
 # optional
-# default empty (will ask)
-# column name for the project in the Jira board.
+# default: empty (will ask)
+# name for "In Review" column in the Jira board, if exists.
 PUMP_JIRA_IN_REVIEW_1=
 PUMP_JIRA_IN_REVIEW_2=
 PUMP_JIRA_IN_REVIEW_3=
@@ -455,8 +483,34 @@ PUMP_JIRA_IN_REVIEW_8=
 PUMP_JIRA_IN_REVIEW_9=
 
 # optional
-# default empty (will ask)
-# column name for the project in the Jira board.
+# default: empty (will ask)
+# name for "In Test" column in the Jira board, if exists.
+PUMP_JIRA_IN_TEST_1=
+PUMP_JIRA_IN_TEST_2=
+PUMP_JIRA_IN_TEST_3=
+PUMP_JIRA_IN_TEST_4=
+PUMP_JIRA_IN_TEST_5=
+PUMP_JIRA_IN_TEST_6=
+PUMP_JIRA_IN_TEST_7=
+PUMP_JIRA_IN_TEST_8=
+PUMP_JIRA_IN_TEST_9=
+
+# optional
+# default: empty (will ask)
+# name for "Ready For Production" column in the Jira board, if exists.
+PUMP_JIRA_ALMOST_DONE_1=
+PUMP_JIRA_ALMOST_DONE_2=
+PUMP_JIRA_ALMOST_DONE_3=
+PUMP_JIRA_ALMOST_DONE_4=
+PUMP_JIRA_ALMOST_DONE_5=
+PUMP_JIRA_ALMOST_DONE_6=
+PUMP_JIRA_ALMOST_DONE_7=
+PUMP_JIRA_ALMOST_DONE_8=
+PUMP_JIRA_ALMOST_DONE_9=
+
+# optional
+# default: empty (will ask)
+# name for "Done" column in the Jira board, if exists.
 PUMP_JIRA_DONE_1=
 PUMP_JIRA_DONE_2=
 PUMP_JIRA_DONE_3=
@@ -468,7 +522,21 @@ PUMP_JIRA_DONE_8=
 PUMP_JIRA_DONE_9=
 
 # optional
-# jira work types
+# default: empty (will ask)
+# name for "Canceled" column in the Jira board, if exists.
+PUMP_JIRA_CANCELED_1=
+PUMP_JIRA_CANCELED_2=
+PUMP_JIRA_CANCELED_3=
+PUMP_JIRA_CANCELED_4=
+PUMP_JIRA_CANCELED_5=
+PUMP_JIRA_CANCELED_6=
+PUMP_JIRA_CANCELED_7=
+PUMP_JIRA_CANCELED_8=
+PUMP_JIRA_CANCELED_9=
+
+# optional
+# default: empty (will ask)
+# jira work types.
 PUMP_JIRA_WORK_TYPES_1=
 PUMP_JIRA_WORK_TYPES_2=
 PUMP_JIRA_WORK_TYPES_3=
@@ -480,8 +548,8 @@ PUMP_JIRA_WORK_TYPES_8=
 PUMP_JIRA_WORK_TYPES_9=
 
 # optional
-# default empty (will ask)
-# use jira to get summary of tickets to display folders
+# default: empty (will ask)
+# use jira to get summary of tickets to display folders.
 PUMP_JIRA_PULL_SUMMARY_1=
 PUMP_JIRA_PULL_SUMMARY_2=
 PUMP_JIRA_PULL_SUMMARY_3=
@@ -491,3 +559,16 @@ PUMP_JIRA_PULL_SUMMARY_6=
 PUMP_JIRA_PULL_SUMMARY_7=
 PUMP_JIRA_PULL_SUMMARY_8=
 PUMP_JIRA_PULL_SUMMARY_9=
+
+# optional
+# path to project's scripts to run via exec command.
+# example: /Users/admin/Developer/pump-zsh/scripts
+PUMP_SCRIPT_FOLDER_1=
+PUMP_SCRIPT_FOLDER_2=
+PUMP_SCRIPT_FOLDER_3=
+PUMP_SCRIPT_FOLDER_4=
+PUMP_SCRIPT_FOLDER_5=
+PUMP_SCRIPT_FOLDER_6=
+PUMP_SCRIPT_FOLDER_7=
+PUMP_SCRIPT_FOLDER_8=
+PUMP_SCRIPT_FOLDER_9=
