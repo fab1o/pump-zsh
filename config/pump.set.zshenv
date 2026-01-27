@@ -18,11 +18,6 @@ PUMP_RUN_OPEN_COV=
 # no default, will ask
 PUMP_USE_MONOGRAM=
 
-# PUMP_PR_TITLE_FORMAT
-# Format for PR title. Available variables: <jira_key>, <jira_title>
-# default: "<jira_key> <jira_title>"
-PUMP_PR_TITLE_FORMAT="<jira_key> <jira_title>"
-
 # PUMP_INTERVAL
 # interval in minutes to run `gha` and `<pro> prs` commands.
 PUMP_INTERVAL=20
