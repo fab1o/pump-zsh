@@ -1,10 +1,10 @@
 #!/bin/zsh
 # This script is used to install the pump plugin for Oh My Zsh for the 1st time
 
-echo " installing pump-zsh..."
+print " installing pump-zsh..."
 
 if ! command -v jq &>/dev/null; then
-  if ! command -v brew &>/dev/null; then
+  if command -v brew &>/dev/null; then
     brew install jq
   else
     print ""
@@ -14,7 +14,7 @@ if ! command -v jq &>/dev/null; then
 fi
 
 if ! command -v gum &>/dev/null; then
-  if ! command -v brew &>/dev/null; then
+  if command -v brew &>/dev/null; then
     brew install gum
   else
     print ""
@@ -24,7 +24,7 @@ if ! command -v gum &>/dev/null; then
 fi
 
 if ! command -v glow &>/dev/null; then
-  if ! command -v brew &>/dev/null; then
+  if command -v brew &>/dev/null; then
     brew install glow
   else
     print ""
@@ -34,7 +34,7 @@ if ! command -v glow &>/dev/null; then
 fi
 
 if ! command -v gh &>/dev/null; then
-  if ! command -v brew &>/dev/null; then
+  if command -v brew &>/dev/null; then
     brew install gh
   else
     print ""
@@ -43,7 +43,7 @@ if ! command -v gh &>/dev/null; then
   fi
 fi
 
-print ""
+print " done installing dependencies, now installing pump..."
 
 RELEASE_API="https://api.github.com/repos/fab1o/pump-zsh/releases/latest"
 TAG=$(curl -H "Cache-Control: no-cache" -s $RELEASE_API | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
