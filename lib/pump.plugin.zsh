@@ -13610,10 +13610,7 @@ function pull() {
 
   local is_quiet="$( (( ${argv[(Ie)--quiet]} || pull_is_q )) && echo 1 || echo 0)"
 
-  git -C "$folder" pull $remote_name $branch_arg ${flags[@]} $@  
-  local RET=$?
-
-  if (( RET != 0 )); then
+  if ! git -C "$folder" pull $remote_name $branch_arg ${flags[@]} $@; then
     if (( ! pull_is_r )); then
       if (( ! is_quiet )); then
         print ""
@@ -13622,15 +13619,15 @@ function pull() {
           return $?;
         fi
       fi
-    else
-      setup_git_merge_tool_
+    fi
 
-      local files="$(git -C "$folder" diff --name-only --diff-filter=U 2>/dev/null)"
+    setup_git_merge_tool_
 
-      if [[ -n "$files" && -n "$PUMP_MERGE_TOOL" ]]; then
-        git -C "$folder" mergetool --tool=$PUMP_MERGE_TOOL "$files"
-        RET=$?
-      fi
+    local files="$(git -C "$folder" diff --name-only --diff-filter=U 2>/dev/null)"
+
+    if [[ -n "$files" && -n "$PUMP_MERGE_TOOL" ]]; then
+      git -C "$folder" mergetool --tool=$PUMP_MERGE_TOOL "$files"
+      RET=$?
     fi
   fi
 
