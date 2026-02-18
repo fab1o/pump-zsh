@@ -37,7 +37,13 @@ echo ""
 # Install gum
 if ! command -v gum &>/dev/null; then
   echo " 🌿 Installing gum..."
-  brew install gum
+  curl -L https://github.com/charmbracelet/gum/releases/download/v0.16.2/gum_0.16.2_Darwin_arm64.tar.gz -o gum.tar.gz
+  tar -xzf gum.tar.gz
+  sudo mv gum_0.16.2_Darwin_arm64/gum /usr/local/bin/
+  rm -rf gum_0.16.2_Darwin_arm64
+  rm -rf gum.tar.gz
+  # alternatively, if you have Homebrew installed, you can run:
+  # brew install gum
 else
   echo " ✅ gum already installed."
 fi

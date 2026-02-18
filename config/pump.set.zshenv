@@ -29,3 +29,7 @@ PUMP_USE_MONOGRAM=
 
 # interval in minutes to run `gha`, `prs` and other commands.
 PUMP_INTERVAL=20
+
+# day to check for updates, 1-7 (Monday-Sunday), 0 to disable.
+# no default
+PUMP_UPDATE_DAY=
