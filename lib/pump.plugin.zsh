@@ -3447,7 +3447,8 @@ function get_node_versions_() {
   eval "$(parse_flags_ "$0" "" "" "$@")"
   (( get_node_versions_is_debug )) && set -x
 
-  local folder="${1:-$PWD}"
+  local node_engine="$1"
+  local folder="${2:-$PWD}"
 
   if ! command -v nvm &>/dev/null; then return 1; fi
 
@@ -3467,8 +3468,6 @@ function get_node_versions_() {
       yes="--yes"
     fi
   fi
-
-  local node_engine="$(get_from_package_json_ "engines.node" "$folder")"
 
   # find matching versions
   local version=""
@@ -13487,7 +13486,7 @@ function repush() {
 
   if ! is_folder_git_ "$folder"; then return 1; fi
 
-  if ! recommit "$folder" $@; then return 1; fi
+  if ! recommit -q "$folder" $@; then return 1; fi
 
   pushf "$folder" $@
 }
@@ -13590,6 +13589,7 @@ function pull() {
     else
       flags+=("--rebase")
     fi
+    flags+=("--strategy-option=patience")
   fi
 
   if (( pull_is_t )); then
@@ -13610,10 +13610,10 @@ function pull() {
 
   local is_quiet="$( (( ${argv[(Ie)--quiet]} || pull_is_q )) && echo 1 || echo 0)"
 
-  git -C "$folder" pull $remote_name $branch_arg ${flags[@]} $@  
+  git -C "$folder" pull $remote_name $branch_arg ${flags[@]} $@
   local RET=$?
 
-  if (( RET != 0 )); then
+  if (( RET )); then
     if (( ! pull_is_r )); then
       if (( ! is_quiet )); then
         print ""
@@ -13622,21 +13622,22 @@ function pull() {
           return $?;
         fi
       fi
-    else
-      setup_git_merge_tool_
 
-      local files="$(git -C "$folder" diff --name-only --diff-filter=U 2>/dev/null)"
+      return 1;
+    fi
 
-      if [[ -n "$files" && -n "$PUMP_MERGE_TOOL" ]]; then
-        git -C "$folder" mergetool --tool=$PUMP_MERGE_TOOL "$files"
-        RET=$?
-      fi
+    setup_git_merge_tool_
+
+    local files="$(git -C "$folder" diff --name-only --diff-filter=U 2>/dev/null)"
+
+    if [[ -n "$files" && -n "$PUMP_MERGE_TOOL" ]]; then
+      git -C "$folder" mergetool --tool=$PUMP_MERGE_TOOL "$files"
+      RET=$?
     fi
   fi
 
   if (( RET == 0 && ! is_quiet )); then
     git -C "$folder" --no-pager log --oneline --decorate -1
-    # no pbcopy
   fi
 
   return $RET;
@@ -15553,7 +15554,8 @@ function detect_node_version_() {
     return 0;
   fi
 
-  local versions=($(get_node_versions_ "$folder"))
+  local node_engine="$(get_from_package_json_ "engines.node" "$folder")"
+  local versions=($(get_node_versions_ "$node_engine" "$folder"))
 
   if [[ -z "$versions" ]]; then
     print " ${yellow_cor}warning: no matching node version in nvm for engine: ${bold_yellow_cor}${node_engine}${reset_cor}" >&2
