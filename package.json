@@ -1,0 +1,44 @@
+{
+  "author": "Fabio Costa",
+  "bugs": {
+    "url": "https://github.com/fab1o/pump-zsh/issues"
+  },
+  "dependencies": {
+    "npm-watch": "^0.13.0"
+  },
+  "description": "An Oh My Zsh plugin with a configurable set of aliases and functions to supercharge your terminal experience — plus a custom Oh My Posh theme for added style and clarity.",
+  "engines": {
+    "node": ">=14.0.0 <25",
+    "zsh": ">=5.0.0"
+  },
+  "homepage": "https://github.com/fab1o/pump-zsh#readme",
+  "license": "GPL-3.0",
+  "name": "@fab1o/pump-zsh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fab1o/pump-zsh.git"
+  },
+  "scripts": {
+    "dev": "zsh -c \"print 'Run npm run watch to start watching for changes.'\"",
+    "check_zshrc": "zsh ./scripts/check_zshrc.zsh",
+    "edit_zshrc": "zsh ./scripts/edit_zshrc.zsh",
+    "install_deps": "bash ./scripts/install_deps.sh",
+    "install_pump": "zsh ./scripts/install.zsh",
+    "uninstall": "zsh ./scripts/uninstall.zsh",
+    "update": "zsh ./scripts/npm_update.zsh",
+    "update_configs": "zsh ./scripts/update_configs.zsh",
+    "watch": "npm-watch",
+    "setup": "npm i && npm run install_deps && npm run install_pump"
+  },
+  "version": "1.0.0",
+  "watch": {
+    "update": [
+      "lib/*.*",
+      "lib/themes/*.*",
+      "package.json"
+    ],
+    "update_configs": [
+      "config/*.*"
+    ]
+  }
+}
