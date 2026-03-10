@@ -1,0 +1,129 @@
+// // .copy and paste into your .zshrc file at the end of the file
+// and uncomment the line below
+//
+// eval "$(oh-my-posh init zsh --config $HOME/.oh-my-zsh/plugins/pump/pump-rprompt.omp.json)"
+
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "blocks": [
+    {
+      "alignment": "right",
+      "newline": false,
+      "segments": [
+        {
+          "background": "transparent",
+          "foreground": "p:gruvblacklight",
+          "properties": {
+            "always_enabled": true
+          },
+          "style": "plain",
+          "template": "<b> {{.FormattedMs}}</b>",
+          "type": "executiontime"
+        }
+      ],
+      "type": "rprompt"
+    },
+    {
+      "alignment": "left",
+      "newline": false,
+      "segments": [
+        {
+          "background": "transparent",
+          "foreground": "green",
+          "foreground_templates": ["{{ if .Error }}red{{ end }}"],
+          "properties": {
+            "always_enabled": true
+          },
+          "style": "plain",
+          "template": "➜ ",
+          "type": "status"
+        },
+        {
+          "background": "transparent",
+          "foreground": "cyan",
+          "properties": {
+            "style": "folder"
+          },
+          "style": "plain",
+          "template": "<b>{{ .Path }}</b> ",
+          "type": "path"
+        },
+        {
+          "background": "transparent",
+          "foreground": "p:gruvbluedark",
+          "properties": {
+            "always_enabled": true
+          },
+          "style": "plain",
+          "template": "<b>{{ .Env.CURRENT_PUMP_SHORT_NAME }}⟣</b>",
+          "type": "path"
+        },
+        {
+          "background": "transparent",
+          "foreground": "p:gruvblue",
+          "properties": {
+            "always_enabled": true
+          },
+          "style": "plain",
+          "template": "<b>{{if .Version}}{{.Version}}⟣{{ end }}</b>",
+          "type": "project"
+        },
+        {
+          "background": "transparent",
+          "foreground": "blue",
+          "foreground_templates": [
+            "{{ if and (gt .Behind 0) (gt .Ahead 0) }}p:gruvred{{ end }}",
+            "{{ if gt .Ahead 0 }}p:gruvyellow{{ end }}",
+            "{{ if gt .Behind 0 }}p:gruvmagenta{{ end }}",
+            "{{ if or (.Working.Changed) (.Staging.Changed) }}p:orange{{ end }}"
+          ],
+          "properties": {
+            "branch_icon": "",
+            "branch_template": "{{ .Branch }}",
+            "fetch_status": true
+          },
+          "style": "plain",
+          "template": "<b>{{if .BranchStatus}}{{.BranchStatus}}{{ end }}{{ if or (.Working.Changed) (.Staging.Changed) }}✗{{ else }}:{{ end }}({{.HEAD}})</b>",
+          "type": "git"
+        }
+      ],
+      "type": "prompt"
+    }
+  ],
+  "console_title_template": "{{ .UserName }} @ {{ .Shell }} in {{ .Folder }}",
+  "final_space": true,
+  "palette": {
+    "blue": "#2470ad",
+    "bluedark": "#20649b",
+    "greenbright": "#00FF00",
+    "gruvblack": "#353535",
+    "gruvblacklight": "#a09588",
+    "gruvblue": "#649498",
+    "gruvbluedark": "#507679",
+    "gruvbluelight": "#9ab2a8",
+    "gruvcyan": "#84a981",
+    "gruvcyanlight": "#a8ce94",
+    "gruvgreen": "#a7a53d",
+    "gruvgreenlight": "#c4c44e",
+    "gruvmagenta": "#b57b96",
+    "gruvmagentalight": "#d29daa",
+    "gruvred": "#c64631",
+    "gruvredlight": "#eb6b4e",
+    "gruvwhite": "#b4a998",
+    "gruvwhitelight": "#ece1c2",
+    "gruvyellow": "#d7aa46",
+    "gruvyellowlight": "#f3c958",
+    "orange": "#F07623",
+    "orangelight": "#ea955c",
+    "orangedark": "#d86a1f",
+    "purple": "#83769c",
+    "purpledark": "#756a8c"
+  },
+  "upgrade": {
+    "auto": false,
+    "interval": "168h",
+    "notice": false,
+    "source": "cdn"
+  },
+  "version": 3
+}
